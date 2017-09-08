@@ -1,52 +1,50 @@
-# Prerequisites
-*.d
-
-# Object files
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+bin
+pkg
+src/vendor
 *.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
 *.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+*.a
+*.so
++src/tr1d1um/tr1d1um
++src/tr1d1um/debug
++src/tr1d1um/output
+ 
+ # config
+-src/tr1d1um/tr1d1um.json
++src/tr1d1um/tr1d1um.json
++keys/*.private
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+src/tr1d1um/tr1d1um
+src/tr1d1um/debug
+src/tr1d1um/output
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# config
+src/tr1d1um/tr1d1um.json
+keys/*.private
+
+# Vim
+*.swp
+*.out
+
+# Folders
+_obj
+_test
+vendor
+coverage*
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+*.prof

@@ -1,0 +1,61 @@
+#!bin/bash
+#
+# tr1d1um Application Startup Script
+#
+# chkconfig: 345 90 14
+# description: Application Startup Script
+# config: /etc/tr1d1um/supervisord.conf
+# pidfile: /var/run/tr1d1um/tr1d1um.pid
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+RETVAL=0
+DAEMON_COREFILE_LIMIT=unlimited
+
+# Set limits here in addition to limits.conf
+ulimit -n 750000
+
+start() {
+	echo -n $"Starting tr1d1um: "
+	daemon supervisord -c /etc/tr1d1um/supervisord.conf
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/tr1d1um
+}
+
+stop() {
+	echo -n $"Stopping tr1d1um: "
+	killproc supervisord
+	echo
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/tr1d1um
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop) 
+	stop
+	;;
+  restart|force-reload|reload)
+	restart
+	;;
+  condrestart)
+	[ -f /var/lock/subsys/tr1d1um ] && restart
+	;;
+  status)
+	status supervisord
+	RETVAL=$?
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart|reload|force-reload|condrestart}"
+	exit 1
+esac
+
+exit $RETVAL

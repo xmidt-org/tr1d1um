@@ -1,0 +1,12 @@
+{
+	"port": 8080,
+	"hcport": 8888,
+	"pprofport": 9999,
+	                   
+	"log" : {
+		"file"      : "tr1d1umLog.log",
+		"level"     : "DEBUG",
+		"maxSize"   : 5242880,
+		"maxBackup" : 3
+	}
+}
