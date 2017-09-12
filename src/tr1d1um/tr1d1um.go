@@ -18,6 +18,7 @@ const (
 	applicationName = "tr1d1um"
 	DefaultKeyId = "current"
 )
+var tConfig Tr1d1umConfig
 
 func tr1d1um(arguments []string) int {
 
@@ -76,7 +77,9 @@ func tr1d1um(arguments []string) int {
 func AddRoutes(r *mux.Router, h *alice.Chain) (* mux.Router) {
 	//todo: path will change later
 	//todo: add restrictions
-	//todo: add handler that points to the conversion
+
+	//todo: configure handler path correctly
+	r.Handle("/p", h.ThenFunc(GetConfigHandle))
 	return r
 }
 

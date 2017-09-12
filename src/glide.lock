@@ -1,5 +1,5 @@
-hash: 07931599e3a6477a3bc52ecf5deedf3c17d71f6665f332d607f4a365a1386fb0
-updated: 2017-09-11T11:10:59.437563373-07:00
+hash: 2bfa67957a3c655c85e4d16be0bc15121bef3f06bf514d2c8e05efd4e842d01e
+updated: 2017-09-11T15:34:19.776763993-07:00
 imports:
 - name: github.com/c9s/goprocinfo
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
@@ -48,6 +48,13 @@ imports:
   - json/parser
   - json/scanner
   - json/token
+- name: github.com/ian-kent/go-log
+  version: 5731446c36ab9f716106ce0731f484c50fdf1ad1
+  subpackages:
+  - appenders
+  - layout
+  - levels
+  - logger
 - name: github.com/jtacoma/uritemplates
   version: 307ae868f90f4ee1b73ebe4596e0394237dacce8
 - name: github.com/justinas/alice
@@ -60,10 +67,14 @@ imports:
   version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/pelletier/go-toml
   version: 69d355db5304c0f7f809a2edc054553e7142f016
+- name: github.com/philhofer/fwd
+  version: 1612a298117663d7bc9a760ae20d383413859798
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
+- name: github.com/satori/go.uuid
+  version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
 - name: github.com/SermoDigital/jose
   version: f6df55f235c24f236d11dbcf665249a59ac2021f
   subpackages:
@@ -91,10 +102,21 @@ imports:
   - linux
   - mock
   - require
+- name: github.com/t-k/fluent-logger-golang
+  version: 0f8ec08f2057a61574b6943e75045fffbeae894e
+  subpackages:
+  - fluent
+- name: github.com/tinylib/msgp
+  version: 38a6f61a768dc24552dad94611923841b53acc4f
+  subpackages:
+  - msgp
 - name: github.com/ugorji/go
   version: d23841a297e5489e787e72fceffabf9d2994b52a
   subpackages:
   - codec
+- name: github.comcast.com/webpa/tscommon
+  version: 343e30f8208af2bbbcc4407499af863a8ce15318
+  vcs: git
 - name: golang.org/x/sys
   version: e312636bdaa2fac4f0acde9d17ab9fbad2b4ad10
   subpackages:
