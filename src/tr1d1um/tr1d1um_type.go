@@ -31,7 +31,6 @@ type Tr1d1umConfig struct {
 	} `json:"jwtValidators"`
 }
 
-
 type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory
@@ -39,4 +38,11 @@ type JWTValidator struct {
 	// Custom is an optional configuration section that defines
 	// custom rules for validation over and above the standard RFC rules.
 	Custom secure.JWTValidatorFactory
+}
+
+
+type WDMP struct {
+	Command    string   `json:"command"`
+	Names      []string `json:"names,omitempty"`
+	Attributes string   `json:"attributes,omitempty"`
 }

@@ -2,14 +2,13 @@ package main
 
 import (
 	"net/http"
-	ts "github.comcast.com/webpa/tscommon"
-	"github.com/gorilla/mux"
 	"strings"
 	"encoding/json"
 	"regexp"
 	"time"
 	"bytes"
 	"fmt"
+	"github.com/Comcast/webpa-common/wrp"
 )
 var paramRegex *regexp.Regexp
 
@@ -52,8 +51,30 @@ func (sh ConversionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	}
 }
 */
+func ConversionHandler(resp http.ResponseWriter, req *http.Request){
+	wdmp := new(WDMP)
 
-func GetConfigHandle(resp http.ResponseWriter, req *http.Request) {
+	//read in parameters and command
+	wdmp.Names = strings.Split(req.FormValue("names"), ",")
+	wdmp.Command = req.Method
+
+	//Get payload for transfer
+	payload, err := json.Marshal(wdmp)
+
+	if err != nil {
+		return
+	}
+
+	//todo: place it into wrp?
+	wrpMessage := wrp.Message{}
+	wrpMessage.Type = wrp.SimpleEventMessageType
+	wrpMessage.Payload = payload //todo: could we send this payload directly without having to place it inside
+								//todo: the wrpMessage struct?
+
+	PostWithDeadline(resp, payload)
+}
+/*
+func getConfigHandler(resp http.ResponseWriter, req *http.Request) {
 	tid, deviceId, service, ok := ConfigRequirements(resp, req, "GET")
 	if !ok {
 		return
@@ -183,6 +204,7 @@ func ConfigRequirements(resp http.ResponseWriter, req *http.Request, method stri
 }
 
 
+
 func checkService(resp http.ResponseWriter, req *http.Request, tid string) (string, bool) {
 	service, ok := ts.GetValuFromReqVar(req, "service")
 	if !ok {
@@ -217,6 +239,8 @@ func GetTidOrDefault(req *http.Request)(tid string){
 	return 
 }
 
+*/
+
 
 /*
  * Now that we have the needed encoded payload (containing the XPC Message Data), we have
@@ -241,7 +265,7 @@ func PostWithDeadline(resp http.ResponseWriter, payload []byte){
 
 	//todo: use response from server and write to resp accordingly
 	//todo: for now, print status
-	fmt.Println(respFromServer.StatusCode);
+	fmt.Println(respFromServer.StatusCode)
 	return
 }
 

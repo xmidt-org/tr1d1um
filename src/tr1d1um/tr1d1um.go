@@ -79,7 +79,7 @@ func AddRoutes(r *mux.Router, h *alice.Chain) (* mux.Router) {
 	//todo: add restrictions
 
 	//todo: configure handler path correctly
-	r.Handle("/p", h.ThenFunc(GetConfigHandle))
+	r.Handle("/device/", h.ThenFunc(ConversionHandler))
 	return r
 }
 
