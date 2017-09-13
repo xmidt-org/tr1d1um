@@ -13,6 +13,7 @@ import (
 	"github.com/justinas/alice"
 	"github.com/Comcast/webpa-common/secure/key"
 	"time"
+	"github.com/go-kit/kit/log"
 )
 
 const (
@@ -36,24 +37,24 @@ func tr1d1um(arguments []string) int {
 	var (
 		messageKey = logging.MessageKey()
 		errorKey = logging.ErrorKey()
-		infoLog= logging.Info(logger)
-		errorLog= logging.Error(logger)
+		infoLogger = logging.Info(logger)
+		errorLogger = logging.Error(logger)
 	)
 
-	infoLog.Log("configurationFile", v.ConfigFileUsed())
+	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
 	tConfig := new(Tr1d1umConfig)
 	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
 	if err != nil {
-		errorLog.Log(messageKey,"Unable to unmarshal configuration data into struct", errorKey, err)
+		errorLogger.Log(messageKey,"Unable to unmarshal configuration data into struct", errorKey, err)
 		return 1
 	}
 
 	r := mux.NewRouter()
 
-	validator, err := getValidator(v)
+	validator, err := GetValidator(v)
 	if err != nil {
-		infoLog.Log(messageKey,"Error retrieving validator from configs", "configFile", v.ConfigFileUsed())
+		infoLogger.Log(messageKey,"Error retrieving validator from configs", "configFile", v.ConfigFileUsed())
 		return 1
 	}
 
@@ -66,8 +67,8 @@ func tr1d1um(arguments []string) int {
 
 	preHandler := alice.New(authHandler.Decorate)
 
-	conversionHandler := ConversionHandler{log: logger, timeOut: time.Duration(tConfig.timeOut), targetUrl:
-		tConfig.targetUrl}
+	conversionHandler := ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
+	SetUpHandler(&conversionHandler, errorLogger, infoLogger)
 
 	r = AddRoutes(r, &preHandler, &conversionHandler)
 
@@ -86,7 +87,7 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 }
 
 // getValidator returns validator for JWT tokens
-func getValidator(v *viper.Viper) (validator secure.Validator, err error) {
+func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	default_validators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator
 
@@ -132,6 +133,16 @@ func getValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	validator = validators
 
 	return
+}
+
+
+func SetUpHandler(cHandler *ConversionHandler, errorLogger log.Logger, infoLogger log.Logger){
+	//pass loggers
+	cHandler.errorLogger = errorLogger
+	cHandler.infoLogger = infoLogger
+	//set functions
+	cHandler.GetFormattedData = GetFormattedData
+	cHandler.WrapInWrp = WrapInWrp
 }
 
 func main() {

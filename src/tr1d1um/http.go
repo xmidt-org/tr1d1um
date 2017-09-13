@@ -2,38 +2,33 @@ package main
 
 import (
 	"net/http"
-	"strings"
-	"encoding/json"
 	"time"
 	"bytes"
-	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
+	"github.com/Comcast/webpa-common/logging"
 )
 type ConversionHandler struct {
-	log log.Logger
+	infoLogger log.Logger
+	errorLogger log.Logger
 	timeOut time.Duration
 	targetUrl string
+	GetFormattedData func(*http.Request, string, string) ([]byte, error)
+	WrapInWrp func([]byte) ([]byte, error)
 }
 
 func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request){
-	wdmp := new(WDMP)
-
-	//read in parameters and command
-	wdmp.Names = strings.Split(req.FormValue("names"), ",")
-	wdmp.Command = req.Method
-
-	//Get payload for transfer
-	wdmpPayload, err := json.Marshal(wdmp)
+	wdmpPayload, err := sh.GetFormattedData(req, "names", ",")
 
 	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(), "Could not marshal wdmp object", logging.ErrorKey(), err.Error())
 		return
 	}
 
-	wrpMessage := wrp.Message{Type:wrp.SimpleRequestResponseMessageType}
-	wrpMessage.Payload = wdmpPayload
-	wrpPayload, err := json.Marshal(wrpMessage)
+	wrpPayload, err := sh.WrapInWrp(wdmpPayload)
 
 	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(), "Could not wrap wdmp data into a wrp message",
+			logging.ErrorKey(), err.Error())
 		return
 	}
 
@@ -48,6 +43,7 @@ func (sh ConversionHandler) SendData(resp http.ResponseWriter, payload []byte){
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Write([]byte("Error creating new request"))
+		sh.errorLogger.Log(logging.MessageKey(), "Could not create new request", logging.ErrorKey(), err.Error())
 		return
 	}
 
@@ -56,6 +52,7 @@ func (sh ConversionHandler) SendData(resp http.ResponseWriter, payload []byte){
 	if err != nil{
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Write([]byte("Error while posting request"))
+		sh.errorLogger.Log(logging.MessageKey(), "Could not complete request", logging.ErrorKey(), err.Error())
 		return
 	}
 
