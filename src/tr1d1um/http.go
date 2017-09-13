@@ -29,7 +29,7 @@ func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *
 		return
 	}
 
-	wrpMessage := wrp.Message{}
+	wrpMessage := wrp.Message{Type:wrp.SimpleRequestResponseMessageType}
 	wrpMessage.Payload = wdmpPayload
 	wrpPayload, err := json.Marshal(wrpMessage)
 
