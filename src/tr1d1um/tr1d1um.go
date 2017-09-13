@@ -12,14 +12,13 @@ import (
 	"github.com/SermoDigital/jose/jwt"
 	"github.com/justinas/alice"
 	"github.com/Comcast/webpa-common/secure/key"
+	"time"
 )
 
 const (
 	applicationName = "tr1d1um"
 	DefaultKeyId = "current"
 )
-var tConfig Tr1d1umConfig
-
 func tr1d1um(arguments []string) int {
 
 	var (
@@ -44,7 +43,7 @@ func tr1d1um(arguments []string) int {
 	infoLog.Log("configurationFile", v.ConfigFileUsed())
 
 	tConfig := new(Tr1d1umConfig)
-	err = v.Unmarshal(tConfig)
+	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
 	if err != nil {
 		errorLog.Log(messageKey,"Unable to unmarshal configuration data into struct", errorKey, err)
 		return 1
@@ -65,26 +64,28 @@ func tr1d1um(arguments []string) int {
 		Logger:              logger,
 	}
 
-	tHandler := alice.New(authHandler.Decorate)
+	preHandler := alice.New(authHandler.Decorate)
 
-	r = AddRoutes(r, &tHandler)
+	conversionHandler := ConversionHandler{log: logger, timeOut: time.Duration(tConfig.timeOut), targetUrl:
+		tConfig.targetUrl}
+
+	r = AddRoutes(r, &preHandler, &conversionHandler)
 
 	//todo: finish this initialization method
 
 	return 0
 }
 
-func AddRoutes(r *mux.Router, h *alice.Chain) (* mux.Router) {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) (* mux.Router) {
 	//todo: path will change later
 	//todo: add restrictions
 
 	//todo: configure handler path correctly
-	r.Handle("/device/", h.ThenFunc(ConversionHandler))
+	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).Methods("GET")
 	return r
 }
 
 // getValidator returns validator for JWT tokens
-//todo will probably change to use go-kit
 func getValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	default_validators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator

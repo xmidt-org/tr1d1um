@@ -17,9 +17,10 @@ type Tr1d1umConfig struct {
 	Version           string   `json:"version"`
 	MaxApiTcpConns    int64    `json:"maxApiTcpConnections"`
 	MaxHealthTcpConns int64    `json:"maxHealthTcpConnections"`
-	GetSyncList       GetSync  `json:"getSync"`
 	ServiceList       []string `json:"serviceList"`
-	WrpSource		  string    `json:"wrpSource"`
+	WrpSource		  string   `json:"wrpSource"`
+	timeOut			  int64    `json:"timeOut"`
+	targetUrl		  string   `json:"targetUrl"`
 
 	JWTValidators []struct {
 		// JWTKeys is used to create the key.Resolver for JWT verification keys

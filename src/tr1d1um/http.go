@@ -4,54 +4,18 @@ import (
 	"net/http"
 	"strings"
 	"encoding/json"
-	"regexp"
 	"time"
 	"bytes"
-	"fmt"
 	"github.com/Comcast/webpa-common/wrp"
+	"github.com/go-kit/kit/log"
 )
-var paramRegex *regexp.Regexp
-
-/*
 type ConversionHandler struct {
-	//todo add //loggers
+	log log.Logger
 	timeOut time.Duration
-	targetUlr string
+	targetUrl string
 }
 
-func (sh ConversionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	_ , err := HttpRequestToWRP(request, ioutil.ReadAll)
-	if err != nil { //something is wrong in the received request
-		response.WriteHeader(http.StatusBadRequest)
-		response.Write([]byte(err.Error()))
-		return
-	}
-
-	//todo forespard converted wrp request to targetUrl with timeout
-
-	/*
-	encodedWrp, err :=  attemptEncoding(wrpRequest, wrp.MustEncode)
-
-	if err != nil { // cannot put 100% blame on request
-		response.WriteHeader(http.StatusInternalServerError)
-		response.Write([]byte(err.Error()))
-		return
-	}
-	var payload bytes.Buffer
-
-	r := bufio.NewReader(&payload)
-
-	//todo actually post stuff to other server
-	req, err := http.NewRequest("POST", sh.targetUlr,r)
-
-	if err != nil {
-		response.WriteHeader(http.StatusInternalServerError)
-		response.Write([]byte(err.Error()))
-		return
-	}
-}
-*/
-func ConversionHandler(resp http.ResponseWriter, req *http.Request){
+func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request){
 	wdmp := new(WDMP)
 
 	//read in parameters and command
@@ -59,20 +23,64 @@ func ConversionHandler(resp http.ResponseWriter, req *http.Request){
 	wdmp.Command = req.Method
 
 	//Get payload for transfer
-	payload, err := json.Marshal(wdmp)
+	wdmpPayload, err := json.Marshal(wdmp)
 
 	if err != nil {
 		return
 	}
 
-	//todo: place it into wrp?
 	wrpMessage := wrp.Message{}
-	wrpMessage.Type = wrp.SimpleEventMessageType
-	wrpMessage.Payload = payload //todo: could we send this payload directly without having to place it inside
-								//todo: the wrpMessage struct?
+	wrpMessage.Payload = wdmpPayload
+	wrpPayload, err := json.Marshal(wrpMessage)
 
-	PostWithDeadline(resp, payload)
+	if err != nil {
+		return
+	}
+
+	sh.SendData(resp, wrpPayload)
 }
+
+func (sh ConversionHandler) SendData(resp http.ResponseWriter, payload []byte){
+	clientWithDeadline := http.Client{Timeout:sh.timeOut}
+
+	//todo: any headers to be added here
+	requestToServer, err := http.NewRequest("GET", sh.targetUrl, bytes.NewBuffer(payload))
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		resp.Write([]byte("Error creating new request"))
+		return
+	}
+
+	respFromServer, err := clientWithDeadline.Do(requestToServer)
+
+	if err != nil{
+		resp.WriteHeader(http.StatusInternalServerError)
+		resp.Write([]byte("Error while posting request"))
+		return
+	}
+
+	//Try forwarding back the response to the initial requester
+	resp.WriteHeader(respFromServer.StatusCode)
+	resp.Write([]byte(respFromServer.Status))
+}
+
+/*
+func AttemptEncoding(message *wrp.Message, encode func(interface{}, wrp.Format) ([]byte)) (encoded []byte, err error) {
+   if encode == nil {
+	   err = errors.New("encode method is nil")
+	   return
+   }
+   defer func() {
+	   panicked := recover()
+	   if panicked != nil {
+		   err = panicked.(error) //recover from encoding panic
+	   }
+   }()
+
+   encoded = encode(message, wrp.Msgpack)
+}
+*/
+
 /*
 func getConfigHandler(resp http.ResponseWriter, req *http.Request) {
 	tid, deviceId, service, ok := ConfigRequirements(resp, req, "GET")
@@ -236,52 +244,7 @@ func GetTidOrDefault(req *http.Request)(tid string){
 	if !ok {
 		tid = ts.NewUUID()
 	}
-	return 
-}
-
-*/
-
-
-/*
- * Now that we have the needed encoded payload (containing the XPC Message Data), we have
- * to send it to
- *
-*/
-
-func PostWithDeadline(resp http.ResponseWriter, payload []byte){
-	clientWithDeadline := http.DefaultClient
-	clientWithDeadline.Timeout = time.Second * 3 //todo: for now
-
-	//todo: any headers to be added here
-	requestToServer, err := http.NewRequest("GET", "someWebpaUrl", bytes.NewBuffer(payload))
-	if err != nil {
-		//todo: respond accordingly
-	}
-
-	respFromServer, err := clientWithDeadline.Do(requestToServer)
-	if err != nil{
-		//todo: respond accordingly
-	}
-
-	//todo: use response from server and write to resp accordingly
-	//todo: for now, print status
-	fmt.Println(respFromServer.StatusCode)
 	return
 }
 
-/*
-func AttemptEncoding(message *wrp.Message, encode func(interface{}, wrp.Format) ([]byte)) (encoded []byte, err error) {
-   if encode == nil {
-	   err = errors.New("encode method is nil")
-	   return
-   }
-   defer func() {
-	   panicked := recover()
-	   if panicked != nil {
-		   err = panicked.(error) //recover from encoding panic
-	   }
-   }()
-
-   encoded = encode(message, wrp.Msgpack)
-}
 */
