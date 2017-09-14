@@ -1,28 +1,21 @@
 package main
 
-import (
-	"testing"
-	"errors"
-	"net/http"
-	"github.com/stretchr/testify/assert"
-)
-
 type logTracker struct {
 	keys []interface{}
 	vals []interface{}
 }
 
-func (fake *logTracker) Log(keyvals ...interface{}) (err error) {
-	for i, keyval := range keyvals{
+func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
+	for i, keyVal := range keyVals{
 		if i % 2 == 0{
-			fake.keys = append(fake.keys, keyval)
+			fake.keys = append(fake.keys, keyVal)
 		} else {
-			fake.vals = append(fake.vals, keyval)
+			fake.vals = append(fake.vals, keyVal)
 		}
 	}
 	return
 }
-
+/*
 func TestConversionGETHandlerWrapFailure(t *testing.T) {
 	assert := assert.New(t)
 	conversionHanlder := new(ConversionHandler)
@@ -35,24 +28,6 @@ func TestConversionGETHandlerWrapFailure(t *testing.T) {
 	errorMessage := conversionHanlder.errorLogger.(*logTracker).vals[0].(string)
 	assert.EqualValues(ERR_UNSUCCESSFUL_DATA_WRAP,errorMessage)
 }
-
+*/
 //todo: more cases
 
-
-func SetupTestingConditions(failWrap, failFormat bool, conversionHandler *ConversionHandler) {
-	logger := logTracker{}
-	conversionHandler.errorLogger = &logger
-	conversionHandler.WrapInWrp = func(bytes []byte) (data []byte, err error) {
-		if failWrap {
-			err = errors.New("wrapInWrp: always failing")
-		}
-		return
-	}
-
-	conversionHandler.GetFlavorFormat = func(request *http.Request, s1, s2, s3 string) (data []byte, err error) {
-		if failFormat {
-			err = errors.New("getFlavorFormat: always failing")
-		}
-		return
-	}
-}

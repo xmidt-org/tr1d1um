@@ -70,7 +70,7 @@ func tr1d1um(arguments []string) int {
 
 func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) (* mux.Router) {
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
-		return request.Body == nil
+		return request.Body != nil
 	}
 
 	//todo: inquire about API version
@@ -82,6 +82,12 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
 	ConversionDELETEHandler)).Methods(http.MethodDelete)
+
+	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
+	ConversionADDHandler)).Methods(http.MethodPost).MatcherFunc(BodyNonNil)
+
+	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
+	ConversionREPLACEHandler)).Methods(http.MethodPut).MatcherFunc(BodyNonNil)
 
 	return r
 }
@@ -147,7 +153,6 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
 	cHandler.AddFlavorFormat = AddFlavorFormat
 
-	cHandler.WrapInWrp = WrapInWrp
 	return
 }
 
