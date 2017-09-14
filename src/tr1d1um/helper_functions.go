@@ -7,18 +7,14 @@ import (
 	"net/http"
 	"io"
 	"errors"
+	"github.com/gorilla/mux"
 )
 
 var (
 	ErrJsonEmpty   = errors.New("JSON payload is empty")
 )
 
-//Given some wdmp data, wraps it into a wrp object, returns the resulting payload
-func WrapInWrp(wdmpData []byte) (payload []byte, err error){
-	wrpMessage := wrp.Message{Type:wrp.SimpleRequestResponseMessageType, Payload:wdmpData}
-	payload, err = json.Marshal(wrpMessage)
-	return
-}
+
 
 // All we care about is the payload. Method helps abstract away work done with the WDMP object
 func GetFlavorFormat(req *http.Request, attr, formValKey, sep string) (payload[]byte, err error){
@@ -40,7 +36,7 @@ func GetFlavorFormat(req *http.Request, attr, formValKey, sep string) (payload[]
 	return
 }
 
-func SetFlavorFormat(req *http.Request, ReadEntireBody func(io.Reader)(payload []byte, err error)) (payload[]byte, err error){
+func SetFlavorFormat(req *http.Request, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
 	wdmp := new(SetWDMP)
 	DecodeJsonPayload(req, wdmp, ReadEntireBody)
 
@@ -51,6 +47,46 @@ func SetFlavorFormat(req *http.Request, ReadEntireBody func(io.Reader)(payload [
 	}
 
 	payload, err = json.Marshal(wdmp)
+	return
+}
+
+func DeleteFlavorFormat(req *http.Request, rowKey string) (payload[]byte, err error){
+	wdmp := &DeleteRowWDMP{Command:COMMAND_DELETE_ROW}
+
+	if row, exists := GetFromUrlPath(rowKey, req); exists {
+		wdmp.Row = row
+	} else {
+		err = errors.New("row name is required")
+		return
+	}
+
+	payload, err = json.Marshal(wdmp)
+	return
+}
+
+func AddFlavorFormat(req *http.Request, tableName string, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
+	//todo: complete this one
+	wdmp := &AddRowWDMP{Command:COMMAND_ADD_ROW}
+	DecodeJsonPayload(req, wdmp, ReadEntireBody)
+
+	payload, err = json.Marshal(wdmp)
+	return
+}
+
+func ReplaceFlavorFormat(req *http.Request, tableName string, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
+	wdmp := &ReplaceRowsWDMP{Command:COMMAND_REPLACE_ROWS}
+
+	if table, exists := GetFromUrlPath(tableName, req); exists {
+		wdmp.Table = table
+	} else {
+		err = errors.New("tableName is required for this method")
+		return
+	}
+
+	err = DecodeJsonPayload(req, wdmp.Rows, ReadEntireBody)
+
+	//todo: validate unmarshalled data
+
 	return
 }
 
@@ -65,7 +101,6 @@ func ValidateAndGetCommand(req *http.Request, wdmp *SetWDMP) (command string, er
 	}
 	return
 }
-
 
 /*  -Inputs-:
  **checkingForSetAttr**: true if we're checking for the required parameter properties for the SET_ATTRIBUTES command
@@ -112,6 +147,13 @@ func validateSETParams(checkingForSetAttr bool, wdmp *SetWDMP, override string) 
 	return
 }
 
+//Given some wdmp data, wraps it into a wrp object, returns the resulting payload
+func WrapInWrp(wdmpData []byte) (payload []byte, err error){
+	wrpMessage := wrp.Message{Type:wrp.SimpleRequestResponseMessageType, Payload:wdmpData}
+	payload, err = json.Marshal(wrpMessage)
+	return
+}
+
 func DecodeJsonPayload(req *http.Request, v interface{}, ReadEntireBody func(io.Reader)([]byte, error)) (err error) {
 	if ReadEntireBody == nil {
 		err = errors.New("method ReadEntireBody is undefined")
@@ -135,4 +177,12 @@ func DecodeJsonPayload(req *http.Request, v interface{}, ReadEntireBody func(io.
 	}
 	return
 }
+
+func GetFromUrlPath(key string, req *http.Request)(val string, exists bool){
+	if pathVars := mux.Vars(req); pathVars != nil {
+		val, exists = pathVars[key]
+	}
+	return
+}
+
 

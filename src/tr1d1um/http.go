@@ -15,6 +15,10 @@ type ConversionHandler struct {
 	targetUrl string
 	GetFlavorFormat func(*http.Request, string, string, string) ([]byte, error)
 	SetFlavorFormat func(*http.Request, func(io.Reader)([]byte,error)) ([]byte, error)
+	DeleteFlavorFormat func(*http.Request, string) ([]byte, error)
+	ReplaceFlavorFormat func(*http.Request, string, func(io.Reader)([]byte,error)) ([]byte, error)
+	AddFlavorFormat func(*http.Request, string, func(io.Reader)([]byte,error)) ([]byte, error)
+
 	WrapInWrp func([]byte) ([]byte, error)
 }
 
@@ -53,6 +57,45 @@ func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *
 
 	sh.SendData(resp, wrpPayload)
 }
+
+func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request){
+	wdmpPayload, err := sh.DeleteFlavorFormat(req, "parameter")
+
+	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
+		return
+	}
+
+	wrpPayload, err := sh.WrapInWrp(wdmpPayload)
+
+	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(),ERR_UNSUCCESSFUL_DATA_WRAP, logging.ErrorKey(), err.Error())
+		return
+	}
+
+	sh.SendData(resp, wrpPayload)
+}
+
+func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request){
+	wdmpPayload, err := sh.ReplaceFlavorFormat(req, "parameter", ioutil.ReadAll)
+
+	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
+		return
+	}
+
+	wrpPayload, err := sh.WrapInWrp(wdmpPayload)
+
+	if err != nil {
+		sh.errorLogger.Log(logging.MessageKey(),ERR_UNSUCCESSFUL_DATA_WRAP, logging.ErrorKey(), err.Error())
+		return
+	}
+
+	sh.SendData(resp, wrpPayload)
+}
+
+
+//todo: add handler
 
 func (sh ConversionHandler) SendData(resp http.ResponseWriter, payload []byte){
 	clientWithDeadline := http.Client{Timeout:sh.timeOut}

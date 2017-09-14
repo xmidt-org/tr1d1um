@@ -72,13 +72,17 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
 		return request.Body == nil
 	}
-	//todo: path will change later
-	//todo: add restrictions
 
-	//todo: configure handler path correctly
-	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).Methods(http.MethodGet)
-	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).Methods(http.MethodPatch).
-	MatcherFunc(BodyNonNil)
+	//todo: inquire about API version
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).
+	Methods(http.MethodGet)
+
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).
+	Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
+
+	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
+	ConversionDELETEHandler)).Methods(http.MethodDelete)
+
 	return r
 }
 
@@ -139,6 +143,10 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	//set functions
 	cHandler.GetFlavorFormat = GetFlavorFormat
 	cHandler.SetFlavorFormat = SetFlavorFormat
+	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
+	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
+	cHandler.AddFlavorFormat = AddFlavorFormat
+
 	cHandler.WrapInWrp = WrapInWrp
 	return
 }
