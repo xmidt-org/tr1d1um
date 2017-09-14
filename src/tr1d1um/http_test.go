@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"github.com/stretchr/testify/assert"
-	"strings"
 )
 
 type logTracker struct {
@@ -28,13 +27,13 @@ func TestConversionGETHandlerWrapFailure(t *testing.T) {
 	assert := assert.New(t)
 	conversionHanlder := new(ConversionHandler)
 	SetupTestingConditions(true, false, conversionHanlder)
-	req, err := http.NewRequest("GET", "/device/config?names=param1;param2", nil)
+	req, err := http.NewRequest("GET", "/device/config?names=param1,param2", nil)
 	if err != nil {
 		assert.FailNow("Could not make new request")
 	}
 	conversionHanlder.ConversionGETHandler(nil, req)
 	errorMessage := conversionHanlder.errorLogger.(*logTracker).vals[0].(string)
-	assert.True(strings.HasPrefix(errorMessage, "Could not wrap wdmp"))
+	assert.EqualValues(ERR_UNSUCCESSFUL_DATA_WRAP,errorMessage)
 }
 
 //todo: more cases
@@ -45,14 +44,14 @@ func SetupTestingConditions(failWrap, failFormat bool, conversionHandler *Conver
 	conversionHandler.errorLogger = &logger
 	conversionHandler.WrapInWrp = func(bytes []byte) (data []byte, err error) {
 		if failWrap {
-			err = errors.New("wrapinwrp: always failing")
+			err = errors.New("wrapInWrp: always failing")
 		}
 		return
 	}
 
-	conversionHandler.GetFormattedData = func(request *http.Request, i string, i2 string) (data []byte, err error) {
+	conversionHandler.GetFlavorFormat = func(request *http.Request, s1, s2, s3 string) (data []byte, err error) {
 		if failFormat {
-			err = errors.New("getformatteddata: always failing")
+			err = errors.New("getFlavorFormat: always failing")
 		}
 		return
 	}

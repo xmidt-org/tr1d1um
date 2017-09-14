@@ -14,6 +14,7 @@ import (
 	"github.com/Comcast/webpa-common/secure/key"
 	"time"
 	"github.com/go-kit/kit/log"
+	"net/http"
 )
 
 const (
@@ -21,7 +22,6 @@ const (
 	DefaultKeyId = "current"
 )
 func tr1d1um(arguments []string) int {
-
 	var (
 		f= pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 		v= viper.New()
@@ -50,27 +50,18 @@ func tr1d1um(arguments []string) int {
 		return 1
 	}
 
-	r := mux.NewRouter()
+	preHandler, err := SetUpPreHandler(v, logger)
 
-	validator, err := GetValidator(v)
 	if err != nil {
-		infoLogger.Log(messageKey,"Error retrieving validator from configs", "configFile", v.ConfigFileUsed())
+		infoLogger.Log(messageKey,"Error setting up pre handler", errorKey, err)
 		return 1
 	}
 
-	authHandler := handler.AuthorizationHandler{
-		HeaderName:          "Authorization",
-		ForbiddenStatusCode: 403,
-		Validator:           validator,
-		Logger:              logger,
-	}
+	conversionHandler := SetUpHandler(tConfig, errorLogger, infoLogger)
 
-	preHandler := alice.New(authHandler.Decorate)
+	r := mux.NewRouter()
 
-	conversionHandler := ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
-	SetUpHandler(&conversionHandler, errorLogger, infoLogger)
-
-	r = AddRoutes(r, &preHandler, &conversionHandler)
+	r = AddRoutes(r, preHandler, conversionHandler)
 
 	//todo: finish this initialization method
 
@@ -78,11 +69,16 @@ func tr1d1um(arguments []string) int {
 }
 
 func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) (* mux.Router) {
+	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
+		return request.Body == nil
+	}
 	//todo: path will change later
 	//todo: add restrictions
 
 	//todo: configure handler path correctly
-	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).Methods("GET")
+	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).Methods(http.MethodGet)
+	r.Handle("/device/", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).Methods(http.MethodPatch).
+	MatcherFunc(BodyNonNil)
 	return r
 }
 
@@ -135,14 +131,34 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	return
 }
 
-
-func SetUpHandler(cHandler *ConversionHandler, errorLogger log.Logger, infoLogger log.Logger){
+func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger)(cHandler *ConversionHandler){
+	cHandler = &ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
 	//pass loggers
 	cHandler.errorLogger = errorLogger
 	cHandler.infoLogger = infoLogger
 	//set functions
-	cHandler.GetFormattedData = GetFormattedData
+	cHandler.GetFlavorFormat = GetFlavorFormat
+	cHandler.SetFlavorFormat = SetFlavorFormat
 	cHandler.WrapInWrp = WrapInWrp
+	return
+}
+
+func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error){
+	validator, err := GetValidator(v)
+	if err != nil {
+		return
+	}
+
+	authHandler := handler.AuthorizationHandler{
+		HeaderName:          "Authorization",
+		ForbiddenStatusCode: 403,
+		Validator:           validator,
+		Logger:              logger,
+	}
+
+	newPreHandler := alice.New(authHandler.Decorate)
+	preHandler = &newPreHandler
+	return
 }
 
 func main() {

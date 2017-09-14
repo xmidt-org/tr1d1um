@@ -28,12 +28,12 @@ func TestGetFormattedData(t *testing.T) {
 		assert.FailNow("Could not make new request")
 	}
 
-	wdmp := &WDMP{Command:"GET"}
+	wdmp := &GetWDMP{Command:COMMAND_GET}
 	wdmp.Names = []string{"param1","param2","param3"}
 
 	expected, expectedErr := json.Marshal(wdmp)
 
-	actual, actualErr := GetFormattedData(req,"names", ",")
+	actual, actualErr := GetFlavorFormat(req,"attributes", "names", ",")
 
 	assert.EqualValues(expected, actual)
 	assert.EqualValues(expectedErr, actualErr)

@@ -41,9 +41,3 @@ type JWTValidator struct {
 	Custom secure.JWTValidatorFactory
 }
 
-
-type WDMP struct {
-	Command    string   `json:"command"`
-	Names      []string `json:"names,omitempty"`
-	Attributes string   `json:"attributes,omitempty"`
-}
