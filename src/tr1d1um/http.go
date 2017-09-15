@@ -6,10 +6,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/Comcast/webpa-common/logging"
 	"io/ioutil"
-	"io"
 	"github.com/Comcast/webpa-common/wrp"
 	"encoding/json"
 	"errors"
+	"io"
+	"github.com/gorilla/mux"
 )
 type ConversionHandler struct {
 	infoLogger log.Logger
@@ -18,10 +19,10 @@ type ConversionHandler struct {
 	targetUrl string
 	/*These functions should be set during handler set up */
 	GetFlavorFormat func(*http.Request, string, string, string) ([]byte, error)
-	SetFlavorFormat func(*http.Request, func(io.Reader)([]byte,error)) ([]byte, error)
-	DeleteFlavorFormat func(*http.Request, string) ([]byte, error)
-	ReplaceFlavorFormat func(*http.Request, string, func(io.Reader)([]byte,error)) ([]byte, error)
-	AddFlavorFormat func(*http.Request, string, func(io.Reader)([]byte,error)) ([]byte, error)
+	SetFlavorFormat func(*http.Request, BodyReader) ([]byte, error)
+	DeleteFlavorFormat func(Vars, string) ([]byte, error)
+	AddFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
+	ReplaceFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
 }
 
 func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request){
@@ -51,7 +52,7 @@ func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *
 }
 
 func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request){
-	wdmpPayload, err := sh.DeleteFlavorFormat(req, "parameter")
+	wdmpPayload, err := sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
 
 	if err != nil {
 		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
@@ -64,7 +65,7 @@ func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, re
 }
 
 func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request){
-	wdmpPayload, err := sh.ReplaceFlavorFormat(req, "parameter", ioutil.ReadAll)
+	wdmpPayload, err := sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
 
 	if err != nil {
 		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
@@ -77,7 +78,7 @@ func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, r
 }
 
 func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request){
-	wdmpPayload, err := sh.AddFlavorFormat(req, "parameter", ioutil.ReadAll)
+	wdmpPayload, err := sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
 
 	if err != nil {
 		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())

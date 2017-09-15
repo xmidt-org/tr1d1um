@@ -6,25 +6,27 @@ import (
 	"net/http"
 	"io"
 	"errors"
-	"github.com/gorilla/mux"
 )
 
 var (
 	ErrJsonEmpty   = errors.New("JSON payload is empty")
 )
 
+type BodyReader func(io.Reader)([]byte,error)
+
+type Vars map[string]string
 
 /* The following functions break down the different cases for requests (https://swagger.webpa.comcast.net/)
  containing WDMP content. Their main functionality is to attempt at reading such content, validating it
  and subsequently returning a json type encoding of it. Most often this resulting []byte is used as payload for
  wrp messages
 */
-func GetFlavorFormat(req *http.Request, attr, formValKey, sep string) (payload[]byte, err error){
+func GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (payload[]byte, err error){
 	wdmp := new(GetWDMP)
 
-	if names := strings.Split(req.FormValue(formValKey),sep); len(names) > 0 {
+	if nameGroup := req.FormValue(namesKey); nameGroup != "" {
 		wdmp.Command = COMMAND_GET
-		wdmp.Names = names
+		wdmp.Names = strings.Split(nameGroup, sep)
 	} else{
 		err = errors.New("names is a required property for GET")
 		return
@@ -32,17 +34,18 @@ func GetFlavorFormat(req *http.Request, attr, formValKey, sep string) (payload[]
 
 	if attributes := req.FormValue(attr); attributes != "" {
 		wdmp.Command = COMMAND_GET_ATTRS
+		wdmp.Attribute = attributes
 	}
 
 	payload, err = json.Marshal(wdmp)
 	return
 }
 
-func SetFlavorFormat(req *http.Request, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
+func SetFlavorFormat(req *http.Request, ReadEntireBody BodyReader) (payload[]byte, err error){
 	wdmp := new(SetWDMP)
-	DecodeJsonPayload(req, wdmp, ReadEntireBody)
+	DecodeJsonPayload(req.Body, wdmp, ReadEntireBody)
 
-	wdmp.Command, err = ValidateAndGetCommand(req, wdmp)
+	wdmp.Command, err = ValidateAndRetrieveCommand(req.Header, wdmp)
 
 	if err != nil {
 		return
@@ -52,10 +55,10 @@ func SetFlavorFormat(req *http.Request, ReadEntireBody func(io.Reader)([]byte,er
 	return
 }
 
-func DeleteFlavorFormat(req *http.Request, rowKey string) (payload[]byte, err error){
+func DeleteFlavorFormat(urlVars Vars, rowKey string) (payload[]byte, err error){
 	wdmp := &DeleteRowWDMP{Command:COMMAND_DELETE_ROW}
 
-	if row, exists := GetFromUrlPath(rowKey, req); exists {
+	if row, exists := GetFromUrlPath(rowKey, urlVars); exists {
 		wdmp.Row = row
 	} else {
 		err = errors.New("row name is required")
@@ -66,16 +69,16 @@ func DeleteFlavorFormat(req *http.Request, rowKey string) (payload[]byte, err er
 	return
 }
 
-func AddFlavorFormat(req *http.Request, tableName string, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
+func AddFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEntireBody BodyReader) (payload[]byte, err error){
 	wdmp := &AddRowWDMP{Command:COMMAND_ADD_ROW}
 
-	if table, exists := GetFromUrlPath(tableName, req); exists {
+	if table, exists := GetFromUrlPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
 		err = errors.New("tableName is required for this method")
 		return
 	}
-	err = DecodeJsonPayload(req, wdmp.Row, ReadEntireBody)
+	err = DecodeJsonPayload(body, wdmp.Row, ReadEntireBody)
 
 	if err != nil {
 		return
@@ -89,33 +92,38 @@ func AddFlavorFormat(req *http.Request, tableName string, ReadEntireBody func(io
 	return
 }
 
-func ReplaceFlavorFormat(req *http.Request, tableName string, ReadEntireBody func(io.Reader)([]byte,error)) (payload[]byte, err error){
-	wdmp := &ReplaceRowsWDMP{Command:COMMAND_REPLACE_ROWS}
+func ReplaceFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEntireBody BodyReader) (payload[]byte, err error){
+	wdmp := ReplaceRowsWDMP{Command:COMMAND_REPLACE_ROWS}
 
-	if table, exists := GetFromUrlPath(tableName, req); exists {
+	if table, exists := GetFromUrlPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
 		err = errors.New("tableName is required for this method")
 		return
 	}
 
-	err = DecodeJsonPayload(req, wdmp.Rows, ReadEntireBody)
+	err = DecodeJsonPayload(body, &wdmp.Rows, ReadEntireBody)
+
+	if err != nil {
+		return
+	}
 
 	if !ValidREPLACEParams(wdmp.Rows){
 		err = errors.New("invalid Replacement data")
 		return
 	}
 
+	payload, err = json.Marshal(wdmp)
 	return
 }
 
 
 /* Validation functions */
-func ValidateAndGetCommand(req *http.Request, wdmp *SetWDMP) (command string, err error){
-	if newCid := req.Header.Get(HEADER_WPA_SYNC_NEW_CID); newCid != "" {
-		wdmp.OldCid = req.Header.Get(HEADER_WPA_SYNC_OLD_CID)
+func ValidateAndRetrieveCommand(header http.Header, wdmp *SetWDMP) (command string, err error){
+	if newCid := header.Get(HEADER_WPA_SYNC_NEW_CID); newCid != "" {
+		wdmp.OldCid = header.Get(HEADER_WPA_SYNC_OLD_CID)
 		wdmp.NewCid = newCid
-		wdmp.SyncCmc =  req.Header.Get(HEADER_WPA_SYNC_CMC)
+		wdmp.SyncCmc =  header.Get(HEADER_WPA_SYNC_CMC)
 		command, err = ValidateSETParams(false, wdmp, COMMAND_TEST_SET)
 	} else {
 		command, err = ValidateSETParams(true, wdmp, "")
@@ -181,14 +189,9 @@ func ValidREPLACEParams(rows map[string]map[string]string) (valid bool){
 }
 
 
-/* Other helper */
-func DecodeJsonPayload(req *http.Request, v interface{}, ReadEntireBody func(io.Reader)([]byte, error)) (err error) {
-	if ReadEntireBody == nil {
-		err = errors.New("method ReadEntireBody is undefined")
-		return
-	}
-	payload, err := ReadEntireBody(req.Body)
-	req.Body.Close()
+/* Other helper functions */
+func DecodeJsonPayload(body io.Reader, v interface{}, ReadEntireBody BodyReader) (err error) {
+	payload, err := ReadEntireBody(body)
 
 	if err != nil {
 		return
@@ -200,15 +203,12 @@ func DecodeJsonPayload(req *http.Request, v interface{}, ReadEntireBody func(io.
 	}
 
 	err = json.Unmarshal(payload, v)
-	if err != nil {
-		return
-	}
 	return
 }
 
-func GetFromUrlPath(key string, req *http.Request)(val string, exists bool){
-	if pathVars := mux.Vars(req); pathVars != nil {
-		val, exists = pathVars[key]
+func GetFromUrlPath(key string, urlVars map[string]string)(val string, exists bool){
+	if urlVars!= nil {
+		val, exists = urlVars[key]
 	}
 	return
 }

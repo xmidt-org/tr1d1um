@@ -15,8 +15,6 @@ const(
 	HEADER_WPA_SYNC_CMC     = "X-Webpa-Sync-Cmc"
 
 	ERR_UNSUCCESSFUL_DATA_PARSE = "Unsuccessful Data Parse"
-	ERR_UNSUCCESSFUL_DATA_WRAP = "Unsuccessful WDMP data transfer into wrp message"
-
 )
 /*
 	GET-Flavored structs
