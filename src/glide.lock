@@ -1,0 +1,111 @@
+hash: 07931599e3a6477a3bc52ecf5deedf3c17d71f6665f332d607f4a365a1386fb0
+updated: 2017-09-12T14:41:24.503934812-07:00
+imports:
+- name: github.com/c9s/goprocinfo
+  version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
+  subpackages:
+  - linux
+- name: github.com/Comcast/webpa-common
+  version: cb246362b61aaf042a936fa615a48554d111f9b4
+  subpackages:
+  - concurrent
+  - health
+  - logging
+  - resource
+  - secure
+  - secure/handler
+  - secure/key
+  - server
+  - types
+  - wrp
+- name: github.com/davecgh/go-spew
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  subpackages:
+  - spew
+- name: github.com/fsnotify/fsnotify
+  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
+- name: github.com/go-kit/kit
+  version: a9ca6725cbbea455e61c6bc8a1ed28e81eb3493b
+  subpackages:
+  - log
+  - log/level
+- name: github.com/go-logfmt/logfmt
+  version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
+- name: github.com/go-stack/stack
+  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
+- name: github.com/gorilla/context
+  version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
+- name: github.com/gorilla/mux
+  version: 392c28fe23e1c45ddba891b0320b3b5df220beea
+- name: github.com/hashicorp/hcl
+  version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/scanner
+  - hcl/strconv
+  - hcl/token
+  - json/parser
+  - json/scanner
+  - json/token
+- name: github.com/jtacoma/uritemplates
+  version: 307ae868f90f4ee1b73ebe4596e0394237dacce8
+- name: github.com/justinas/alice
+  version: 1051eaf52fcafdd87ead59d28b065f1fcb8274ec
+- name: github.com/kr/logfmt
+  version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/magiconair/properties
+  version: be5ece7dd465ab0765a9682137865547526d1dfb
+- name: github.com/mitchellh/mapstructure
+  version: d0303fe809921458f417bcf828397a65db30a7e4
+- name: github.com/pelletier/go-toml
+  version: 69d355db5304c0f7f809a2edc054553e7142f016
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
+- name: github.com/SermoDigital/jose
+  version: f6df55f235c24f236d11dbcf665249a59ac2021f
+  subpackages:
+  - crypto
+  - jws
+  - jwt
+- name: github.com/spf13/afero
+  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
+- name: github.com/spf13/jwalterweatherman
+  version: 0efa5202c04663c757d84f90f5219c1250baf94f
+- name: github.com/spf13/pflag
+  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+- name: github.com/spf13/viper
+  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
+- name: github.com/stretchr/objx
+  version: cbeaeb16a013161a98496fad62933b1d21786672
+- name: github.com/stretchr/testify
+  version: 890a5c3458b43e6104ff5da8dfa139d013d77544
+  subpackages:
+  - assert
+  - linux
+  - mock
+  - require
+- name: github.com/ugorji/go
+  version: d23841a297e5489e787e72fceffabf9d2994b52a
+  subpackages:
+  - codec
+- name: golang.org/x/sys
+  version: e312636bdaa2fac4f0acde9d17ab9fbad2b4ad10
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
+  subpackages:
+  - transform
+  - unicode/norm
+- name: gopkg.in/natefinch/lumberjack.v2
+  version: a96e63847dc3c67d17befa69c303767e2f84e54f
+- name: gopkg.in/yaml.v2
+  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
+testImports: []
