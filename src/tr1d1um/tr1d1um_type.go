@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/Comcast/webpa-common/secure/key"
 	"github.com/Comcast/webpa-common/secure"
+	"github.com/Comcast/webpa-common/secure/key"
 )
 
 type Tr1d1umConfig struct {
@@ -18,9 +18,9 @@ type Tr1d1umConfig struct {
 	MaxApiTcpConns    int64    `json:"maxApiTcpConnections"`
 	MaxHealthTcpConns int64    `json:"maxHealthTcpConnections"`
 	ServiceList       []string `json:"serviceList"`
-	WrpSource		  string   `json:"wrpSource"`
-	timeOut			  int64    `json:"timeOut"`
-	targetUrl		  string   `json:"targetUrl"`
+	WrpSource         string   `json:"wrpSource"`
+	timeOut           int64    `json:"timeOut"`
+	targetUrl         string   `json:"targetUrl"`
 
 	JWTValidators []struct {
 		// JWTKeys is used to create the key.Resolver for JWT verification keys
@@ -40,4 +40,3 @@ type JWTValidator struct {
 	// custom rules for validation over and above the standard RFC rules.
 	Custom secure.JWTValidatorFactory
 }
-

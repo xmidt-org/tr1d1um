@@ -1,6 +1,6 @@
 package main
 
-const(
+const (
 	COMMAND_GET          = "GET"
 	COMMAND_GET_ATTRS    = "GET_ATTRIBUTES"
 	COMMAND_SET          = "SET"
@@ -16,14 +16,15 @@ const(
 
 	ERR_UNSUCCESSFUL_DATA_PARSE = "Unsuccessful Data Parse"
 )
+
 /*
 	GET-Flavored structs
 */
 
 type GetWDMP struct {
-	Command    string   `json:"command"`
-	Names      []string `json:"names,omitempty"`
-	Attribute string    `json:"attributes,omitempty"`
+	Command   string   `json:"command"`
+	Names     []string `json:"names,omitempty"`
+	Attribute string   `json:"attributes,omitempty"`
 }
 
 /*
@@ -33,8 +34,8 @@ type GetWDMP struct {
 type Attr map[string]interface{}
 
 type SetParam struct {
-	Name*      string      `json:"name"`
-	DataType*   int32      `json:"dataType,omitempty"`
+	Name       *string     `json:"name"`
+	DataType   *int32      `json:"dataType,omitempty"`
 	Value      interface{} `json:"value,omitempty"`
 	Attributes Attr        `json:"attributes,omitempty"`
 }
@@ -67,4 +68,3 @@ type DeleteRowWDMP struct {
 	Command string `json:"command"`
 	Row     string `json:"row"`
 }
-
