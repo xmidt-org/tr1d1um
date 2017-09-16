@@ -1,6 +1,11 @@
 package main
 
-const(
+import (
+	"errors"
+	"github.com/go-ozzo/ozzo-validation"
+)
+
+const (
 	COMMAND_GET          = "GET"
 	COMMAND_GET_ATTRS    = "GET_ATTRIBUTES"
 	COMMAND_SET          = "SET"
@@ -16,14 +21,15 @@ const(
 
 	ERR_UNSUCCESSFUL_DATA_PARSE = "Unsuccessful Data Parse"
 )
+
 /*
 	GET-Flavored structs
 */
 
 type GetWDMP struct {
-	Command    string   `json:"command"`
-	Names      []string `json:"names,omitempty"`
-	Attribute string    `json:"attributes,omitempty"`
+	Command   string   `json:"command"`
+	Names     []string `json:"names,omitempty"`
+	Attribute string   `json:"attributes,omitempty"`
 }
 
 /*
@@ -33,8 +39,8 @@ type GetWDMP struct {
 type Attr map[string]interface{}
 
 type SetParam struct {
-	Name*      string      `json:"name"`
-	DataType*   int32      `json:"dataType,omitempty"`
+	Name       *string     `json:"name"`
+	DataType   *int8       `json:"dataType,omitempty"`
 	Value      interface{} `json:"value,omitempty"`
 	Attributes Attr        `json:"attributes,omitempty"`
 }
@@ -68,3 +74,24 @@ type DeleteRowWDMP struct {
 	Row     string `json:"row"`
 }
 
+/* Validation functions */
+
+//Applicable for the SET and TEST_SET
+func (sp SetParam) Validate() error {
+	return validation.ValidateStruct(&sp,
+		validation.Field(&sp.Name, validation.NotNil),
+		validation.Field(&sp.DataType, validation.NotNil),
+		validation.Field(&sp.Value, validation.Required))
+}
+
+func ValidateSETAttrParams(params []SetParam) (err error) {
+	if params == nil || len(params) == 0 {
+		return errors.New("invalid list of params")
+	}
+	for _, param := range params {
+		if err = validation.Validate(param.Attributes, validation.Required.Error("invalid attr")); err != nil {
+			return
+		}
+	}
+	return
+}

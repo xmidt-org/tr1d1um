@@ -1,33 +1,33 @@
 package main
 
 import (
-	"os"
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/secure"
+	"github.com/Comcast/webpa-common/secure/handler"
+	"github.com/Comcast/webpa-common/secure/key"
+	"github.com/Comcast/webpa-common/server"
+	"github.com/SermoDigital/jose/jwt"
+	"github.com/go-kit/kit/log"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/Comcast/webpa-common/server"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/gorilla/mux"
-	"github.com/Comcast/webpa-common/secure/handler"
-	"github.com/Comcast/webpa-common/secure"
-	"github.com/SermoDigital/jose/jwt"
-	"github.com/justinas/alice"
-	"github.com/Comcast/webpa-common/secure/key"
-	"time"
-	"github.com/go-kit/kit/log"
 	"net/http"
+	"os"
+	"time"
 )
 
 const (
 	applicationName = "tr1d1um"
-	DefaultKeyId = "current"
+	DefaultKeyId    = "current"
 )
+
 func tr1d1um(arguments []string) int {
 	var (
-		f= pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-		v= viper.New()
-		logger, _, err= server.Initialize(applicationName, arguments, f, v)
+		f              = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
+		v              = viper.New()
+		logger, _, err = server.Initialize(applicationName, arguments, f, v)
 	)
-
 	if err != nil {
 		logging.Error(logger).Log(logging.MessageKey(), "Unable to initialize Viper environment: %s\n",
 			logging.ErrorKey(), err)
@@ -35,9 +35,9 @@ func tr1d1um(arguments []string) int {
 	}
 
 	var (
-		messageKey = logging.MessageKey()
-		errorKey = logging.ErrorKey()
-		infoLogger = logging.Info(logger)
+		messageKey  = logging.MessageKey()
+		errorKey    = logging.ErrorKey()
+		infoLogger  = logging.Info(logger)
 		errorLogger = logging.Error(logger)
 	)
 
@@ -46,14 +46,14 @@ func tr1d1um(arguments []string) int {
 	tConfig := new(Tr1d1umConfig)
 	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
 	if err != nil {
-		errorLogger.Log(messageKey,"Unable to unmarshal configuration data into struct", errorKey, err)
+		errorLogger.Log(messageKey, "Unable to unmarshal configuration data into struct", errorKey, err)
 		return 1
 	}
 
 	preHandler, err := SetUpPreHandler(v, logger)
 
 	if err != nil {
-		infoLogger.Log(messageKey,"Error setting up pre handler", errorKey, err)
+		infoLogger.Log(messageKey, "Error setting up pre handler", errorKey, err)
 		return 1
 	}
 
@@ -68,26 +68,26 @@ func tr1d1um(arguments []string) int {
 	return 0
 }
 
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) (* mux.Router) {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
 		return request.Body != nil
 	}
 
 	//todo: inquire about API version
 	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).
-	Methods(http.MethodGet)
+		Methods(http.MethodGet)
 
 	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).
-	Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
+		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-	ConversionDELETEHandler)).Methods(http.MethodDelete)
+		ConversionDELETEHandler)).Methods(http.MethodDelete)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-	ConversionADDHandler)).Methods(http.MethodPost).MatcherFunc(BodyNonNil)
+		ConversionADDHandler)).Methods(http.MethodPost).MatcherFunc(BodyNonNil)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-	ConversionREPLACEHandler)).Methods(http.MethodPut).MatcherFunc(BodyNonNil)
+		ConversionREPLACEHandler)).Methods(http.MethodPut).MatcherFunc(BodyNonNil)
 
 	return r
 }
@@ -141,7 +141,7 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	return
 }
 
-func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger)(cHandler *ConversionHandler){
+func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
 	cHandler = &ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
 	//pass loggers
 	cHandler.errorLogger = errorLogger
@@ -156,7 +156,7 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	return
 }
 
-func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error){
+func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
 	validator, err := GetValidator(v)
 	if err != nil {
 		return
@@ -177,4 +177,3 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 func main() {
 	os.Exit(tr1d1um(os.Args))
 }
-
