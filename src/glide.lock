@@ -1,5 +1,5 @@
-hash: 07931599e3a6477a3bc52ecf5deedf3c17d71f6665f332d607f4a365a1386fb0
-updated: 2017-09-12T14:41:24.503934812-07:00
+hash: 3eec5107271bc3ff2719d45f3601279145b952cfb6c924b83da4e432d2faf8c6
+updated: 2017-09-15T11:46:13.542649385-07:00
 imports:
 - name: github.com/c9s/goprocinfo
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
@@ -31,6 +31,8 @@ imports:
   - log/level
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
+- name: github.com/go-ozzo/ozzo-validation
+  version: 85dcd8368eba387e65a03488b003e233994e87e9
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/gorilla/context

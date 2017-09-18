@@ -6,8 +6,8 @@ type logTracker struct {
 }
 
 func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
-	for i, keyVal := range keyVals{
-		if i % 2 == 0{
+	for i, keyVal := range keyVals {
+		if i%2 == 0 {
 			fake.keys = append(fake.keys, keyVal)
 		} else {
 			fake.vals = append(fake.vals, keyVal)
@@ -15,6 +15,7 @@ func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
 	}
 	return
 }
+
 /*
 func TestConversionGETHandlerWrapFailure(t *testing.T) {
 	assert := assert.New(t)
@@ -30,4 +31,3 @@ func TestConversionGETHandlerWrapFailure(t *testing.T) {
 }
 */
 //todo: more cases
-
