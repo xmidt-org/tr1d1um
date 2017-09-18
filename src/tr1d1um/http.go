@@ -25,6 +25,8 @@ type ConversionHandler struct {
 	DeleteFlavorFormat  func(Vars, string) ([]byte, error)
 	AddFlavorFormat     func(io.Reader, Vars, string, BodyReader) ([]byte, error)
 	ReplaceFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
+
+	SendData func(time.Duration, http.ResponseWriter, *wrp.SimpleRequestResponse)
 }
 
 func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request) {
@@ -37,7 +39,7 @@ func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(resp, wrpMessage)
+	sh.SendData(sh.timeOut, resp, wrpMessage)
 }
 
 func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *http.Request) {
@@ -50,7 +52,7 @@ func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(resp, wrpMessage)
+	sh.SendData(sh.timeOut, resp, wrpMessage)
 }
 
 func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request) {
@@ -63,7 +65,7 @@ func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, re
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(resp, wrpMessage)
+	sh.SendData(sh.timeOut, resp, wrpMessage)
 }
 
 func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request) {
@@ -76,7 +78,7 @@ func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, r
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(resp, wrpMessage)
+	sh.SendData(sh.timeOut, resp, wrpMessage)
 }
 
 func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request) {
@@ -89,10 +91,11 @@ func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(resp, wrpMessage)
+	sh.SendData(sh.timeOut, resp, wrpMessage)
 }
 
-func (sh ConversionHandler) SendData(resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
+func SendData(timeOut time.Duration, resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
+	//todo: some work needs to happen here like setting the destination of the device, etc.
 	wrpPayload, err := json.Marshal(wrpMessage)
 
 	if err != nil {
@@ -100,14 +103,13 @@ func (sh ConversionHandler) SendData(resp http.ResponseWriter, wrpMessage *wrp.S
 		return
 	}
 
-	clientWithDeadline := http.Client{Timeout: sh.timeOut}
+	clientWithDeadline := http.Client{Timeout: timeOut}
 
 	//todo: any headers to be added here
-	requestToServer, err := http.NewRequest("GET", sh.targetUrl, bytes.NewBuffer(wrpPayload))
+	requestToServer, err := http.NewRequest("GET", "someTargetUrl", bytes.NewBuffer(wrpPayload))
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Write([]byte("Error creating new request"))
-		sh.errorLogger.Log(logging.MessageKey(), "Could not create new request", logging.ErrorKey(), err.Error())
 		return
 	}
 
@@ -116,7 +118,6 @@ func (sh ConversionHandler) SendData(resp http.ResponseWriter, wrpMessage *wrp.S
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Write([]byte("Error while posting request"))
-		sh.errorLogger.Log(logging.MessageKey(), "Could not complete request", logging.ErrorKey(), err.Error())
 		return
 	}
 

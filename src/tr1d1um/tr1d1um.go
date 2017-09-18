@@ -142,7 +142,11 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 }
 
 func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
-	cHandler = &ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
+	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
+	if err != nil {
+		timeOut = time.Second * 60 //default val
+	}
+	cHandler = &ConversionHandler{timeOut: timeOut, targetUrl: tConfig.targetUrl}
 	//pass loggers
 	cHandler.errorLogger = errorLogger
 	cHandler.infoLogger = infoLogger
@@ -153,6 +157,7 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
 	cHandler.AddFlavorFormat = AddFlavorFormat
 
+	cHandler.SendData = SendData
 	return
 }
 

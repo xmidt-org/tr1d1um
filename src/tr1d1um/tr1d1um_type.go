@@ -19,7 +19,6 @@ type Tr1d1umConfig struct {
 	MaxHealthTcpConns int64    `json:"maxHealthTcpConnections"`
 	ServiceList       []string `json:"serviceList"`
 	WrpSource         string   `json:"wrpSource"`
-	timeOut           int64    `json:"timeOut"`
 	targetUrl         string   `json:"targetUrl"`
 
 	JWTValidators []struct {
