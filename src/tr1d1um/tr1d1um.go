@@ -12,10 +12,10 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
-	"io/ioutil"
 )
 
 const (
@@ -75,20 +75,17 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	}
 
 	//todo: inquire about API version
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
 		Methods(http.MethodGet)
 
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
 		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionDELETEHandler)).Methods(http.MethodDelete)
+		ConversionHandler)).Methods(http.MethodDelete)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionADDHandler)).Methods(http.MethodPost).MatcherFunc(BodyNonNil)
-
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionREPLACEHandler)).Methods(http.MethodPut).MatcherFunc(BodyNonNil)
+		ConversionHandler)).Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
 
 	return r
 }

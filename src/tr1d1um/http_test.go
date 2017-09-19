@@ -35,8 +35,6 @@ func TestConversionGETHandler(t *testing.T) {
 	assert := assert.New(t)
 	fakeLogger := logTracker{}
 	ch := ConversionHandler{errorLogger: &fakeLogger}
-	const errMsg = "getFlavorFormat failed"
-	var expectedPayload = []byte{'_'}
 
 	fakeRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
 	t.Run("GetFlavorFormatErr", func(testing *testing.T) {
@@ -45,7 +43,7 @@ func TestConversionGETHandler(t *testing.T) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionGETHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
@@ -66,7 +64,7 @@ func TestConversionGETHandler(t *testing.T) {
 			actualPayload = response.Payload
 		}
 
-		ch.ConversionGETHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 		assert.EqualValues(expectedPayload, actualPayload)
 	})
 }
@@ -82,7 +80,7 @@ func TestConversionSETHandler(t *testing.T) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionSETHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
@@ -101,7 +99,7 @@ func TestConversionSETHandler(t *testing.T) {
 			actualPayload = response.Payload
 		}
 
-		ch.ConversionSETHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 		assert.EqualValues(expectedPayload, actualPayload)
 	})
 
@@ -118,7 +116,7 @@ func TestConversionDELETEHandler(t *testing.T) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionDELETEHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
@@ -137,7 +135,7 @@ func TestConversionDELETEHandler(t *testing.T) {
 			actualPayload = response.Payload
 		}
 
-		ch.ConversionDELETEHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 		assert.EqualValues(expectedPayload, actualPayload)
 	})
 }
@@ -153,7 +151,7 @@ func TestConversionREPLACEHandler(t *testing.T) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionREPLACEHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
@@ -172,7 +170,7 @@ func TestConversionREPLACEHandler(t *testing.T) {
 			actualPayload = response.Payload
 		}
 
-		ch.ConversionREPLACEHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 		assert.EqualValues(expectedPayload, actualPayload)
 	})
 }
@@ -181,14 +179,14 @@ func TestConversionADDHandler(t *testing.T) {
 	assert := assert.New(t)
 	fakeLogger := logTracker{}
 	ch := ConversionHandler{errorLogger: &fakeLogger}
-	fakeRequest := httptest.NewRequest(http.MethodPut, "http://device/config?", nil)
+	fakeRequest := httptest.NewRequest(http.MethodPost, "http://device/config?", nil)
 
 	t.Run("AddFlavorFormatErr", func(testing *testing.T) {
 		ch.AddFlavorFormat = func(_ io.Reader, _ Vars, _ string, _ BodyReader) ([]byte, error) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionADDHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
@@ -207,7 +205,7 @@ func TestConversionADDHandler(t *testing.T) {
 			actualPayload = response.Payload
 		}
 
-		ch.ConversionADDHandler(nil, fakeRequest)
+		ch.ConversionHandler(nil, fakeRequest)
 		assert.EqualValues(expectedPayload, actualPayload)
 	})
 }

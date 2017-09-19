@@ -318,22 +318,6 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 		assert.Nil(ValidateAndDeduceSET(emptyHeader, wdmp))
 		assert.EqualValues(COMMAND_SET_ATTRS, wdmp.Command)
 	})
-
-	/*
-
-		t.Run("SET", func (t *testing.T) {
-
-		})
-
-		t.Run("SET_ATTRS", func (t *testing.T) {
-
-		})
-
-		t.Run("TEST_SET", func (t *testing.T) {
-
-		})
-	*/
-
 }
 
 func TestSetOrLeave(t *testing.T) {
@@ -341,6 +325,30 @@ func TestSetOrLeave(t *testing.T) {
 	assert.EqualValues("fallback", SetOrLeave("fallback", ""))
 	assert.EqualValues("", SetOrLeave("", ""))
 	assert.EqualValues("theNewVal", SetOrLeave("", "theNewVal"))
+}
+
+func TestExtractPayloadFromWrp(t *testing.T) {
+	assert := assert.New(t)
+	cr := CustomResultReader{}
+	cr.err = errors.New("error reading")
+
+	t.Run("SomeErrorOccurred", func(t *testing.T) {
+		payload, err := ExtractPayloadFromWrp(nil, cr.CustomReader)
+		assert.Nil(payload)
+		assert.NotNil(err)
+		assert.EqualValues(cr.err, err)
+	})
+
+	t.Run("IdealCase", func(t *testing.T) {
+		//cr.err = nil
+		//cr.data = []byte(`{"msg_type": 3, "payload": j}`) //todo: Need to show correct payload extraction
+		//expected := []byte("b")
+		//
+		//payload, err := ExtractPayloadFromWrp(nil, cr.CustomReader)
+		//assert.NotNil(payload)
+		//assert.Nil(err)
+		//assert.EqualValues(expected, payload)
+	})
 }
 
 /*Set the data and err fields and the next call to CustomReader will return them*/

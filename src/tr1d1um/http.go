@@ -30,8 +30,31 @@ type ConversionHandler struct {
 	ReadAll BodyReader
 }
 
-func (sh *ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.GetFlavorFormat(req, "attributes", "names", ",")
+func (sh *ConversionHandler) ConversionHandler(resp http.ResponseWriter, req *http.Request) {
+	var wdmpPayload []byte
+	var err error
+
+	switch req.Method {
+	case http.MethodGet:
+		wdmpPayload, err = sh.GetFlavorFormat(req, "attributes", "names", ",")
+		break
+
+	case http.MethodPatch:
+		wdmpPayload, err = sh.SetFlavorFormat(req, ioutil.ReadAll)
+		break
+
+	case http.MethodDelete:
+		wdmpPayload, err = sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
+		break
+
+	case http.MethodPut:
+		wdmpPayload, err = sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
+		break
+
+	case http.MethodPost:
+		wdmpPayload, err = sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
+		break
+	}
 
 	if err != nil {
 		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
@@ -40,67 +63,7 @@ func (sh *ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req 
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	ConfigureWrp(wrp, req)
-
-	sh.SendData(sh, resp, wrpMessage)
-}
-
-func (sh *ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.SetFlavorFormat(req, ioutil.ReadAll)
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	ConfigureWrp(wrp, req)
-
-	sh.SendData(sh, resp, wrpMessage)
-}
-
-func (sh *ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	ConfigureWrp(wrp, req)
-
-	sh.SendData(sh, resp, wrpMessage)
-}
-
-func (sh *ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	ConfigureWrp(wrp, req)
-
-	sh.SendData(sh, resp, wrpMessage)
-}
-
-func (sh *ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	ConfigureWrp(wrp, req)
+	ConfigureWrp(wrpMessage, req)
 
 	sh.SendData(sh, resp, wrpMessage)
 }
@@ -117,7 +80,7 @@ func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.S
 	clientWithDeadline := http.Client{Timeout: sh.timeOut}
 
 	//todo: any headers to be added here
-	requestToServer, err := http.NewRequest(http.MethodGet, sh.targetUrl ,bytes.NewBuffer(wrpPayload))
+	requestToServer, err := http.NewRequest(http.MethodGet, sh.targetUrl, bytes.NewBuffer(wrpPayload))
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 
 	if err != nil {
@@ -155,7 +118,7 @@ func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.S
 	resp.Write(responsePayload)
 }
 
-func ConfigureWrp(wrpMsg * wrp.SimpleRequestResponse, req *http.Request){
+func ConfigureWrp(wrpMsg *wrp.SimpleRequestResponse, req *http.Request) {
 	wrpMsg.ContentType = req.Header.Get("Content-Type")
 	if pathVars := mux.Vars(req); pathVars != nil {
 		deviceId, deviceIdExists := pathVars["deviceid"]
@@ -165,4 +128,3 @@ func ConfigureWrp(wrpMsg * wrp.SimpleRequestResponse, req *http.Request){
 		}
 	}
 }
-
