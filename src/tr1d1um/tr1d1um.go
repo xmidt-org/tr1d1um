@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"io/ioutil"
 )
 
 const (
@@ -110,6 +111,8 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	cHandler.SendData = SendData
 
 	cHandler.targetUrl = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
+
+	cHandler.ReadAll = ioutil.ReadAll
 	return
 }
 
