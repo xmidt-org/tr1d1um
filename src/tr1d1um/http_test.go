@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 const errMsg = "shared failure"
@@ -63,7 +62,7 @@ func TestConversionGETHandler(t *testing.T) {
 		var actualPayload []byte
 
 		// Set SendData
-		ch.SendData = func(duration time.Duration, writer http.ResponseWriter, response *wrp.SimpleRequestResponse) {
+		ch.SendData = func(duration *ConversionHandler, writer http.ResponseWriter, response *wrp.SimpleRequestResponse) {
 			actualPayload = response.Payload
 		}
 
@@ -98,7 +97,7 @@ func TestConversionSETHandler(t *testing.T) {
 
 		var actualPayload []byte
 
-		ch.SendData = func(_ time.Duration, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
+		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
 			actualPayload = response.Payload
 		}
 
@@ -134,7 +133,7 @@ func TestConversionDELETEHandler(t *testing.T) {
 
 		var actualPayload []byte
 
-		ch.SendData = func(_ time.Duration, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
+		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
 			actualPayload = response.Payload
 		}
 
@@ -169,7 +168,7 @@ func TestConversionREPLACEHandler(t *testing.T) {
 
 		var actualPayload []byte
 
-		ch.SendData = func(_ time.Duration, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
+		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
 			actualPayload = response.Payload
 		}
 
@@ -204,7 +203,7 @@ func TestConversionADDHandler(t *testing.T) {
 
 		var actualPayload []byte
 
-		ch.SendData = func(_ time.Duration, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
+		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
 			actualPayload = response.Payload
 		}
 

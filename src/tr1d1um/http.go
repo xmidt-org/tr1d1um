@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
@@ -26,10 +25,12 @@ type ConversionHandler struct {
 	AddFlavorFormat     func(io.Reader, Vars, string, BodyReader) ([]byte, error)
 	ReplaceFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
 
-	SendData func(time.Duration, http.ResponseWriter, *wrp.SimpleRequestResponse)
+	SendData func(*ConversionHandler, http.ResponseWriter, *wrp.SimpleRequestResponse)
+
+	ReadAll BodyReader
 }
 
-func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request) {
+func (sh *ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request) {
 	wdmpPayload, err := sh.GetFlavorFormat(req, "attributes", "names", ",")
 
 	if err != nil {
@@ -39,10 +40,12 @@ func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(sh.timeOut, resp, wrpMessage)
+	ConfigureWrp(wrp, req)
+
+	sh.SendData(sh, resp, wrpMessage)
 }
 
-func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *http.Request) {
+func (sh *ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *http.Request) {
 	wdmpPayload, err := sh.SetFlavorFormat(req, ioutil.ReadAll)
 
 	if err != nil {
@@ -52,10 +55,12 @@ func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(sh.timeOut, resp, wrpMessage)
+	ConfigureWrp(wrp, req)
+
+	sh.SendData(sh, resp, wrpMessage)
 }
 
-func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request) {
+func (sh *ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request) {
 	wdmpPayload, err := sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
 
 	if err != nil {
@@ -65,10 +70,12 @@ func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, re
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(sh.timeOut, resp, wrpMessage)
+	ConfigureWrp(wrp, req)
+
+	sh.SendData(sh, resp, wrpMessage)
 }
 
-func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request) {
+func (sh *ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request) {
 	wdmpPayload, err := sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
 
 	if err != nil {
@@ -78,10 +85,12 @@ func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, r
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(sh.timeOut, resp, wrpMessage)
+	ConfigureWrp(wrp, req)
+
+	sh.SendData(sh, resp, wrpMessage)
 }
 
-func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request) {
+func (sh *ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request) {
 	wdmpPayload, err := sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
 
 	if err != nil {
@@ -91,25 +100,29 @@ func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *
 
 	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
 
-	sh.SendData(sh.timeOut, resp, wrpMessage)
+	ConfigureWrp(wrp, req)
+
+	sh.SendData(sh, resp, wrpMessage)
 }
 
-func SendData(timeOut time.Duration, resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
-	//todo: some work needs to happen here like setting the destination of the device, etc.
+func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
 	wrpPayload, err := json.Marshal(wrpMessage)
 
 	if err != nil {
-		err = errors.New("unsuccessful wrp conversion to json")
+		resp.WriteHeader(http.StatusInternalServerError)
+		sh.errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
-	clientWithDeadline := http.Client{Timeout: timeOut}
+	clientWithDeadline := http.Client{Timeout: sh.timeOut}
 
 	//todo: any headers to be added here
-	requestToServer, err := http.NewRequest("GET", "someTargetUrl", bytes.NewBuffer(wrpPayload))
+	requestToServer, err := http.NewRequest(http.MethodGet, sh.targetUrl ,bytes.NewBuffer(wrpPayload))
+	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
+
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
-		resp.Write([]byte("Error creating new request"))
+		sh.errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
@@ -117,11 +130,39 @@ func SendData(timeOut time.Duration, resp http.ResponseWriter, wrpMessage *wrp.S
 
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
-		resp.Write([]byte("Error while posting request"))
+		sh.errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
-	//Try forwarding back the response to the initial requester
-	resp.WriteHeader(respFromServer.StatusCode)
-	resp.Write([]byte(respFromServer.Status))
+	if respFromServer.StatusCode != http.StatusOK { //something was not okay. Try to forward to original request
+		resp.WriteHeader(respFromServer.StatusCode)
+		if respBody, err := sh.ReadAll(respFromServer.Body); err != nil {
+			resp.Write(respBody)
+		}
+		sh.errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
+		return
+	}
+
+	responsePayload, err := ExtractPayloadFromWrp(respFromServer.Body, ioutil.ReadAll)
+
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		sh.errorLogger.Log(logging.ErrorKey(), err)
+		return
+	}
+
+	resp.WriteHeader(http.StatusOK)
+	resp.Write(responsePayload)
 }
+
+func ConfigureWrp(wrpMsg * wrp.SimpleRequestResponse, req *http.Request){
+	wrpMsg.ContentType = req.Header.Get("Content-Type")
+	if pathVars := mux.Vars(req); pathVars != nil {
+		deviceId, deviceIdExists := pathVars["deviceid"]
+		service, serviceExists := pathVars["service"]
+		if deviceIdExists && serviceExists {
+			wrpMsg.Destination = deviceId + "/" + service
+		}
+	}
+}
+

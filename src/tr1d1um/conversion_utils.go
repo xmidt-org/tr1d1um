@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"github.com/Comcast/webpa-common/wrp"
 )
 
 var (
@@ -169,4 +170,13 @@ func SetOrLeave(currentVal, newVal string) string {
 		return currentVal
 	}
 	return newVal
+}
+
+func ExtractPayloadFromWrp(body io.Reader, ReadAll BodyReader) (payload []byte, err error) {
+	wrpResponse := wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType}
+	if err = DecodeJsonPayload(body, wrpResponse, ReadAll); err != nil {
+		return
+	}
+	payload = wrpResponse.Payload
+	return
 }

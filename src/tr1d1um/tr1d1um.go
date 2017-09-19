@@ -92,6 +92,45 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	return r
 }
 
+func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
+	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
+	if err != nil {
+		timeOut = time.Second * 60 //default val
+	}
+	cHandler = &ConversionHandler{timeOut: timeOut, targetUrl: tConfig.targetUrl}
+	//pass loggers
+	cHandler.errorLogger = errorLogger
+	cHandler.infoLogger = infoLogger
+	//set functions
+	cHandler.GetFlavorFormat = GetFlavorFormat
+	cHandler.SetFlavorFormat = SetFlavorFormat
+	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
+	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
+	cHandler.AddFlavorFormat = AddFlavorFormat
+	cHandler.SendData = SendData
+
+	cHandler.targetUrl = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
+	return
+}
+
+func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
+	validator, err := GetValidator(v)
+	if err != nil {
+		return
+	}
+
+	authHandler := handler.AuthorizationHandler{
+		HeaderName:          "Authorization",
+		ForbiddenStatusCode: 403,
+		Validator:           validator,
+		Logger:              logger,
+	}
+
+	newPreHandler := alice.New(authHandler.Decorate)
+	preHandler = &newPreHandler
+	return
+}
+
 // getValidator returns validator for JWT tokens
 func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	default_validators := make(secure.Validators, 0, 0)
@@ -138,44 +177,6 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 
 	validator = validators
 
-	return
-}
-
-func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
-	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
-	if err != nil {
-		timeOut = time.Second * 60 //default val
-	}
-	cHandler = &ConversionHandler{timeOut: timeOut, targetUrl: tConfig.targetUrl}
-	//pass loggers
-	cHandler.errorLogger = errorLogger
-	cHandler.infoLogger = infoLogger
-	//set functions
-	cHandler.GetFlavorFormat = GetFlavorFormat
-	cHandler.SetFlavorFormat = SetFlavorFormat
-	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
-	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
-	cHandler.AddFlavorFormat = AddFlavorFormat
-
-	cHandler.SendData = SendData
-	return
-}
-
-func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
-	validator, err := GetValidator(v)
-	if err != nil {
-		return
-	}
-
-	authHandler := handler.AuthorizationHandler{
-		HeaderName:          "Authorization",
-		ForbiddenStatusCode: 403,
-		Validator:           validator,
-		Logger:              logger,
-	}
-
-	newPreHandler := alice.New(authHandler.Decorate)
-	preHandler = &newPreHandler
 	return
 }
 
