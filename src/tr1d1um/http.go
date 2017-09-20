@@ -25,7 +25,7 @@ type ConversionHandler struct {
 
 	SendRequest    func(*ConversionHandler, http.ResponseWriter, *wrp.Message)
 	HandleResponse func(*ConversionHandler, http.ResponseWriter, *http.Request)
-	GenericEncode  func(interface{}, wrp.Format) ([]byte, error)
+	EncodeJson     func(interface{}) ([]byte, error)
 }
 
 func (sh *ConversionHandler) ConversionHandler(resp http.ResponseWriter, req *http.Request) {
@@ -60,7 +60,7 @@ func (sh *ConversionHandler) ConversionHandler(resp http.ResponseWriter, req *ht
 		return
 	}
 
-	wdmpPayload, err := sh.GenericEncode(wdmp, wrp.JSON)
+	wdmpPayload, err := sh.EncodeJson(wdmp)
 
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)

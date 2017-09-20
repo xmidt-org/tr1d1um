@@ -2,15 +2,18 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
 type Vars map[string]string
+type BodyReader func(io.Reader) ([]byte, error)
 
 /* The following functions break down the different cases for requests (https://swagger.webpa.comcast.net/)
 containing WDMP content. Their main functionality is to attempt at reading such content, validating it
@@ -39,14 +42,9 @@ func GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (wdmp *GetWD
 func SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err error) {
 	wdmp = new(SetWDMP)
 
-	if err = wrp.NewDecoder(req.Body, wrp.JSON).Decode(wdmp); err == nil {
+	if err = DecodeJson(req.Body, wdmp); err == nil {
 		err = ValidateAndDeduceSET(req.Header, wdmp)
 	}
-	/*
-		p, err := ioutil.ReadAll(req.Body)
-		json.Unmarshal(p, wdmp)
-	*/
-
 	return
 }
 
@@ -72,7 +70,9 @@ func AddFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp *Add
 		return
 	}
 
-	err = wrp.NewDecoder(input, wrp.JSON).Decode(&wdmp.Row)
+	if err = DecodeJson(input, &wdmp.Row); err == nil {
+		err = validation.Validate(wdmp.Row, validation.Required)
+	}
 
 	return
 }
@@ -87,11 +87,9 @@ func ReplaceFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp 
 		return
 	}
 
-	if err = wrp.NewDecoder(input, wrp.JSON).Decode(&wdmp.Rows); err != nil {
-		return
+	if err = DecodeJson(input, &wdmp.Rows); err == nil {
+		err = validation.Validate(wdmp.Rows, validation.Required)
 	}
-
-	err = validation.Validate(wdmp.Rows, validation.Required)
 
 	return
 }
@@ -121,7 +119,23 @@ func ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
 	return
 }
 
-/* Same as invoking urlVars[key] directly but urlVars can be nil in which case key does not exist in it*/
+//Decodes data from the input into v
+//Uses json.Unmarshall to perform actual decoding
+func DecodeJson(input io.Reader, v interface{}) (err error) {
+	var payload []byte
+	if payload, err = ioutil.ReadAll(input); err == nil {
+		err = json.Unmarshal(payload, v)
+	}
+	return
+}
+
+//Wrapper function for json.Marshall
+func EncodeJson(v interface{}) (data []byte, err error) {
+	data, err = json.Marshal(v)
+	return
+}
+
+// Same as invoking urlVars[key] directly but urlVars can be nil in which case key does not exist in it
 func GetFromUrlPath(key string, urlVars Vars) (val string, exists bool) {
 	if urlVars != nil {
 		val, exists = urlVars[key]
@@ -140,7 +154,7 @@ func ExtractPayload(input io.Reader, format wrp.Format) (payload []byte, err err
 	return
 }
 
-//Wraps common encoder. Using a temporary buffer, simply returns
+//Wraps common WRP encoder. Using a temporary buffer, simply returns
 //encoded data and error when applicable
 func GenericEncode(v interface{}, f wrp.Format) (data []byte, err error) {
 	var tmp bytes.Buffer

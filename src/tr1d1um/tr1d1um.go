@@ -107,7 +107,7 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 
 	cHandler.SendRequest = SendRequest
 	cHandler.HandleResponse = HandleResponse
-	cHandler.GenericEncode = GenericEncode
+	cHandler.EncodeJson = EncodeJson
 
 	cHandler.targetUrl = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
 	return
