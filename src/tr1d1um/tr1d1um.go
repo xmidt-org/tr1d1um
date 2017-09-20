@@ -12,7 +12,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -105,11 +104,12 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
 	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
 	cHandler.AddFlavorFormat = AddFlavorFormat
-	cHandler.SendData = SendData
+
+	cHandler.SendRequest = SendRequest
+	cHandler.HandleResponse = HandleResponse
+	cHandler.GenericEncode = GenericEncode
 
 	cHandler.targetUrl = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
-
-	cHandler.ReadAll = ioutil.ReadAll
 	return
 }
 

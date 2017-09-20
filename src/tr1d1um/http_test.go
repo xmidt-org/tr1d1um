@@ -5,15 +5,12 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/assert"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 const errMsg = "shared failure"
-
-var expectedPayload = []byte{'_'}
 
 type logTracker struct {
 	keys []interface{}
@@ -31,181 +28,72 @@ func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
 	return
 }
 
-func TestConversionGETHandler(t *testing.T) {
+func (fake *logTracker) Reset() {
+	fake.vals = nil
+	fake.keys = nil
+}
+
+var FailingEncode = func(_ interface{}, _ wrp.Format) ([]byte, error) {
+	return nil, errors.New(errMsg)
+}
+
+var SucceedingEncode = func(_ interface{}, _ wrp.Format) ([]byte, error) {
+	return nil, nil
+}
+
+func TestConversionTHandler(t *testing.T) {
 	assert := assert.New(t)
 	fakeLogger := logTracker{}
-	ch := ConversionHandler{errorLogger: &fakeLogger}
+	ch := &ConversionHandler{errorLogger: &fakeLogger}
 
-	fakeRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
-	t.Run("GetFlavorFormatErr", func(testing *testing.T) {
+	t.Run("ErrDataParse", func(testing *testing.T) {
+		defer fakeLogger.Reset()
+		commonRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
+
 		//force GetFlavorFormat to fail
-		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) ([]byte, error) {
+		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) (*GetWDMP, error) {
 			return nil, errors.New(errMsg)
 		}
 
-		ch.ConversionHandler(nil, fakeRequest)
+		recorder := httptest.NewRecorder()
+		ch.ConversionHandler(recorder, commonRequest)
 
 		assert.EqualValues(2, len(fakeLogger.vals))
 		assert.EqualValues(2, len(fakeLogger.keys))
+		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
 		assert.EqualValues(errMsg, fakeLogger.vals[1])
 	})
 
-	t.Run("NoError", func(testing *testing.T) {
-		//fake success and changes in method
-		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) ([]byte, error) {
-			return expectedPayload, nil
+	t.Run("ErrEncode", func(testing *testing.T) {
+		defer fakeLogger.Reset()
+		commonRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
+		SetUp(false, ch)
+
+		//force GetFlavorFormat to succeed
+		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) (*GetWDMP, error) {
+			return nil, nil
 		}
 
-		var actualPayload []byte
+		ch.SendRequest = func(handler *ConversionHandler, writer http.ResponseWriter, message *wrp.Message) {}
 
-		// Set SendData
-		ch.SendData = func(duration *ConversionHandler, writer http.ResponseWriter, response *wrp.SimpleRequestResponse) {
-			actualPayload = response.Payload
-		}
+		recorder := httptest.NewRecorder()
+		ch.ConversionHandler(recorder, commonRequest)
 
-		ch.ConversionHandler(nil, fakeRequest)
-		assert.EqualValues(expectedPayload, actualPayload)
+		assert.EqualValues(1, len(fakeLogger.vals))
+		assert.EqualValues(1, len(fakeLogger.keys))
+		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[0])
+		assert.EqualValues(errMsg, fakeLogger.vals[0])
 	})
+
+	//todo: more tests per case but only for ideal cases as the errors above are common to all commands
 }
 
-func TestConversionSETHandler(t *testing.T) {
-	assert := assert.New(t)
-	fakeLogger := logTracker{}
-	ch := ConversionHandler{errorLogger: &fakeLogger}
-	fakeRequest := httptest.NewRequest(http.MethodPatch, "http://device/config?", nil)
-
-	t.Run("SetFlavorFormatErr", func(testing *testing.T) {
-		ch.SetFlavorFormat = func(_ *http.Request, _ BodyReader) ([]byte, error) {
-			return nil, errors.New(errMsg)
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-
-		assert.EqualValues(2, len(fakeLogger.vals))
-		assert.EqualValues(2, len(fakeLogger.keys))
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
-		assert.EqualValues(errMsg, fakeLogger.vals[1])
-	})
-
-	t.Run("SetFlavorNoError", func(testing *testing.T) {
-		ch.SetFlavorFormat = func(_ *http.Request, _ BodyReader) ([]byte, error) {
-			return expectedPayload, nil
-		}
-
-		var actualPayload []byte
-
-		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
-			actualPayload = response.Payload
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-		assert.EqualValues(expectedPayload, actualPayload)
-	})
-
-}
-
-func TestConversionDELETEHandler(t *testing.T) {
-	assert := assert.New(t)
-	fakeLogger := logTracker{}
-	ch := ConversionHandler{errorLogger: &fakeLogger}
-	fakeRequest := httptest.NewRequest(http.MethodDelete, "http://device/config?", nil)
-
-	t.Run("DeleteFlavorFormatErr", func(testing *testing.T) {
-		ch.DeleteFlavorFormat = func(vars Vars, i string) ([]byte, error) {
-			return nil, errors.New(errMsg)
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-
-		assert.EqualValues(2, len(fakeLogger.vals))
-		assert.EqualValues(2, len(fakeLogger.keys))
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
-		assert.EqualValues(errMsg, fakeLogger.vals[1])
-	})
-
-	t.Run("DeleteFlavorNoError", func(testing *testing.T) {
-		ch.DeleteFlavorFormat = func(vars Vars, i string) ([]byte, error) {
-			return expectedPayload, nil
-		}
-
-		var actualPayload []byte
-
-		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
-			actualPayload = response.Payload
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-		assert.EqualValues(expectedPayload, actualPayload)
-	})
-}
-
-func TestConversionREPLACEHandler(t *testing.T) {
-	assert := assert.New(t)
-	fakeLogger := logTracker{}
-	ch := ConversionHandler{errorLogger: &fakeLogger}
-	fakeRequest := httptest.NewRequest(http.MethodPut, "http://device/config?", nil)
-
-	t.Run("ReplaceFlavorFormatErr", func(testing *testing.T) {
-		ch.ReplaceFlavorFormat = func(_ io.Reader, _ Vars, _ string, _ BodyReader) ([]byte, error) {
-			return nil, errors.New(errMsg)
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-
-		assert.EqualValues(2, len(fakeLogger.vals))
-		assert.EqualValues(2, len(fakeLogger.keys))
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
-		assert.EqualValues(errMsg, fakeLogger.vals[1])
-	})
-
-	t.Run("ReplaceFlavorNoError", func(testing *testing.T) {
-		ch.ReplaceFlavorFormat = func(_ io.Reader, _ Vars, _ string, _ BodyReader) ([]byte, error) {
-			return expectedPayload, nil
-		}
-
-		var actualPayload []byte
-
-		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
-			actualPayload = response.Payload
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-		assert.EqualValues(expectedPayload, actualPayload)
-	})
-}
-
-func TestConversionADDHandler(t *testing.T) {
-	assert := assert.New(t)
-	fakeLogger := logTracker{}
-	ch := ConversionHandler{errorLogger: &fakeLogger}
-	fakeRequest := httptest.NewRequest(http.MethodPost, "http://device/config?", nil)
-
-	t.Run("AddFlavorFormatErr", func(testing *testing.T) {
-		ch.AddFlavorFormat = func(_ io.Reader, _ Vars, _ string, _ BodyReader) ([]byte, error) {
-			return nil, errors.New(errMsg)
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-
-		assert.EqualValues(2, len(fakeLogger.vals))
-		assert.EqualValues(2, len(fakeLogger.keys))
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
-		assert.EqualValues(errMsg, fakeLogger.vals[1])
-	})
-
-	t.Run("AddFlavorNoError", func(testing *testing.T) {
-		ch.AddFlavorFormat = func(_ io.Reader, _ Vars, _ string, _ BodyReader) ([]byte, error) {
-			return expectedPayload, nil
-		}
-
-		var actualPayload []byte
-
-		ch.SendData = func(_ *ConversionHandler, _ http.ResponseWriter, response *wrp.SimpleRequestResponse) {
-			actualPayload = response.Payload
-		}
-
-		ch.ConversionHandler(nil, fakeRequest)
-		assert.EqualValues(expectedPayload, actualPayload)
-	})
+func SetUp(success bool, ch *ConversionHandler) {
+	if success {
+		ch.GenericEncode = SucceedingEncode
+	} else {
+		ch.GenericEncode = FailingEncode
+	}
 }

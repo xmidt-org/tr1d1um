@@ -2,13 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -19,57 +17,64 @@ type ConversionHandler struct {
 	timeOut     time.Duration
 	targetUrl   string
 	/*These functions should be set during handler set up */
-	GetFlavorFormat     func(*http.Request, string, string, string) ([]byte, error)
-	SetFlavorFormat     func(*http.Request, BodyReader) ([]byte, error)
-	DeleteFlavorFormat  func(Vars, string) ([]byte, error)
-	AddFlavorFormat     func(io.Reader, Vars, string, BodyReader) ([]byte, error)
-	ReplaceFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
+	GetFlavorFormat     func(*http.Request, string, string, string) (*GetWDMP, error)
+	SetFlavorFormat     func(*http.Request) (*SetWDMP, error)
+	DeleteFlavorFormat  func(Vars, string) (*DeleteRowWDMP, error)
+	AddFlavorFormat     func(io.Reader, Vars, string) (*AddRowWDMP, error)
+	ReplaceFlavorFormat func(io.Reader, Vars, string) (*ReplaceRowsWDMP, error)
 
-	SendData func(*ConversionHandler, http.ResponseWriter, *wrp.SimpleRequestResponse)
-
-	ReadAll BodyReader
+	SendRequest    func(*ConversionHandler, http.ResponseWriter, *wrp.Message)
+	HandleResponse func(*ConversionHandler, http.ResponseWriter, *http.Request)
+	GenericEncode  func(interface{}, wrp.Format) ([]byte, error)
 }
 
 func (sh *ConversionHandler) ConversionHandler(resp http.ResponseWriter, req *http.Request) {
-	var wdmpPayload []byte
 	var err error
+	var wdmp interface{}
 
 	switch req.Method {
 	case http.MethodGet:
-		wdmpPayload, err = sh.GetFlavorFormat(req, "attributes", "names", ",")
+		wdmp, err = sh.GetFlavorFormat(req, "attributes", "names", ",")
 		break
 
 	case http.MethodPatch:
-		wdmpPayload, err = sh.SetFlavorFormat(req, ioutil.ReadAll)
+		wdmp, err = sh.SetFlavorFormat(req)
 		break
 
 	case http.MethodDelete:
-		wdmpPayload, err = sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
+		wdmp, err = sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
 		break
 
 	case http.MethodPut:
-		wdmpPayload, err = sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
+		wdmp, err = sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter")
 		break
 
 	case http.MethodPost:
-		wdmpPayload, err = sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
+		wdmp, err = sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter")
 		break
 	}
 
 	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
 		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
 		return
 	}
 
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
+	wdmpPayload, err := sh.GenericEncode(wdmp, wrp.JSON)
 
-	ConfigureWrp(wrpMessage, req)
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		sh.errorLogger.Log(logging.ErrorKey(), err.Error())
+		return
+	}
 
-	sh.SendData(sh, resp, wrpMessage)
+	wrpMsg := GetConfiguredWrp(wdmpPayload, mux.Vars(req), req.Header)
+
+	sh.SendRequest(sh, resp, wrpMsg)
 }
 
-func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
-	wrpPayload, err := json.Marshal(wrpMessage)
+func SendRequest(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.Message) {
+	wrpPayload, err := GenericEncode(wrpMessage, wrp.JSON)
 
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -77,11 +82,22 @@ func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.S
 		return
 	}
 
-	clientWithDeadline := http.Client{Timeout: sh.timeOut}
-
-	//todo: any headers to be added here
 	requestToServer, err := http.NewRequest(http.MethodGet, sh.targetUrl, bytes.NewBuffer(wrpPayload))
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
+	//todo: any more headers to be added here
+
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		sh.errorLogger.Log(logging.ErrorKey(), err)
+		return
+	}
+	HandleResponse(sh, resp, requestToServer)
+}
+
+func HandleResponse(sh *ConversionHandler, resp http.ResponseWriter, req *http.Request) {
+	clientWithDeadline := http.Client{Timeout: sh.timeOut}
+
+	respFromServer, err := clientWithDeadline.Do(req)
 
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -89,42 +105,33 @@ func SendData(sh *ConversionHandler, resp http.ResponseWriter, wrpMessage *wrp.S
 		return
 	}
 
-	respFromServer, err := clientWithDeadline.Do(requestToServer)
-
-	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		sh.errorLogger.Log(logging.ErrorKey(), err)
-		return
-	}
-
-	if respFromServer.StatusCode != http.StatusOK { //something was not okay. Try to forward to original request
+	if respFromServer.StatusCode != http.StatusOK {
 		resp.WriteHeader(respFromServer.StatusCode)
-		if respBody, err := sh.ReadAll(respFromServer.Body); err != nil {
-			resp.Write(respBody)
-		}
 		sh.errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
 
-	responsePayload, err := ExtractPayloadFromWrp(respFromServer.Body, ioutil.ReadAll)
-
-	if err != nil {
+	if responsePayload, err := ExtractPayload(respFromServer.Body, wrp.JSON); err == nil {
+		resp.WriteHeader(http.StatusOK)
+		resp.Write(responsePayload)
+	} else {
 		resp.WriteHeader(http.StatusInternalServerError)
 		sh.errorLogger.Log(logging.ErrorKey(), err)
-		return
 	}
-
-	resp.WriteHeader(http.StatusOK)
-	resp.Write(responsePayload)
 }
 
-func ConfigureWrp(wrpMsg *wrp.SimpleRequestResponse, req *http.Request) {
-	wrpMsg.ContentType = req.Header.Get("Content-Type")
-	if pathVars := mux.Vars(req); pathVars != nil {
-		deviceId, deviceIdExists := pathVars["deviceid"]
-		service, serviceExists := pathVars["service"]
-		if deviceIdExists && serviceExists {
-			wrpMsg.Destination = deviceId + "/" + service
-		}
+//Set the necessary fields in the wrp and return it
+func GetConfiguredWrp(wdmp []byte, pathVars Vars, header http.Header) (wrpMsg *wrp.Message) {
+	deviceId, _ := GetFromUrlPath("deviceid", pathVars)
+	service, _ := GetFromUrlPath("service", pathVars)
+
+	wrpMsg = &wrp.Message{
+		Type:            wrp.SimpleRequestResponseMessageType,
+		ContentType:     header.Get("Content-Type"),
+		Payload:         wdmp,
+		Source:          WRP_SOURCE + "/" + service,
+		Destination:     deviceId + "/" + service,
+		TransactionUUID: header.Get(HEADER_WPA_TID),
 	}
+	return
 }

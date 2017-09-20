@@ -18,8 +18,11 @@ const (
 	HEADER_WPA_SYNC_OLD_CID = "X-Webpa-Sync-Old-Cid"
 	HEADER_WPA_SYNC_NEW_CID = "X-Webpa-Sync-New-Cid"
 	HEADER_WPA_SYNC_CMC     = "X-Webpa-Sync-Cmc"
+	HEADER_WPA_TID          = "X-WebPA-Transaction-Id"
 
 	ERR_UNSUCCESSFUL_DATA_PARSE = "Unsuccessful Data Parse"
+
+	WRP_SOURCE = "dns:tr1d1um.webpa.comcast.net"
 )
 
 /*
@@ -37,6 +40,7 @@ type GetWDMP struct {
 */
 
 type Attr map[string]interface{}
+type IndexRow map[string]map[string]string
 
 type SetParam struct {
 	Name       *string     `json:"name"`
@@ -64,9 +68,9 @@ type AddRowWDMP struct {
 }
 
 type ReplaceRowsWDMP struct {
-	Command string                       `json:"command"`
-	Table   string                       `json:"table"`
-	Rows    map[string]map[string]string `json:"rows"`
+	Command string   `json:"command"`
+	Table   string   `json:"table"`
+	Rows    IndexRow `json:"rows"`
 }
 
 type DeleteRowWDMP struct {

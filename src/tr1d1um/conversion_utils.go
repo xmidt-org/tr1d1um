@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrJsonEmpty = errors.New("JSON payload is empty")
-)
-
-type BodyReader func(io.Reader) ([]byte, error)
-
 type Vars map[string]string
 
 /* The following functions break down the different cases for requests (https://swagger.webpa.comcast.net/)
@@ -23,8 +17,8 @@ containing WDMP content. Their main functionality is to attempt at reading such 
 and subsequently returning a json type encoding of it. Most often this resulting []byte is used as payload for
 wrp messages
 */
-func GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (payload []byte, err error) {
-	wdmp := new(GetWDMP)
+func GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
+	wdmp = new(GetWDMP)
 
 	if nameGroup := req.FormValue(namesKey); nameGroup != "" {
 		wdmp.Command = COMMAND_GET
@@ -39,27 +33,25 @@ func GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (payload []b
 		wdmp.Attribute = attributes
 	}
 
-	payload, err = json.Marshal(wdmp)
 	return
 }
 
-func SetFlavorFormat(req *http.Request, ReadEntireBody BodyReader) (payload []byte, err error) {
-	wdmp := new(SetWDMP)
+func SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err error) {
+	wdmp = new(SetWDMP)
 
-	if err = DecodeJsonPayload(req.Body, wdmp, ReadEntireBody); err != nil {
-		return
+	if err = wrp.NewDecoder(req.Body, wrp.JSON).Decode(wdmp); err == nil {
+		err = ValidateAndDeduceSET(req.Header, wdmp)
 	}
+	/*
+		p, err := ioutil.ReadAll(req.Body)
+		json.Unmarshal(p, wdmp)
+	*/
 
-	if err = ValidateAndDeduceSET(req.Header, wdmp); err != nil {
-		return
-	}
-
-	payload, err = json.Marshal(wdmp)
 	return
 }
 
-func DeleteFlavorFormat(urlVars Vars, rowKey string) (payload []byte, err error) {
-	wdmp := &DeleteRowWDMP{Command: COMMAND_DELETE_ROW}
+func DeleteFlavorFormat(urlVars Vars, rowKey string) (wdmp *DeleteRowWDMP, err error) {
+	wdmp = &DeleteRowWDMP{Command: COMMAND_DELETE_ROW}
 
 	if row, exists := GetFromUrlPath(rowKey, urlVars); exists && row != "" {
 		wdmp.Row = row
@@ -67,13 +59,11 @@ func DeleteFlavorFormat(urlVars Vars, rowKey string) (payload []byte, err error)
 		err = errors.New("non-empty row name is required")
 		return
 	}
-
-	payload, err = json.Marshal(wdmp)
 	return
 }
 
-func AddFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEntireBody BodyReader) (payload []byte, err error) {
-	wdmp := &AddRowWDMP{Command: COMMAND_ADD_ROW}
+func AddFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp *AddRowWDMP, err error) {
+	wdmp = &AddRowWDMP{Command: COMMAND_ADD_ROW}
 
 	if table, exists := GetFromUrlPath(tableName, urlVars); exists {
 		wdmp.Table = table
@@ -82,21 +72,13 @@ func AddFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEntireB
 		return
 	}
 
-	if err = DecodeJsonPayload(body, &wdmp.Row, ReadEntireBody); err != nil {
-		return
-	}
+	err = wrp.NewDecoder(input, wrp.JSON).Decode(&wdmp.Row)
 
-	if len(wdmp.Row) == 0 {
-		err = errors.New("input data is empty")
-		return
-	}
-
-	payload, err = json.Marshal(wdmp)
 	return
 }
 
-func ReplaceFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEntireBody BodyReader) (payload []byte, err error) {
-	wdmp := &ReplaceRowsWDMP{Command: COMMAND_REPLACE_ROWS}
+func ReplaceFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp *ReplaceRowsWDMP, err error) {
+	wdmp = &ReplaceRowsWDMP{Command: COMMAND_REPLACE_ROWS}
 
 	if table, exists := GetFromUrlPath(tableName, urlVars); exists {
 		wdmp.Table = table
@@ -105,15 +87,12 @@ func ReplaceFlavorFormat(body io.Reader, urlVars Vars, tableName string, ReadEnt
 		return
 	}
 
-	if err = DecodeJsonPayload(body, &wdmp.Rows, ReadEntireBody); err != nil {
+	if err = wrp.NewDecoder(input, wrp.JSON).Decode(&wdmp.Rows); err != nil {
 		return
 	}
 
-	if err = validation.Validate(wdmp.Rows, validation.Required); err != nil {
-		return
-	}
+	err = validation.Validate(wdmp.Rows, validation.Required)
 
-	payload, err = json.Marshal(wdmp)
 	return
 }
 
@@ -125,7 +104,10 @@ func ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
 		wdmp.Command = COMMAND_SET
 		if newCid := header.Get(HEADER_WPA_SYNC_NEW_CID); newCid != "" {
 			wdmp.OldCid, wdmp.NewCid = header.Get(HEADER_WPA_SYNC_OLD_CID), newCid
-			wdmp.SyncCmc = SetOrLeave(wdmp.SyncCmc, header.Get(HEADER_WPA_SYNC_CMC)) //field is optional
+
+			if syncCmc := header.Get(HEADER_WPA_SYNC_CMC); syncCmc != "" {
+				wdmp.SyncCmc = syncCmc
+			}
 			wdmp.Command = COMMAND_TEST_SET
 		}
 	} else {
@@ -139,45 +121,30 @@ func ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
 	return
 }
 
-/* Other helper functions */
-func DecodeJsonPayload(body io.Reader, v interface{}, ReadEntireBody BodyReader) (err error) {
-	payload, err := ReadEntireBody(body)
-
-	if err != nil {
-		return
-	}
-
-	if len(payload) == 0 {
-		err = ErrJsonEmpty
-		return
-	}
-
-	err = json.Unmarshal(payload, v)
-	return
-}
-
-func GetFromUrlPath(key string, urlVars map[string]string) (val string, exists bool) {
+/* Same as invoking urlVars[key] directly but urlVars can be nil in which case key does not exist in it*/
+func GetFromUrlPath(key string, urlVars Vars) (val string, exists bool) {
 	if urlVars != nil {
 		val, exists = urlVars[key]
 	}
 	return
 }
 
-//if newVal is empty, the currentVal is return
-//else newVal is return
-func SetOrLeave(currentVal, newVal string) string {
-	if validation.Validate(newVal, validation.Required) != nil {
-		return currentVal
+//Given an encoded wrp message, decode it and return its payload
+func ExtractPayload(input io.Reader, format wrp.Format) (payload []byte, err error) {
+	wrpResponse := &wrp.Message{}
+
+	if err = wrp.NewDecoder(input, format).Decode(wrpResponse); err == nil {
+		payload = wrpResponse.Payload
 	}
-	return newVal
+
+	return
 }
 
-func ExtractPayloadFromWrp(body io.Reader, ReadAll BodyReader) (payload []byte, err error) {
-	wrpResponse := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType}
-
-	if err = DecodeJsonPayload(body, wrpResponse, ReadAll); err != nil {
-		return
-	}
-	payload = wrpResponse.Payload
+//Wraps common encoder. Using a temporary buffer, simply returns
+//encoded data and error when applicable
+func GenericEncode(v interface{}, f wrp.Format) (data []byte, err error) {
+	var tmp bytes.Buffer
+	err = wrp.NewEncoder(&tmp, f).Encode(v)
+	data = tmp.Bytes()
 	return
 }
