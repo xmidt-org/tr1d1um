@@ -49,7 +49,7 @@ func (m *MockConversionTool) GetFromUrlPath(key string, vars Vars) (string, bool
 }
 
 func (m *MockConversionTool) GetConfiguredWrp(wdmp []byte, pathVars Vars, header http.Header) (wrpMsg *wrp.Message) {
-	args := m.Called(header, wdmp)
+	args := m.Called(wdmp, pathVars, header)
 	return args.Get(0).(*wrp.Message)
 }
 
