@@ -19,7 +19,7 @@ type Tr1d1umConfig struct {
 	MaxHealthTcpConns int64    `json:"maxHealthTcpConnections"`
 	ServiceList       []string `json:"serviceList"`
 	WrpSource         string   `json:"wrpSource"`
-	targetUrl         string   `json:"targetUrl"`
+	targetURL         string   `json:"targetUrl"`
 
 	JWTValidators []struct {
 		// JWTKeys is used to create the key.Resolver for JWT verification keys

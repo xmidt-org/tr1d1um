@@ -1,17 +1,135 @@
 package main
 
 import (
+	"bytes"
 	"errors"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/stretchr/testify/assert"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 )
 
 const errMsg = "shared failure"
+
+var (
+	payload, recorder, body                  = []byte("SomePayload"), httptest.NewRecorder(), bytes.NewBufferString("body")
+	resp                                     = &http.Response{}
+	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
+	ch                                       = &ConversionHandler{
+		wdmpConvert:    mockConversion,
+		sender:         mockSender,
+		encodingHelper: mockEncoding,
+		errorLogger:    &logTracker{}, //todo: temparary as webpacommon mock for logging is hard to follow
+	}
+)
+
+func TestConversionHandler(t *testing.T) {
+	assert := assert.New(t)
+	commonURL := "http://device/config?"
+	commonRequest := httptest.NewRequest(http.MethodGet, commonURL, nil)
+
+	t.Run("ErrDataParse", func(testing *testing.T) {
+		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
+			Return(&GetWDMP{}, errors.New(errMsg)).Once()
+
+		ch.ConversionHandler(recorder, commonRequest)
+		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+
+		mockConversion.AssertExpectations(t)
+	})
+
+	t.Run("ErrEncode", func(testing *testing.T) {
+		mockEncoding.On("EncodeJSON", wdmpGet).Return([]byte(""), errors.New(errMsg)).Once()
+		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
+			Return(wdmpGet, nil).Once()
+
+		recorder = httptest.NewRecorder()
+		ch.ConversionHandler(recorder, commonRequest)
+
+		mockEncoding.AssertExpectations(t)
+		mockConversion.AssertExpectations(t)
+	})
+
+	t.Run("IdealGet", func(t *testing.T) {
+		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").Return(wdmpGet, nil).Once()
+
+		SetUpTest(wdmpGet, commonRequest)
+		AssertCommonCalls(t)
+	})
+
+	t.Run("IdealSet", func(t *testing.T) {
+		commonRequest = httptest.NewRequest(http.MethodPatch, commonURL, body)
+
+		mockConversion.On("SetFlavorFormat", commonRequest).Return(wdmpSet, nil).Once()
+
+		SetUpTest(wdmpSet, commonRequest)
+		AssertCommonCalls(t)
+	})
+
+	t.Run("IdealAdd", func(t *testing.T) {
+		commonRequest = httptest.NewRequest(http.MethodPost, commonURL, body)
+		var urlVars Vars = mux.Vars(commonRequest)
+
+		mockConversion.On("AddFlavorFormat", commonRequest.Body, urlVars, "parameter").
+			Return(wdmpAdd, nil).Once()
+
+		SetUpTest(wdmpAdd, commonRequest)
+		AssertCommonCalls(t)
+	})
+
+	t.Run("IdealReplace", func(t *testing.T) {
+		commonRequest = httptest.NewRequest(http.MethodPut, commonURL, body)
+		var urlVars Vars = mux.Vars(commonRequest)
+
+		mockConversion.On("ReplaceFlavorFormat", commonRequest.Body, urlVars, "parameter").
+			Return(wdmpReplace, nil).Once()
+
+		SetUpTest(wdmpReplace, commonRequest)
+		AssertCommonCalls(t)
+	})
+
+	t.Run("IdealDelete", func(t *testing.T) {
+		commonRequest = httptest.NewRequest(http.MethodDelete, commonURL, body)
+		var urlVars Vars = mux.Vars(commonRequest)
+
+		mockConversion.On("DeleteFlavorFormat", urlVars, "parameter").Return(wdmpDel, nil).Once()
+
+		SetUpTest(wdmpDel, commonRequest)
+		AssertCommonCalls(t)
+	})
+}
+
+func SetUpTest(encodeArg interface{}, req *http.Request) {
+	recorder = httptest.NewRecorder()
+
+	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
+	mockSender.On("Send", ch, recorder, payload, req).Return(resp, nil).Once()
+	mockSender.On("HandleResponse", ch, nil, resp, recorder).Once()
+
+	ch.ConversionHandler(recorder, req)
+}
+
+func AssertCommonCalls(t *testing.T) {
+	mockConversion.AssertExpectations(t)
+	mockEncoding.AssertExpectations(t)
+	mockSender.AssertExpectations(t)
+}
+
+type Catcher struct {
+	LasResult         interface{}
+	SendRequestCalled bool
+}
+
+func (catcher *Catcher) CatchResult(v interface{}) ([]byte, error) {
+	catcher.LasResult = v
+	return nil, nil
+}
+func (catcher *Catcher) InterceptRequest(_ *ConversionHandler, _ http.ResponseWriter, _ *wrp.Message) {
+	catcher.SendRequestCalled = true
+}
 
 type logTracker struct {
 	keys []interface{}
@@ -27,131 +145,4 @@ func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
 		}
 	}
 	return
-}
-
-func (fake *logTracker) Reset() {
-	fake.vals = nil
-	fake.keys = nil
-}
-
-var FailingEncode = func(_ interface{}) ([]byte, error) {
-	return nil, errors.New(errMsg)
-}
-
-func TestConversionHandler(t *testing.T) {
-	assert := assert.New(t)
-	fakeLogger := logTracker{}
-	ch := &ConversionHandler{errorLogger: &fakeLogger}
-
-	resultCatcher := &Catcher{}
-	ch.EncodeJson = resultCatcher.CatchResult
-	ch.SendRequest = resultCatcher.InterceptRequest
-
-	t.Run("ErrDataParse", func(testing *testing.T) {
-		defer fakeLogger.Reset()
-		commonRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
-
-		//force GetFlavorFormat to fail
-		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) (*GetWDMP, error) {
-			return nil, errors.New(errMsg)
-		}
-
-		recorder := httptest.NewRecorder()
-		ch.ConversionHandler(recorder, commonRequest)
-
-		assert.EqualValues(2, len(fakeLogger.vals))
-		assert.EqualValues(2, len(fakeLogger.keys))
-		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[1])
-		assert.EqualValues(errMsg, fakeLogger.vals[1])
-	})
-
-	t.Run("ErrEncode", func(testing *testing.T) {
-		defer fakeLogger.Reset()
-
-		ch.EncodeJson = FailingEncode
-		commonRequest := httptest.NewRequest(http.MethodGet, "http://device/config?", nil)
-
-		//force GetFlavorFormat to succeed
-		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) (*GetWDMP, error) {
-			return nil, nil
-		}
-
-		recorder := httptest.NewRecorder()
-		ch.ConversionHandler(recorder, commonRequest)
-
-		assert.EqualValues(1, len(fakeLogger.vals))
-		assert.EqualValues(1, len(fakeLogger.keys))
-		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
-		assert.EqualValues(logging.ErrorKey(), fakeLogger.keys[0])
-		assert.EqualValues(errMsg, fakeLogger.vals[0])
-
-		ch.EncodeJson = resultCatcher.CatchResult
-	})
-
-	t.Run("IdealGet", func(t *testing.T) {
-		ch.GetFlavorFormat = func(_ *http.Request, _ string, _ string, _ string) (*GetWDMP, error) {
-			return wdmpGet, nil
-		}
-
-		AssertCommon(ch, http.MethodGet, wdmpGet, resultCatcher, assert)
-	})
-
-	t.Run("IdealSet", func(t *testing.T) {
-		ch.SetFlavorFormat = func(_ *http.Request) (*SetWDMP, error) {
-			return wdmpSet, nil
-		}
-
-		AssertCommon(ch, http.MethodPatch, wdmpSet, resultCatcher, assert)
-	})
-
-	t.Run("IdealAdd", func(t *testing.T) {
-		ch.AddFlavorFormat = func(_ io.Reader, _ Vars, _ string) (*AddRowWDMP, error) {
-			return wdmpAdd, nil
-		}
-
-		AssertCommon(ch, http.MethodPost, wdmpAdd, resultCatcher, assert)
-	})
-
-	t.Run("IdealReplace", func(t *testing.T) {
-		ch.ReplaceFlavorFormat = func(_ io.Reader, _ Vars, _ string) (*ReplaceRowsWDMP, error) {
-			return wdmpReplace, nil
-		}
-
-		AssertCommon(ch, http.MethodPut, wdmpReplace, resultCatcher, assert)
-	})
-
-	t.Run("IdealDelete", func(t *testing.T) {
-		ch.DeleteFlavorFormat = func(_ Vars, _ string) (*DeleteRowWDMP, error) {
-			return wdmpDel, nil
-		}
-
-		AssertCommon(ch, http.MethodDelete, wdmpDel, resultCatcher, assert)
-	})
-}
-
-func AssertCommon(ch *ConversionHandler, method string, expected interface{}, c *Catcher, assert *assert.Assertions) {
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(method, "http://someurl", nil)
-	ch.ConversionHandler(recorder, req)
-	assert.EqualValues(expected, c.LasResult)
-	assert.True(c.SendRequestCalled)
-
-	//reset values
-	c.SendRequestCalled = false
-	c.LasResult = nil
-}
-
-type Catcher struct {
-	LasResult         interface{}
-	SendRequestCalled bool
-}
-
-func (catcher *Catcher) CatchResult(v interface{}) ([]byte, error) {
-	catcher.LasResult = v
-	return nil, nil
-}
-
-func (catcher *Catcher) InterceptRequest(_ *ConversionHandler, _ http.ResponseWriter, _ *wrp.Message) {
-	catcher.SendRequestCalled = true
 }

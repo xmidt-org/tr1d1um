@@ -94,22 +94,11 @@ func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log
 	if err != nil {
 		timeOut = time.Second * 60 //default val
 	}
-	cHandler = &ConversionHandler{timeOut: timeOut, targetUrl: tConfig.targetUrl}
+	cHandler = &ConversionHandler{timeOut: timeOut, targetURL: tConfig.targetURL}
 	//pass loggers
 	cHandler.errorLogger = errorLogger
 	cHandler.infoLogger = infoLogger
-	//set functions
-	cHandler.GetFlavorFormat = GetFlavorFormat
-	cHandler.SetFlavorFormat = SetFlavorFormat
-	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
-	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
-	cHandler.AddFlavorFormat = AddFlavorFormat
-
-	cHandler.SendRequest = SendRequest
-	cHandler.HandleResponse = HandleResponse
-	cHandler.EncodeJson = EncodeJson
-
-	cHandler.targetUrl = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
+	cHandler.targetURL = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
 	return
 }
 
