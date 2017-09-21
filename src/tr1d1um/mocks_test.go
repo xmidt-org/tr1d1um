@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http"
+
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/stretchr/testify/mock"
 )
 
 /*  Mocks for ConversionTool  */
@@ -43,12 +44,12 @@ func (m *MockConversionTool) ValidateAndDeduceSET(header http.Header, wdmp *SetW
 	return args.Error(0)
 }
 
-func (m *MockConversionTool) GetFromUrlPath(key string, vars Vars) (string, bool) {
+func (m *MockConversionTool) GetFromURLPath(key string, vars Vars) (string, bool) {
 	args := m.Called(key, vars)
 	return args.String(0), args.Bool(1)
 }
 
-func (m *MockConversionTool) GetConfiguredWrp(wdmp []byte, pathVars Vars, header http.Header) (wrpMsg *wrp.Message) {
+func (m *MockConversionTool) GetConfiguredWRP(wdmp []byte, pathVars Vars, header http.Header) (wrpMsg *wrp.Message) {
 	args := m.Called(wdmp, pathVars, header)
 	return args.Get(0).(*wrp.Message)
 }

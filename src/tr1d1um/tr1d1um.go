@@ -1,6 +1,10 @@
 package main
 
 import (
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/secure/handler"
@@ -12,9 +16,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"net/http"
-	"os"
-	"time"
 )
 
 const (
@@ -120,7 +121,7 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 	return
 }
 
-// getValidator returns validator for JWT tokens
+//GetValidator returns a validator for JWT tokens
 func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	default_validators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator

@@ -1,11 +1,12 @@
 package main
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"net/http"
-	"time"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -52,7 +53,7 @@ func (ch *ConversionHandler) ConversionHandler(origin http.ResponseWriter, req *
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
-		ch.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
+		ch.errorLogger.Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
 

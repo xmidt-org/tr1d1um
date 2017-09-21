@@ -15,7 +15,7 @@ import (
 const errMsg = "shared failure"
 
 var (
-	payload, recorder, body                  = []byte("SomePayload"), httptest.NewRecorder(), bytes.NewBufferString("body")
+	payload, body                            = []byte("SomePayload"), bytes.NewBufferString("body")
 	resp                                     = &http.Response{}
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
 	ch                                       = &ConversionHandler{
@@ -35,6 +35,7 @@ func TestConversionHandler(t *testing.T) {
 		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
 			Return(&GetWDMP{}, errors.New(errMsg)).Once()
 
+		recorder := httptest.NewRecorder()
 		ch.ConversionHandler(recorder, commonRequest)
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 
@@ -46,7 +47,7 @@ func TestConversionHandler(t *testing.T) {
 		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
 			Return(wdmpGet, nil).Once()
 
-		recorder = httptest.NewRecorder()
+		recorder := httptest.NewRecorder()
 		ch.ConversionHandler(recorder, commonRequest)
 
 		mockEncoding.AssertExpectations(t)
@@ -103,7 +104,7 @@ func TestConversionHandler(t *testing.T) {
 }
 
 func SetUpTest(encodeArg interface{}, req *http.Request) {
-	recorder = httptest.NewRecorder()
+	recorder := httptest.NewRecorder()
 
 	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
 	mockSender.On("Send", ch, recorder, payload, req).Return(resp, nil).Once()

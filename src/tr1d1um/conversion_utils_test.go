@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -21,17 +22,17 @@ var (
 	replaceRows      = IndexRow{"0": {"uno": "one", "dos": "two"}}
 	addRows          = map[string]string{"uno": "one", "dos": "two"}
 
-	wdmpGet      = &GetWDMP{Command: COMMAND_GET, Names: sampleNames}
-	wdmpGetAttrs = &GetWDMP{Command: COMMAND_GET_ATTRS, Names: sampleNames, Attribute: "attr1"}
-	wdmpSet      = &SetWDMP{Command: COMMAND_SET_ATTRS, Parameters: []SetParam{valid}}
-	wdmpDel      = &DeleteRowWDMP{Command: COMMAND_DELETE_ROW, Row: "rowName"}
-	wdmpReplace  = &ReplaceRowsWDMP{Command: COMMAND_REPLACE_ROWS, Table: commonVars["uThere?"], Rows: replaceRows}
-	wdmpAdd      = &AddRowWDMP{Command: COMMAND_ADD_ROW, Table: commonVars["uThere?"], Row: addRows}
+	wdmpGet      = &GetWDMP{Command: CommandGet, Names: sampleNames}
+	wdmpGetAttrs = &GetWDMP{Command: CommandGetAttrs, Names: sampleNames, Attribute: "attr1"}
+	wdmpSet      = &SetWDMP{Command: CommandSetAttrs, Parameters: []SetParam{valid}}
+	wdmpDel      = &DeleteRowWDMP{Command: CommandDeleteRow, Row: "rowName"}
+	wdmpReplace  = &ReplaceRowsWDMP{Command: CommandReplaceRows, Table: commonVars["uThere?"], Rows: replaceRows}
+	wdmpAdd      = &AddRowWDMP{Command: CommandAddRow, Table: commonVars["uThere?"], Row: addRows}
 )
 
 func TestGetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	c := ConversionWdmp{}
+	c := ConversionWDMP{}
 
 	t.Run("IdealGet", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2", nil)
@@ -65,7 +66,7 @@ func TestGetFlavorFormat(t *testing.T) {
 
 func TestSetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	c := ConversionWdmp{&EncodingHelper{}}
+	c := ConversionWDMP{&EncodingHelper{}}
 	commonUrl := "http://device/config?k=v"
 	var req *http.Request
 
@@ -107,7 +108,7 @@ func TestSetFlavorFormat(t *testing.T) {
 		wdmp, err := c.SetFlavorFormat(req)
 
 		assert.Nil(err)
-		assert.EqualValues(COMMAND_SET, wdmp.Command)
+		assert.EqualValues(CommandSet, wdmp.Command)
 		assert.EqualValues(name, *wdmp.Parameters[0].Name)
 		assert.EqualValues(value, wdmp.Parameters[0].Value)
 		assert.EqualValues(3, *wdmp.Parameters[0].DataType)
@@ -117,13 +118,13 @@ func TestSetFlavorFormat(t *testing.T) {
 		input := bytes.NewBufferString(`{"parameters":[{"name": "someName","value":"someVal","dataType":3}]}`)
 
 		req := httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", input)
-		req.Header.Set(HEADER_WPA_SYNC_CMC, "sync-val")
-		req.Header.Set(HEADER_WPA_SYNC_NEW_CID, "newCid")
+		req.Header.Set(HeaderWPASyncCMC, "sync-val")
+		req.Header.Set(HeaderWPASyncNewCID, "newCid")
 
 		wdmp, err := c.SetFlavorFormat(req)
 
 		assert.Nil(err)
-		assert.EqualValues(COMMAND_TEST_SET, wdmp.Command)
+		assert.EqualValues(CommandTestSet, wdmp.Command)
 		assert.EqualValues(name, *wdmp.Parameters[0].Name)
 		assert.EqualValues(value, wdmp.Parameters[0].Value)
 		assert.EqualValues(3, *wdmp.Parameters[0].DataType)
@@ -135,7 +136,7 @@ func TestSetFlavorFormat(t *testing.T) {
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
-	c := ConversionWdmp{&EncodingHelper{}}
+	c := ConversionWDMP{&EncodingHelper{}}
 
 	t.Run("NoRowName", func(t *testing.T) {
 		_, err := c.DeleteFlavorFormat(Vars{}, "param")
@@ -160,7 +161,7 @@ func TestReplaceFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
-	c := ConversionWdmp{&EncodingHelper{}}
+	c := ConversionWDMP{&EncodingHelper{}}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.ReplaceFlavorFormat(nil, emptyVars, "uThere?")
@@ -198,7 +199,7 @@ func TestAddFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	emptyVars := Vars{}
 
-	c := ConversionWdmp{&EncodingHelper{}}
+	c := ConversionWDMP{&EncodingHelper{}}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.AddFlavorFormat(nil, emptyVars, "uThere?")
@@ -235,30 +236,30 @@ func TestAddFlavorFormat(t *testing.T) {
 	})
 }
 
-func TestGetFromUrlPath(t *testing.T) {
+func TestGetFromURLPath(t *testing.T) {
 	assert := assert.New(t)
 
 	fakeUrlVar := map[string]string{"k1": "k1v1,k1v2", "k2": "k2v1"}
-	c := ConversionWdmp{}
+	c := ConversionWDMP{}
 
 	t.Run("NormalCases", func(t *testing.T) {
 
-		k1ValGroup, exists := c.GetFromUrlPath("k1", fakeUrlVar)
+		k1ValGroup, exists := c.GetFromURLPath("k1", fakeUrlVar)
 		assert.True(exists)
 		assert.EqualValues("k1v1,k1v2", k1ValGroup)
 
-		k2ValGroup, exists := c.GetFromUrlPath("k2", fakeUrlVar)
+		k2ValGroup, exists := c.GetFromURLPath("k2", fakeUrlVar)
 		assert.True(exists)
 		assert.EqualValues("k2v1", k2ValGroup)
 	})
 
 	t.Run("NonNilNonExistent", func(t *testing.T) {
-		_, exists := c.GetFromUrlPath("k3", fakeUrlVar)
+		_, exists := c.GetFromURLPath("k3", fakeUrlVar)
 		assert.False(exists)
 	})
 
 	t.Run("NilCase", func(t *testing.T) {
-		_, exists := c.GetFromUrlPath("k", nil)
+		_, exists := c.GetFromURLPath("k", nil)
 		assert.False(exists)
 	})
 }
@@ -269,12 +270,12 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 	empty := []SetParam{}
 	attrs := Attr{"attr1": 1, "attr2": "two"}
 
-	c := ConversionWdmp{}
+	c := ConversionWDMP{}
 	noDataType := SetParam{Value: value, Name: &name}
 	valid := SetParam{Name: &name, DataType: &dataType, Value: value}
 	attrParam := SetParam{Name: &name, DataType: &dataType, Attributes: attrs}
 
-	testAndSetHeader := http.Header{HEADER_WPA_SYNC_NEW_CID: []string{"newCid"}}
+	testAndSetHeader := http.Header{HeaderWPASyncNewCID: []string{"newCid"}}
 	emptyHeader := http.Header{}
 
 	wdmp := new(SetWDMP)
@@ -307,19 +308,19 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 	t.Run("MultipleValidSET", func(t *testing.T) {
 		wdmp.Parameters = append(empty, valid, valid)
 		assert.Nil(c.ValidateAndDeduceSET(emptyHeader, wdmp))
-		assert.EqualValues(COMMAND_SET, wdmp.Command)
+		assert.EqualValues(CommandSet, wdmp.Command)
 	})
 
 	t.Run("MultipleValidTEST_SET", func(t *testing.T) {
 		wdmp.Parameters = append(empty, valid, valid)
 		assert.Nil(c.ValidateAndDeduceSET(testAndSetHeader, wdmp))
-		assert.EqualValues(COMMAND_TEST_SET, wdmp.Command)
+		assert.EqualValues(CommandTestSet, wdmp.Command)
 	})
 
 	t.Run("MultipleValidSET_ATTRS", func(t *testing.T) {
 		wdmp.Parameters = append(empty, attrParam, attrParam)
 		assert.Nil(c.ValidateAndDeduceSET(emptyHeader, wdmp))
-		assert.EqualValues(COMMAND_SET_ATTRS, wdmp.Command)
+		assert.EqualValues(CommandSetAttrs, wdmp.Command)
 	})
 }
 
@@ -394,24 +395,24 @@ func TestGenericEncode(t *testing.T) {
 	assert.EqualValues(expectedEncoding, actualEncoding)
 }
 
-func TestGetConfiguredWrp(t *testing.T) {
+func TestGetConfiguredWRP(t *testing.T) {
 	assert := assert.New(t)
 	deviceID := "mac:112233445566"
 	service := "webpaService"
 	tid := "uniqueVal"
 
-	c := ConversionWdmp{}
+	c := ConversionWDMP{}
 
 	inputVars := Vars{"service": service, "deviceid": deviceID}
 	inputHeader := http.Header{}
 	inputHeader.Set("Content-Type", wrp.JSON.ContentType())
-	inputHeader.Set(HEADER_WPA_TID, tid)
+	inputHeader.Set(HeaderWPATID, tid)
 	inputWdmpPayload := []byte(`{irrelevantFormat}`)
 
-	expectedSource := WRP_SOURCE + "/" + service
+	expectedSource := WRPSource + "/" + service
 	expectedDest := deviceID + "/" + service
 
-	wrpMsg := c.GetConfiguredWrp(inputWdmpPayload, inputVars, inputHeader)
+	wrpMsg := c.GetConfiguredWRP(inputWdmpPayload, inputVars, inputHeader)
 
 	assert.NotNil(wrpMsg)
 	assert.EqualValues(wrp.JSON.ContentType(), wrpMsg.ContentType)
