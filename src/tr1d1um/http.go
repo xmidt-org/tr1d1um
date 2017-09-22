@@ -7,6 +7,10 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+//	"github.com/Comcast/webpa-common/wrp"
+//	"encoding/json"
+//	"bytes"
+//	"fmt"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -21,7 +25,7 @@ type ConversionHandler struct {
 }
 
 //ConversionHandler handles the different incoming tr1 requests
-func (ch *ConversionHandler) ConversionHandler(origin http.ResponseWriter, req *http.Request) {
+func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
 	var err error
 	var wdmp interface{}
 	var urlVars Vars

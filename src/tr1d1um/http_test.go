@@ -36,7 +36,7 @@ func TestConversionHandler(t *testing.T) {
 			Return(&GetWDMP{}, errors.New(errMsg)).Once()
 
 		recorder := httptest.NewRecorder()
-		ch.ConversionHandler(recorder, commonRequest)
+		ch.ServeHTTP(recorder, commonRequest)
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 
 		mockConversion.AssertExpectations(t)
@@ -48,7 +48,7 @@ func TestConversionHandler(t *testing.T) {
 			Return(wdmpGet, nil).Once()
 
 		recorder := httptest.NewRecorder()
-		ch.ConversionHandler(recorder, commonRequest)
+		ch.ServeHTTP(recorder, commonRequest)
 
 		mockEncoding.AssertExpectations(t)
 		mockConversion.AssertExpectations(t)
@@ -110,7 +110,7 @@ func SetUpTest(encodeArg interface{}, req *http.Request) {
 	mockSender.On("Send", ch, recorder, payload, req).Return(resp, nil).Once()
 	mockSender.On("HandleResponse", ch, nil, resp, recorder).Once()
 
-	ch.ConversionHandler(recorder, req)
+	ch.ServeHTTP(recorder, req)
 }
 
 func AssertCommonCalls(t *testing.T) {

@@ -192,7 +192,7 @@ func (helper *EncodingHelper) EncodeJSON(v interface{}) (data []byte, err error)
 
 //ExtractPayload decodes an encoded wrp message and returns its payload
 func (helper *EncodingHelper) ExtractPayload(input io.Reader, format wrp.Format) (payload []byte, err error) {
-	wrpResponse := &wrp.Message{}
+	wrpResponse := &wrp.Message{Type:wrp.SimpleRequestResponseMessageType}
 
 	if err = wrp.NewDecoder(input, format).Decode(wrpResponse); err == nil {
 		payload = wrpResponse.Payload

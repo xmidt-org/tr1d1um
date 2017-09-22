@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"fmt"
+	"os/signal"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
@@ -16,22 +18,26 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/Comcast/webpa-common/concurrent"
 )
 
 const (
 	applicationName = "tr1d1um"
 	DefaultKeyId    = "current"
+	baseURI = "/api"
+	version = "v2"// TODO: Should these values change?
 )
 
 func tr1d1um(arguments []string) int {
 	var (
 		f              = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 		v              = viper.New()
-		logger, _, err = server.Initialize(applicationName, arguments, f, v)
+		logger, webPA , err = server.Initialize(applicationName, arguments, f, v)
 	)
 	if err != nil {
-		logging.Error(logger).Log(logging.MessageKey(), "Unable to initialize Viper environment: %s\n",
+		logging.Error(logger).Log(logging.MessageKey(), "Unable to initialize Viper environment",
 			logging.ErrorKey(), err)
+		fmt.Fprint(os.Stderr, "Unable to initialize viper" + err.Error())
 		return 1
 	}
 
@@ -48,6 +54,8 @@ func tr1d1um(arguments []string) int {
 	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
 	if err != nil {
 		errorLogger.Log(messageKey, "Unable to unmarshal configuration data into struct", errorKey, err)
+
+		fmt.Fprint(os.Stderr, "Unable to unmarshall config")
 		return 1
 	}
 
@@ -55,50 +63,66 @@ func tr1d1um(arguments []string) int {
 
 	if err != nil {
 		infoLogger.Log(messageKey, "Error setting up pre handler", errorKey, err)
+
+		fmt.Fprint(os.Stderr, "error setting up prehandler")
 		return 1
 	}
 
-	conversionHandler := SetUpHandler(tConfig, errorLogger, infoLogger)
+	conversionHandler := SetUpHandler(tConfig, logger)
 
-	r := mux.NewRouter()
+	AddRoutes(preHandler, conversionHandler)
 
-	r = AddRoutes(r, preHandler, conversionHandler)
+	_, tr1d1umServer := webPA.Prepare(logger, nil, conversionHandler)
 
-	//todo: finish this initialization method
+	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
+
+	signals  := make(chan os.Signal, 1)
+
+	signal.Notify(signals)
+	<-signals
+	close(shutdown)
+
+	waitGroup.Wait()
 
 	return 0
 }
 
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
+func AddRoutes(preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
 		return request.Body != nil
 	}
 
-	//todo: inquire about API version
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
+	r := mux.NewRouter()
+	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, version)).Subrouter()
+
+	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodGet)
 
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
+	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
 
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionHandler)).Methods(http.MethodDelete)
+	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
+	Methods(http.MethodDelete)
 
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionHandler)).Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
-
-	return r
+	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
+	Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
 }
 
-func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
+func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *ConversionHandler) {
 	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
 	if err != nil {
 		timeOut = time.Second * 60 //default val
 	}
-	cHandler = &ConversionHandler{timeOut: timeOut, targetURL: tConfig.targetURL}
+	cHandler = &ConversionHandler{
+		timeOut: timeOut,
+		targetURL: tConfig.targetURL,
+		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
+		sender: &Tr1SendAndHandle{log:logger, timedClient:&http.Client{Timeout:time.Second*5}, NewHTTPRequest:http.NewRequest},
+		encodingHelper:&EncodingHelper{},
+		}
 	//pass loggers
-	cHandler.errorLogger = errorLogger
-	cHandler.infoLogger = infoLogger
+	cHandler.errorLogger = logging.Error(logger)
+	cHandler.infoLogger = logging.Info(logger)
 	cHandler.targetURL = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
 	return
 }
