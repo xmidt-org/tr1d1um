@@ -1,12 +1,12 @@
-hash: 3eec5107271bc3ff2719d45f3601279145b952cfb6c924b83da4e432d2faf8c6
-updated: 2017-09-15T11:46:13.542649385-07:00
+hash: b2c19c5eeb3cd43768a435dc971e642e34d9f530a7ea7f7c2dc6c4a4bd293c34
+updated: 2017-09-21T10:26:20.231225578-07:00
 imports:
 - name: github.com/c9s/goprocinfo
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
   subpackages:
   - linux
 - name: github.com/Comcast/webpa-common
-  version: cb246362b61aaf042a936fa615a48554d111f9b4
+  version: 5ec9cf570e11eb4bef1162c269f3d301040e7be9
   subpackages:
   - concurrent
   - health
@@ -40,7 +40,7 @@ imports:
 - name: github.com/gorilla/mux
   version: 392c28fe23e1c45ddba891b0320b3b5df220beea
 - name: github.com/hashicorp/hcl
-  version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
+  version: 8f6b1344a92ff8877cf24a5de9177bf7d0a2a187
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -53,15 +53,15 @@ imports:
 - name: github.com/jtacoma/uritemplates
   version: 307ae868f90f4ee1b73ebe4596e0394237dacce8
 - name: github.com/justinas/alice
-  version: 1051eaf52fcafdd87ead59d28b065f1fcb8274ec
+  version: 052b8b6c18edb9db317af86806d8e00ebaa94160
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/magiconair/properties
-  version: be5ece7dd465ab0765a9682137865547526d1dfb
+  version: 8d7837e64d3c1ee4e54a880c5a920ab4316fc90a
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/pelletier/go-toml
-  version: 69d355db5304c0f7f809a2edc054553e7142f016
+  version: 9c1b4e331f1e3d98e72600677699fbe212cd6d16
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
@@ -73,13 +73,13 @@ imports:
   - jws
   - jwt
 - name: github.com/spf13/afero
-  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  version: ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b
   subpackages:
   - mem
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/jwalterweatherman
-  version: 0efa5202c04663c757d84f90f5219c1250baf94f
+  version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
@@ -98,16 +98,18 @@ imports:
   subpackages:
   - codec
 - name: golang.org/x/sys
-  version: e312636bdaa2fac4f0acde9d17ab9fbad2b4ad10
+  version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
+  version: bd91bbf73e9a4a801adbfb97133c992678533126
   subpackages:
   - transform
   - unicode/norm
+- name: gopkg.in/h2non/gock.v1
+  version: 84d599244901620fb3eb96473eb9e50619f69b47
 - name: gopkg.in/natefinch/lumberjack.v2
   version: a96e63847dc3c67d17befa69c303767e2f84e54f
 - name: gopkg.in/yaml.v2
-  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
+  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports: []

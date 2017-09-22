@@ -1,6 +1,10 @@
 package main
 
 import (
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/secure/handler"
@@ -12,9 +16,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"net/http"
-	"os"
-	"time"
 )
 
 const (
@@ -74,25 +75,53 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	}
 
 	//todo: inquire about API version
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionGETHandler)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
 		Methods(http.MethodGet)
 
-	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionSETHandler)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.ThenFunc(conversionHandler.ConversionHandler)).
 		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionDELETEHandler)).Methods(http.MethodDelete)
+		ConversionHandler)).Methods(http.MethodDelete)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionADDHandler)).Methods(http.MethodPost).MatcherFunc(BodyNonNil)
-
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.ThenFunc(conversionHandler.
-		ConversionREPLACEHandler)).Methods(http.MethodPut).MatcherFunc(BodyNonNil)
+		ConversionHandler)).Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
 
 	return r
 }
 
-// getValidator returns validator for JWT tokens
+func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
+	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
+	if err != nil {
+		timeOut = time.Second * 60 //default val
+	}
+	cHandler = &ConversionHandler{timeOut: timeOut, targetURL: tConfig.targetURL}
+	//pass loggers
+	cHandler.errorLogger = errorLogger
+	cHandler.infoLogger = infoLogger
+	cHandler.targetURL = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
+	return
+}
+
+func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
+	validator, err := GetValidator(v)
+	if err != nil {
+		return
+	}
+
+	authHandler := handler.AuthorizationHandler{
+		HeaderName:          "Authorization",
+		ForbiddenStatusCode: 403,
+		Validator:           validator,
+		Logger:              logger,
+	}
+
+	newPreHandler := alice.New(authHandler.Decorate)
+	preHandler = &newPreHandler
+	return
+}
+
+//GetValidator returns a validator for JWT tokens
 func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	default_validators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator
@@ -138,39 +167,6 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 
 	validator = validators
 
-	return
-}
-
-func SetUpHandler(tConfig *Tr1d1umConfig, errorLogger log.Logger, infoLogger log.Logger) (cHandler *ConversionHandler) {
-	cHandler = &ConversionHandler{timeOut: time.Duration(tConfig.timeOut), targetUrl: tConfig.targetUrl}
-	//pass loggers
-	cHandler.errorLogger = errorLogger
-	cHandler.infoLogger = infoLogger
-	//set functions
-	cHandler.GetFlavorFormat = GetFlavorFormat
-	cHandler.SetFlavorFormat = SetFlavorFormat
-	cHandler.DeleteFlavorFormat = DeleteFlavorFormat
-	cHandler.ReplaceFlavorFormat = ReplaceFlavorFormat
-	cHandler.AddFlavorFormat = AddFlavorFormat
-
-	return
-}
-
-func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
-	validator, err := GetValidator(v)
-	if err != nil {
-		return
-	}
-
-	authHandler := handler.AuthorizationHandler{
-		HeaderName:          "Authorization",
-		ForbiddenStatusCode: 403,
-		Validator:           validator,
-		Logger:              logger,
-	}
-
-	newPreHandler := alice.New(authHandler.Decorate)
-	preHandler = &newPreHandler
 	return
 }
 

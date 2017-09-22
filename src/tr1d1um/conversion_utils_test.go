@@ -2,56 +2,62 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
-	"github.com/stretchr/testify/assert"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
-	sampleNames        = []string{"p1", "p2"}
-	dataType    int8   = 3
-	value       string = "someVal"
-	name        string = "someName"
+	sampleNames             = []string{"p1", "p2"}
+	dataType         int8   = 3
+	value            string = "someVal"
+	name             string = "someName"
+	valid                   = SetParam{Name: &name, Attributes: Attr{"notify": 0}}
+	emptyInputBuffer bytes.Buffer
+	commonVars       = Vars{"uThere?": "yes!"}
+	replaceRows      = IndexRow{"0": {"uno": "one", "dos": "two"}}
+	addRows          = map[string]string{"uno": "one", "dos": "two"}
+
+	wdmpGet      = &GetWDMP{Command: CommandGet, Names: sampleNames}
+	wdmpGetAttrs = &GetWDMP{Command: CommandGetAttrs, Names: sampleNames, Attribute: "attr1"}
+	wdmpSet      = &SetWDMP{Command: CommandSetAttrs, Parameters: []SetParam{valid}}
+	wdmpDel      = &DeleteRowWDMP{Command: CommandDeleteRow, Row: "rowName"}
+	wdmpReplace  = &ReplaceRowsWDMP{Command: CommandReplaceRows, Table: commonVars["uThere?"], Rows: replaceRows}
+	wdmpAdd      = &AddRowWDMP{Command: CommandAddRow, Table: commonVars["uThere?"], Row: addRows}
 )
 
 func TestGetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
+	c := ConversionWDMP{}
 
 	t.Run("IdealGet", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2", nil)
 
-		wdmp := &GetWDMP{Command: COMMAND_GET, Names: sampleNames}
+		wdmp, err := c.GetFlavorFormat(req, "attributes", "names", ",")
 
-		expected, expectedErr := json.Marshal(wdmp)
-		actual, actualErr := GetFlavorFormat(req, "attributes", "names", ",")
-
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		assert.Nil(err)
+		assert.EqualValues(wdmpGet, wdmp)
 	})
 
 	t.Run("IdealGetAttr", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2&attributes=attr1",
 			nil)
 
-		wdmp := &GetWDMP{Command: COMMAND_GET_ATTRS, Names: sampleNames, Attribute: "attr1"}
+		wdmp, err := c.GetFlavorFormat(req, "attributes", "names", ",")
 
-		expected, expectedErr := json.Marshal(wdmp)
-		actual, actualErr := GetFlavorFormat(req, "attributes", "names", ",")
-
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		assert.Nil(err)
+		assert.EqualValues(wdmpGetAttrs, wdmp)
 	})
 
 	t.Run("NoNames", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=",
 			nil)
 
-		_, err := GetFlavorFormat(req, "attributes", "names", ",")
+		_, err := c.GetFlavorFormat(req, "attributes", "names", ",")
 
 		assert.NotNil(err)
 		assert.True(strings.HasPrefix(err.Error(), "names is a required"))
@@ -60,204 +66,201 @@ func TestGetFlavorFormat(t *testing.T) {
 
 func TestSetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	cReader := CustomResultReader{}
+	c := ConversionWDMP{&EncodingHelper{}}
+	commonUrl := "http://device/config?k=v"
+	var req *http.Request
 
-	valid := SetParam{Name: &name, DataType: &dataType, Value: value, Attributes: Attr{"notify": 0}}
-
-	req := httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", nil)
-
-	t.Run("DecodeJsonErr", func(t *testing.T) {
-		cReader.err = errors.New("JSON")
-		_, err := SetFlavorFormat(req, cReader.CustomReader)
+	t.Run("DecodeErr", func(t *testing.T) {
+		invalidBody := bytes.NewBufferString("{")
+		req = httptest.NewRequest(http.MethodPatch, commonUrl, invalidBody)
+		_, err := c.SetFlavorFormat(req)
 		assert.NotNil(err)
-		assert.EqualValues("JSON", err.Error())
 	})
 
 	t.Run("InvalidData", func(t *testing.T) {
-		cReader.data, cReader.err = []byte("{}"), nil
-		_, err := SetFlavorFormat(req, cReader.CustomReader)
+		emptyBody := bytes.NewBufferString(`{}`)
+		req = httptest.NewRequest(http.MethodPatch, commonUrl, emptyBody)
+
+		_, err := c.SetFlavorFormat(req)
 		assert.NotNil(err)
 		assert.EqualValues("cannot be blank", err.Error())
 	})
 
-	t.Run("IdealPath", func(t *testing.T) {
-		wdmpObj := &SetWDMP{Command: COMMAND_SET, Parameters: []SetParam{valid}}
+	t.Run("IdealSetAttrs", func(t *testing.T) {
+		input := bytes.NewBufferString(`{"parameters":[{"name": "someName","attributes":
+		{"notify": 0}}]}`)
 
-		cReader.data = []byte(`{"parameters":[{"name": "someName","value":"someVal","attributes": {"notify": 0},
-		"dataType": 3}]}`)
+		req = httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", input)
 
-		actual, actualErr := SetFlavorFormat(req, cReader.CustomReader)
-		expected, expectedErr := json.Marshal(wdmpObj)
+		wdmp, err := c.SetFlavorFormat(req)
 
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		assert.Nil(err)
+		assert.EqualValues(wdmpSet.Command, wdmp.Command)
+		assert.EqualValues(name, *wdmp.Parameters[0].Name)
+		assert.EqualValues(valid.Attributes["notify"], wdmp.Parameters[0].Attributes["notify"])
+	})
+
+	t.Run("IdealSet", func(t *testing.T) {
+		input := bytes.NewBufferString(`{"parameters":[{"name": "someName","value":"someVal","dataType":3}]}`)
+
+		req := httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", input)
+
+		wdmp, err := c.SetFlavorFormat(req)
+
+		assert.Nil(err)
+		assert.EqualValues(CommandSet, wdmp.Command)
+		assert.EqualValues(name, *wdmp.Parameters[0].Name)
+		assert.EqualValues(value, wdmp.Parameters[0].Value)
+		assert.EqualValues(3, *wdmp.Parameters[0].DataType)
+	})
+
+	t.Run("IdealTestSet", func(t *testing.T) {
+		input := bytes.NewBufferString(`{"parameters":[{"name": "someName","value":"someVal","dataType":3}]}`)
+
+		req := httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", input)
+		req.Header.Set(HeaderWPASyncCMC, "sync-val")
+		req.Header.Set(HeaderWPASyncNewCID, "newCid")
+
+		wdmp, err := c.SetFlavorFormat(req)
+
+		assert.Nil(err)
+		assert.EqualValues(CommandTestSet, wdmp.Command)
+		assert.EqualValues(name, *wdmp.Parameters[0].Name)
+		assert.EqualValues(value, wdmp.Parameters[0].Value)
+		assert.EqualValues(3, *wdmp.Parameters[0].DataType)
+		assert.EqualValues("sync-val", wdmp.SyncCmc)
+		assert.EqualValues("newCid", wdmp.NewCid)
 	})
 }
 
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
+	c := ConversionWDMP{&EncodingHelper{}}
 
 	t.Run("NoRowName", func(t *testing.T) {
-		_, err := DeleteFlavorFormat(Vars{}, "param")
+		_, err := c.DeleteFlavorFormat(Vars{}, "param")
 		assert.NotNil(err)
 		assert.True(strings.HasSuffix(err.Error(), "name is required"))
 	})
 
 	t.Run("EmptyRowName", func(t *testing.T) {
-		_, err := DeleteFlavorFormat(commonVars, "emptyParam")
+		_, err := c.DeleteFlavorFormat(commonVars, "emptyParam")
 		assert.NotNil(err)
 		assert.True(strings.HasSuffix(err.Error(), "name is required"))
 	})
 
 	t.Run("IdealPath", func(t *testing.T) {
-		wdmpObj := &DeleteRowWDMP{Command: COMMAND_DELETE_ROW, Row: "rowName"}
-		expected, expectedErr := json.Marshal(wdmpObj)
-		actual, actualErr := DeleteFlavorFormat(commonVars, "param")
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		wdmp, err := c.DeleteFlavorFormat(commonVars, "param")
+		assert.Nil(err)
+		assert.EqualValues(wdmpDel, wdmp)
 	})
 }
 
 func TestReplaceFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	cReader := CustomResultReader{}
 	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
+	c := ConversionWDMP{&EncodingHelper{}}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
-		_, err := ReplaceFlavorFormat(nil, emptyVars, "uThere?", cReader.CustomReader)
+		_, err := c.ReplaceFlavorFormat(nil, emptyVars, "uThere?")
 		assert.NotNil(err)
 		assert.True(strings.HasPrefix(err.Error(), "tableName"))
 	})
 
-	t.Run("DecodeJsonErr", func(t *testing.T) {
-		cReader.data = []byte("")
-		_, err := ReplaceFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
+	t.Run("DecodeJSONErr", func(t *testing.T) {
+		_, err := c.ReplaceFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
 		assert.NotNil(err)
-		assert.True(strings.HasPrefix(err.Error(), "JSON"))
+		assert.Contains(err.Error(), "JSON")
 	})
 
 	t.Run("InvalidParams", func(t *testing.T) {
-		cReader.data = []byte("{}")
-		_, err := ReplaceFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
+		defer emptyInputBuffer.Reset()
+		emptyInputBuffer.WriteString("{}")
+		_, err := c.ReplaceFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
 		assert.NotNil(err)
 		assert.True(strings.HasSuffix(err.Error(), "blank"))
 	})
 
 	t.Run("IdealPath", func(t *testing.T) {
-		wdmpObj := &ReplaceRowsWDMP{Command: COMMAND_REPLACE_ROWS, Table: commonVars["uThere?"]}
-		wdmpObj.Rows = map[string]map[string]string{"0": {"uno": "one", "dos": "two"}}
-		cReader.data = []byte(`{"0":{"uno":"one","dos":"two"}}`)
+		emptyInputBuffer.WriteString(`{"0":{"uno":"one","dos":"two"}}`)
 
-		actual, actualErr := ReplaceFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
+		wdmp, err := c.ReplaceFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
 
-		expected, expectedErr := json.Marshal(wdmpObj)
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		assert.Nil(err)
+		assert.EqualValues(wdmpReplace, wdmp)
+
+		emptyInputBuffer.Reset()
 	})
 }
 
 func TestAddFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	cReader := CustomResultReader{}
-	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
 
+	c := ConversionWDMP{&EncodingHelper{}}
+
 	t.Run("TableNotProvided", func(t *testing.T) {
-		_, err := AddFlavorFormat(nil, emptyVars, "uThere?", cReader.CustomReader)
+		_, err := c.AddFlavorFormat(nil, emptyVars, "uThere?")
 		assert.NotNil(err)
 		assert.True(strings.HasPrefix(err.Error(), "tableName"))
 	})
 
-	t.Run("DecodeJsonErr", func(t *testing.T) {
-		cReader.data = []byte("")
-		_, err := AddFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
+	t.Run("DecodeJSONErr", func(t *testing.T) {
+		_, err := c.AddFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
 		assert.NotNil(err)
-		assert.True(strings.HasPrefix(err.Error(), "JSON"))
+		assert.Contains(err.Error(), "JSON")
 	})
 
 	t.Run("EmptyData", func(t *testing.T) {
-		cReader.data = []byte("{}")
-		_, err := AddFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
+		defer emptyInputBuffer.Reset()
+
+		emptyInputBuffer.WriteString("{}")
+
+		_, err := c.AddFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
+
 		assert.NotNil(err)
-		assert.True(strings.HasSuffix(err.Error(), "data is empty"))
+		assert.True(strings.HasSuffix(err.Error(), "blank"))
 	})
 
 	t.Run("IdealPath", func(t *testing.T) {
-		wdmpObj := &AddRowWDMP{Command: COMMAND_ADD_ROW, Table: commonVars["uThere?"]}
-		wdmpObj.Row = map[string]string{"uno": "one", "dos": "two"}
+		defer emptyInputBuffer.Reset()
 
-		cReader.data = []byte(`{"uno":"one","dos":"two"}`)
+		emptyInputBuffer.WriteString(`{"uno":"one","dos":"two"}`)
 
-		actual, actualErr := AddFlavorFormat(nil, commonVars, "uThere?", cReader.CustomReader)
-		expected, expectedErr := json.Marshal(wdmpObj)
+		wdmp, err := c.AddFlavorFormat(&emptyInputBuffer, commonVars, "uThere?")
 
-		assert.EqualValues(expected, actual)
-		assert.EqualValues(expectedErr, actualErr)
+		assert.Nil(err)
+		assert.EqualValues(wdmpAdd, wdmp)
 	})
 }
 
-func TestGetFromUrlPath(t *testing.T) {
+func TestGetFromURLPath(t *testing.T) {
 	assert := assert.New(t)
 
 	fakeUrlVar := map[string]string{"k1": "k1v1,k1v2", "k2": "k2v1"}
+	c := ConversionWDMP{}
 
 	t.Run("NormalCases", func(t *testing.T) {
 
-		k1ValGroup, exists := GetFromUrlPath("k1", fakeUrlVar)
+		k1ValGroup, exists := c.GetFromURLPath("k1", fakeUrlVar)
 		assert.True(exists)
 		assert.EqualValues("k1v1,k1v2", k1ValGroup)
 
-		k2ValGroup, exists := GetFromUrlPath("k2", fakeUrlVar)
+		k2ValGroup, exists := c.GetFromURLPath("k2", fakeUrlVar)
 		assert.True(exists)
 		assert.EqualValues("k2v1", k2ValGroup)
 	})
 
 	t.Run("NonNilNonExistent", func(t *testing.T) {
-		_, exists := GetFromUrlPath("k3", fakeUrlVar)
+		_, exists := c.GetFromURLPath("k3", fakeUrlVar)
 		assert.False(exists)
 	})
 
 	t.Run("NilCase", func(t *testing.T) {
-		_, exists := GetFromUrlPath("k", nil)
+		_, exists := c.GetFromURLPath("k", nil)
 		assert.False(exists)
-	})
-}
-
-func TestDecodeJsonPayload(t *testing.T) {
-	assert := assert.New(t)
-
-	cReader := CustomResultReader{}
-
-	t.Run("ReadEntireBodyFails", func(t *testing.T) {
-		cReader.err = errors.New("fail")
-		err := DecodeJsonPayload(nil, nil, cReader.CustomReader)
-
-		assert.NotNil(err)
-		assert.EqualValues(err.Error(), "fail")
-	})
-
-	t.Run("EmptyInput", func(t *testing.T) {
-		emptyBody := bytes.NewBufferString("")
-		cReader.data, cReader.err = []byte(""), nil
-
-		err := DecodeJsonPayload(emptyBody, nil, cReader.CustomReader)
-
-		assert.NotNil(err)
-		assert.EqualValues(err, ErrJsonEmpty)
-	})
-
-	t.Run("IdealPath", func(t *testing.T) {
-		cReader.data = []byte(`{"0":"zero","1":"one"}`)
-
-		expected := map[string]string{"0": "zero", "1": "one"}
-		actual := make(map[string]string)
-
-		err := DecodeJsonPayload(nil, &actual, cReader.CustomReader)
-
-		assert.Nil(err)
-		assert.EqualValues(expected, actual)
 	})
 }
 
@@ -267,18 +270,19 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 	empty := []SetParam{}
 	attrs := Attr{"attr1": 1, "attr2": "two"}
 
+	c := ConversionWDMP{}
 	noDataType := SetParam{Value: value, Name: &name}
 	valid := SetParam{Name: &name, DataType: &dataType, Value: value}
 	attrParam := SetParam{Name: &name, DataType: &dataType, Attributes: attrs}
 
-	testAndSetHeader := http.Header{HEADER_WPA_SYNC_NEW_CID: []string{"newCid"}}
+	testAndSetHeader := http.Header{HeaderWPASyncNewCID: []string{"newCid"}}
 	emptyHeader := http.Header{}
 
 	wdmp := new(SetWDMP)
 
-	/* Tests with different possible failures */
+	// Tests with different possible failures
 	t.Run("NilParams", func(t *testing.T) {
-		err := ValidateAndDeduceSET(http.Header{}, wdmp)
+		err := c.ValidateAndDeduceSET(http.Header{}, wdmp)
 		assert.NotNil(err)
 		assert.True(strings.Contains(err.Error(), "cannot be blank"))
 		assert.EqualValues("", wdmp.Command)
@@ -286,7 +290,7 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 
 	t.Run("EmptyParams", func(t *testing.T) {
 		wdmp.Parameters = empty
-		err := ValidateAndDeduceSET(http.Header{}, wdmp)
+		err := c.ValidateAndDeduceSET(http.Header{}, wdmp)
 		assert.NotNil(err)
 		assert.True(strings.Contains(err.Error(), "cannot be blank"))
 		assert.EqualValues("", wdmp.Command)
@@ -295,60 +299,126 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 	//Will attempt at validating SET_ATTR properties instead
 	t.Run("MissingSETProperty", func(t *testing.T) {
 		wdmp.Parameters = append(empty, noDataType)
-		err := ValidateAndDeduceSET(emptyHeader, wdmp)
+		err := c.ValidateAndDeduceSET(emptyHeader, wdmp)
 		assert.EqualValues("invalid attr", err.Error())
 		assert.EqualValues("", wdmp.Command)
 	})
 
-	/* Ideal command cases */
+	// Ideal command cases
 	t.Run("MultipleValidSET", func(t *testing.T) {
 		wdmp.Parameters = append(empty, valid, valid)
-		assert.Nil(ValidateAndDeduceSET(emptyHeader, wdmp))
-		assert.EqualValues(COMMAND_SET, wdmp.Command)
+		assert.Nil(c.ValidateAndDeduceSET(emptyHeader, wdmp))
+		assert.EqualValues(CommandSet, wdmp.Command)
 	})
 
 	t.Run("MultipleValidTEST_SET", func(t *testing.T) {
 		wdmp.Parameters = append(empty, valid, valid)
-		assert.Nil(ValidateAndDeduceSET(testAndSetHeader, wdmp))
-		assert.EqualValues(COMMAND_TEST_SET, wdmp.Command)
+		assert.Nil(c.ValidateAndDeduceSET(testAndSetHeader, wdmp))
+		assert.EqualValues(CommandTestSet, wdmp.Command)
 	})
 
 	t.Run("MultipleValidSET_ATTRS", func(t *testing.T) {
 		wdmp.Parameters = append(empty, attrParam, attrParam)
-		assert.Nil(ValidateAndDeduceSET(emptyHeader, wdmp))
-		assert.EqualValues(COMMAND_SET_ATTRS, wdmp.Command)
+		assert.Nil(c.ValidateAndDeduceSET(emptyHeader, wdmp))
+		assert.EqualValues(CommandSetAttrs, wdmp.Command)
+	})
+}
+
+func TestDecodeJSON(t *testing.T) {
+	assert := assert.New(t)
+	e := EncodingHelper{}
+
+	t.Run("IdealPath", func(t *testing.T) {
+		input := bytes.NewBufferString(`{"0":"zero","1":"one"}`)
+
+		expected := map[string]string{"0": "zero", "1": "one"}
+		actual := make(map[string]string)
+
+		err := e.DecodeJSON(input, &actual)
+
+		assert.Nil(err)
+		assert.EqualValues(expected, actual)
 	})
 
-	/*
+	t.Run("JsonErr", func(t *testing.T) {
+		actual := make(map[string]string)
 
-		t.Run("SET", func (t *testing.T) {
-
-		})
-
-		t.Run("SET_ATTRS", func (t *testing.T) {
-
-		})
-
-		t.Run("TEST_SET", func (t *testing.T) {
-
-		})
-	*/
-
+		err := e.DecodeJSON(bytes.NewBufferString("{"), &actual)
+		assert.NotNil(err)
+	})
 }
 
-func TestSetOrLeave(t *testing.T) {
+func TestEncodeJSON(t *testing.T) {
+	e := EncodingHelper{}
 	assert := assert.New(t)
-	assert.EqualValues("fallback", SetOrLeave("fallback", ""))
-	assert.EqualValues("", SetOrLeave("", ""))
-	assert.EqualValues("theNewVal", SetOrLeave("", "theNewVal"))
+	expected := []byte(`{"command":"GET","names":["p1","p2"]}`)
+	actual, err := e.EncodeJSON(wdmpGet)
+	assert.Nil(err)
+	assert.EqualValues(expected, actual)
 }
 
-/*Set the data and err fields and the next call to CustomReader will return them*/
-type CustomResultReader struct {
-	data []byte
-	err  error
+func TestExtractPayloadFromWrp(t *testing.T) {
+	assert := assert.New(t)
+	e := EncodingHelper{}
+
+	t.Run("IdealScenario", func(t *testing.T) {
+		expectedPayload := []byte("expectMe")
+		wrpMsg := wrp.Message{Payload: expectedPayload}
+		var inputBuffer bytes.Buffer
+
+		wrp.NewEncoder(&inputBuffer, wrp.JSON).Encode(wrpMsg)
+
+		payload, err := e.ExtractPayload(&inputBuffer, wrp.JSON)
+
+		assert.Nil(err)
+		assert.EqualValues(expectedPayload, payload)
+	})
+
+	t.Run("DecodingErr", func(t *testing.T) {
+		badInput := bytes.NewBufferString("{")
+
+		_, err := e.ExtractPayload(badInput, wrp.JSON)
+
+		assert.NotNil(err)
+	})
 }
 
-func (c CustomResultReader) CustomReader(_ io.Reader) ([]byte, error) {
-	return c.data, c.err
+func TestGenericEncode(t *testing.T) {
+	assert := assert.New(t)
+	e := EncodingHelper{}
+	wrpMsg := wrp.Message{Type: wrp.SimpleRequestResponseMessageType, Destination: "someDestination"}
+	expectedEncoding := []byte(`{"msg_type":3,"dest":"someDestination"}`)
+
+	actualEncoding, err := e.GenericEncode(&wrpMsg, wrp.JSON)
+
+	assert.Nil(err)
+	assert.EqualValues(expectedEncoding, actualEncoding)
+}
+
+func TestGetConfiguredWRP(t *testing.T) {
+	assert := assert.New(t)
+	deviceID := "mac:112233445566"
+	service := "webpaService"
+	tid := "uniqueVal"
+
+	c := ConversionWDMP{}
+
+	inputVars := Vars{"service": service, "deviceid": deviceID}
+	inputHeader := http.Header{}
+	inputHeader.Set("Content-Type", wrp.JSON.ContentType())
+	inputHeader.Set(HeaderWPATID, tid)
+	inputWdmpPayload := []byte(`{irrelevantFormat}`)
+
+	expectedSource := WRPSource + "/" + service
+	expectedDest := deviceID + "/" + service
+
+	wrpMsg := c.GetConfiguredWRP(inputWdmpPayload, inputVars, inputHeader)
+
+	assert.NotNil(wrpMsg)
+	assert.EqualValues(wrp.JSON.ContentType(), wrpMsg.ContentType)
+	assert.EqualValues(inputWdmpPayload, wrpMsg.Payload)
+	assert.EqualValues(wrp.SimpleRequestResponseMessageType, wrpMsg.Type)
+	assert.EqualValues(expectedDest, wrpMsg.Destination)
+	assert.EqualValues(expectedSource, wrpMsg.Source)
+	assert.EqualValues(tid, wrpMsg.TransactionUUID)
 }

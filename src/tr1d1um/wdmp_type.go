@@ -2,24 +2,28 @@ package main
 
 import (
 	"errors"
+
 	"github.com/go-ozzo/ozzo-validation"
 )
 
 const (
-	COMMAND_GET          = "GET"
-	COMMAND_GET_ATTRS    = "GET_ATTRIBUTES"
-	COMMAND_SET          = "SET"
-	COMMAND_SET_ATTRS    = "SET_ATTRIBUTES"
-	COMMAND_TEST_SET     = "TEST_AND_SET"
-	COMMAND_ADD_ROW      = "ADD_ROW"
-	COMMAND_DELETE_ROW   = "DELETE_ROW"
-	COMMAND_REPLACE_ROWS = "REPLACE_ROWS"
+	CommandGet         = "GET"
+	CommandGetAttrs    = "GET_ATTRIBUTES"
+	CommandSet         = "SET"
+	CommandSetAttrs    = "SET_ATTRIBUTES"
+	CommandTestSet     = "TEST_AND_SET"
+	CommandAddRow      = "ADD_ROW"
+	CommandDeleteRow   = "DELETE_ROW"
+	CommandReplaceRows = "REPLACE_ROWS"
 
-	HEADER_WPA_SYNC_OLD_CID = "X-Webpa-Sync-Old-Cid"
-	HEADER_WPA_SYNC_NEW_CID = "X-Webpa-Sync-New-Cid"
-	HEADER_WPA_SYNC_CMC     = "X-Webpa-Sync-Cmc"
+	HeaderWPASyncOldCID = "X-Webpa-Sync-Old-Cid"
+	HeaderWPASyncNewCID = "X-Webpa-Sync-New-Cid"
+	HeaderWPASyncCMC    = "X-Webpa-Sync-Cmc"
+	HeaderWPATID        = "X-WebPA-Transaction-Id"
 
-	ERR_UNSUCCESSFUL_DATA_PARSE = "Unsuccessful Data Parse"
+	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
+
+	WRPSource = "dns:tr1d1um.webpa.comcast.net"
 )
 
 /*
@@ -37,6 +41,7 @@ type GetWDMP struct {
 */
 
 type Attr map[string]interface{}
+type IndexRow map[string]map[string]string
 
 type SetParam struct {
 	Name       *string     `json:"name"`
@@ -64,9 +69,9 @@ type AddRowWDMP struct {
 }
 
 type ReplaceRowsWDMP struct {
-	Command string                       `json:"command"`
-	Table   string                       `json:"table"`
-	Rows    map[string]map[string]string `json:"rows"`
+	Command string   `json:"command"`
+	Table   string   `json:"table"`
+	Rows    IndexRow `json:"rows"`
 }
 
 type DeleteRowWDMP struct {

@@ -1,126 +1,70 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/go-kit/kit/log"
-	"github.com/gorilla/mux"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/go-kit/kit/log"
+	"github.com/gorilla/mux"
 )
 
+//ConversionHandler wraps the main WDMP -> WRP conversion method
 type ConversionHandler struct {
-	infoLogger  log.Logger
-	errorLogger log.Logger
-	timeOut     time.Duration
-	targetUrl   string
-	/*These functions should be set during handler set up */
-	GetFlavorFormat     func(*http.Request, string, string, string) ([]byte, error)
-	SetFlavorFormat     func(*http.Request, BodyReader) ([]byte, error)
-	DeleteFlavorFormat  func(Vars, string) ([]byte, error)
-	AddFlavorFormat     func(io.Reader, Vars, string, BodyReader) ([]byte, error)
-	ReplaceFlavorFormat func(io.Reader, Vars, string, BodyReader) ([]byte, error)
+	infoLogger     log.Logger
+	errorLogger    log.Logger
+	timeOut        time.Duration
+	targetURL      string
+	wdmpConvert    ConversionTool
+	sender         SendAndHandle
+	encodingHelper EncodingTool
 }
 
-func (sh ConversionHandler) ConversionGETHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.GetFlavorFormat(req, "attributes", "names", ",")
+//ConversionHandler handles the different incoming tr1 requests
+func (ch *ConversionHandler) ConversionHandler(origin http.ResponseWriter, req *http.Request) {
+	var err error
+	var wdmp interface{}
+	var urlVars Vars
+
+	switch req.Method {
+	case http.MethodGet:
+		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, "attributes", "names", ",")
+		break
+
+	case http.MethodPatch:
+		wdmp, err = ch.wdmpConvert.SetFlavorFormat(req)
+		break
+
+	case http.MethodDelete:
+		urlVars = mux.Vars(req)
+		wdmp, err = ch.wdmpConvert.DeleteFlavorFormat(urlVars, "parameter")
+		break
+
+	case http.MethodPut:
+		urlVars = mux.Vars(req)
+		wdmp, err = ch.wdmpConvert.ReplaceFlavorFormat(req.Body, urlVars, "parameter")
+		break
+
+	case http.MethodPost:
+		urlVars = mux.Vars(req)
+		wdmp, err = ch.wdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
+		break
+	}
 
 	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
+		origin.WriteHeader(http.StatusInternalServerError)
+		ch.errorLogger.Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
 
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	sh.SendData(resp, wrpMessage)
-}
-
-func (sh ConversionHandler) ConversionSETHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.SetFlavorFormat(req, ioutil.ReadAll)
+	wdmpPayload, err := ch.encodingHelper.EncodeJSON(wdmp)
 
 	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
+		origin.WriteHeader(http.StatusInternalServerError)
+		ch.errorLogger.Log(logging.ErrorKey(), err.Error())
 		return
 	}
 
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	sh.SendData(resp, wrpMessage)
-}
-
-func (sh ConversionHandler) ConversionDELETEHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.DeleteFlavorFormat(mux.Vars(req), "parameter")
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	sh.SendData(resp, wrpMessage)
-}
-
-func (sh ConversionHandler) ConversionREPLACEHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.ReplaceFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	sh.SendData(resp, wrpMessage)
-}
-
-func (sh ConversionHandler) ConversionADDHandler(resp http.ResponseWriter, req *http.Request) {
-	wdmpPayload, err := sh.AddFlavorFormat(req.Body, mux.Vars(req), "parameter", ioutil.ReadAll)
-
-	if err != nil {
-		sh.errorLogger.Log(logging.MessageKey(), ERR_UNSUCCESSFUL_DATA_PARSE, logging.ErrorKey(), err.Error())
-		return
-	}
-
-	wrpMessage := &wrp.SimpleRequestResponse{Type: wrp.SimpleRequestResponseMessageType, Payload: wdmpPayload}
-
-	sh.SendData(resp, wrpMessage)
-}
-
-func (sh ConversionHandler) SendData(resp http.ResponseWriter, wrpMessage *wrp.SimpleRequestResponse) {
-	wrpPayload, err := json.Marshal(wrpMessage)
-
-	if err != nil {
-		err = errors.New("unsuccessful wrp conversion to json")
-		return
-	}
-
-	clientWithDeadline := http.Client{Timeout: sh.timeOut}
-
-	//todo: any headers to be added here
-	requestToServer, err := http.NewRequest("GET", sh.targetUrl, bytes.NewBuffer(wrpPayload))
-	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		resp.Write([]byte("Error creating new request"))
-		sh.errorLogger.Log(logging.MessageKey(), "Could not create new request", logging.ErrorKey(), err.Error())
-		return
-	}
-
-	respFromServer, err := clientWithDeadline.Do(requestToServer)
-
-	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		resp.Write([]byte("Error while posting request"))
-		sh.errorLogger.Log(logging.MessageKey(), "Could not complete request", logging.ErrorKey(), err.Error())
-		return
-	}
-
-	//Try forwarding back the response to the initial requester
-	resp.WriteHeader(respFromServer.StatusCode)
-	resp.Write([]byte(respFromServer.Status))
+	response, err := ch.sender.Send(ch, origin, wdmpPayload, req)
+	ch.sender.HandleResponse(ch, err, response, origin)
 }
