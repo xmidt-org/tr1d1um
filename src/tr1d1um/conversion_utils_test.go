@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	sampleNames             = []string{"p1", "p2"}
-	dataType         int8   = 3
-	value            string = "someVal"
-	name             string = "someName"
-	valid                   = SetParam{Name: &name, Attributes: Attr{"notify": 0}}
+	sampleNames           = []string{"p1", "p2"}
+	dataType         int8 = 3
+	value                 = "someVal"
+	name                  = "someName"
+	valid                 = SetParam{Name: &name, Attributes: Attr{"notify": 0}}
 	emptyInputBuffer bytes.Buffer
 	commonVars       = Vars{"uThere?": "yes!"}
 	replaceRows      = IndexRow{"0": {"uno": "one", "dos": "two"}}
@@ -67,19 +67,19 @@ func TestGetFlavorFormat(t *testing.T) {
 func TestSetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	c := ConversionWDMP{&EncodingHelper{}}
-	commonUrl := "http://device/config?k=v"
+	commonURL := "http://device/config?k=v"
 	var req *http.Request
 
 	t.Run("DecodeErr", func(t *testing.T) {
 		invalidBody := bytes.NewBufferString("{")
-		req = httptest.NewRequest(http.MethodPatch, commonUrl, invalidBody)
+		req = httptest.NewRequest(http.MethodPatch, commonURL, invalidBody)
 		_, err := c.SetFlavorFormat(req)
 		assert.NotNil(err)
 	})
 
 	t.Run("InvalidData", func(t *testing.T) {
 		emptyBody := bytes.NewBufferString(`{}`)
-		req = httptest.NewRequest(http.MethodPatch, commonUrl, emptyBody)
+		req = httptest.NewRequest(http.MethodPatch, commonURL, emptyBody)
 
 		_, err := c.SetFlavorFormat(req)
 		assert.NotNil(err)
@@ -239,22 +239,22 @@ func TestAddFlavorFormat(t *testing.T) {
 func TestGetFromURLPath(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeUrlVar := map[string]string{"k1": "k1v1,k1v2", "k2": "k2v1"}
+	fakeURLVar := map[string]string{"k1": "k1v1,k1v2", "k2": "k2v1"}
 	c := ConversionWDMP{}
 
 	t.Run("NormalCases", func(t *testing.T) {
 
-		k1ValGroup, exists := c.GetFromURLPath("k1", fakeUrlVar)
+		k1ValGroup, exists := c.GetFromURLPath("k1", fakeURLVar)
 		assert.True(exists)
 		assert.EqualValues("k1v1,k1v2", k1ValGroup)
 
-		k2ValGroup, exists := c.GetFromURLPath("k2", fakeUrlVar)
+		k2ValGroup, exists := c.GetFromURLPath("k2", fakeURLVar)
 		assert.True(exists)
 		assert.EqualValues("k2v1", k2ValGroup)
 	})
 
 	t.Run("NonNilNonExistent", func(t *testing.T) {
-		_, exists := c.GetFromURLPath("k3", fakeUrlVar)
+		_, exists := c.GetFromURLPath("k3", fakeURLVar)
 		assert.False(exists)
 	})
 

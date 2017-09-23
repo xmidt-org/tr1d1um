@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
-	"time"
-	"fmt"
 	"os/signal"
+	"time"
 
+	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/secure/handler"
@@ -18,26 +19,26 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/Comcast/webpa-common/concurrent"
 )
 
+//convenient global values
 const (
 	applicationName = "tr1d1um"
-	DefaultKeyId    = "current"
-	baseURI = "/api"
-	version = "v2"// TODO: Should these values change?
+	DefaultKeyID    = "current"
+	baseURI         = "/api"
+	version         = "v2" // TODO: Should these values change?
 )
 
 func tr1d1um(arguments []string) int {
 	var (
-		f              = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-		v              = viper.New()
-		logger, webPA , err = server.Initialize(applicationName, arguments, f, v)
+		f                  = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
+		v                  = viper.New()
+		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
 	if err != nil {
 		logging.Error(logger).Log(logging.MessageKey(), "Unable to initialize Viper environment",
 			logging.ErrorKey(), err)
-		fmt.Fprint(os.Stderr, "Unable to initialize viper" + err.Error())
+		fmt.Fprint(os.Stderr, "Unable to initialize viper"+err.Error())
 		return 1
 	}
 
@@ -76,7 +77,7 @@ func tr1d1um(arguments []string) int {
 
 	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
 
-	signals  := make(chan os.Signal, 1)
+	signals := make(chan os.Signal, 1)
 
 	signal.Notify(signals)
 	<-signals
@@ -87,6 +88,7 @@ func tr1d1um(arguments []string) int {
 	return 0
 }
 
+//AddRoutes configures the paths and connection rules to TR1D1UM
 func AddRoutes(preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
 		return request.Body != nil
@@ -102,24 +104,25 @@ func AddRoutes(preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
-	Methods(http.MethodDelete)
+		Methods(http.MethodDelete)
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
-	Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
+		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
 }
 
+//SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
 func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *ConversionHandler) {
-	timeOut, err := time.ParseDuration(tConfig.HttpTimeout)
+	timeOut, err := time.ParseDuration(tConfig.HTTPTimeout)
 	if err != nil {
 		timeOut = time.Second * 60 //default val
 	}
 	cHandler = &ConversionHandler{
-		timeOut: timeOut,
-		targetURL: tConfig.targetURL,
-		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
-		sender: &Tr1SendAndHandle{log:logger, timedClient:&http.Client{Timeout:time.Second*5}, NewHTTPRequest:http.NewRequest},
-		encodingHelper:&EncodingHelper{},
-		}
+		timeOut:        timeOut,
+		targetURL:      tConfig.targetURL,
+		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
+		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: time.Second * 5}, NewHTTPRequest: http.NewRequest},
+		encodingHelper: &EncodingHelper{},
+	}
 	//pass loggers
 	cHandler.errorLogger = logging.Error(logger)
 	cHandler.infoLogger = logging.Info(logger)
@@ -127,6 +130,7 @@ func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *Conversi
 	return
 }
 
+//SetUpPreHandler configures the authorization requirements for requests to reach the main handler
 func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
 	validator, err := GetValidator(v)
 	if err != nil {
@@ -147,14 +151,14 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 
 //GetValidator returns a validator for JWT tokens
 func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
-	default_validators := make(secure.Validators, 0, 0)
+	defaultValidators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator
 
 	v.UnmarshalKey("jwtValidators", &jwtVals)
 
 	// make sure there is at least one jwtValidator supplied
 	if len(jwtVals) < 1 {
-		validator = default_validators
+		validator = defaultValidators
 		return
 	}
 
@@ -173,7 +177,7 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 		validators = append(
 			validators,
 			secure.JWSValidator{
-				DefaultKeyId:  DefaultKeyId,
+				DefaultKeyId:  DefaultKeyID,
 				Resolver:      keyResolver,
 				JWTValidators: []*jwt.Validator{validatorDescriptor.Custom.New()},
 			},

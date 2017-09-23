@@ -45,11 +45,10 @@ type ConversionWDMP struct {
 	encodingHelper EncodingTool
 }
 
-/* The following functions break down the different cases for requests (https://swagger.webpa.comcast.net/)
-containing WDMP content. Their main functionality is to attempt at reading such content, validating it
-and subsequently returning a json type encoding of it. Most often this resulting []byte is used as payload for
-wrp messages
-*/
+//The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects based on
+//the commands they serve in TR181 devices
+
+//GetFlavorFormat constructs a WDMP object out of the contents of a given request. Supports the GET command
 func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
 	wdmp = new(GetWDMP)
 
@@ -69,6 +68,7 @@ func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, attr, namesKey, sep
 	return
 }
 
+//SetFlavorFormat has analogous functionality to GetFlavorformat but instead supports the various SET commands
 func (cw *ConversionWDMP) SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err error) {
 	wdmp = new(SetWDMP)
 
@@ -78,6 +78,7 @@ func (cw *ConversionWDMP) SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err
 	return
 }
 
+//DeleteFlavorFormat again has analogous functionality to GetFlavormat but for the DELETE_ROW command
 func (cw *ConversionWDMP) DeleteFlavorFormat(urlVars Vars, rowKey string) (wdmp *DeleteRowWDMP, err error) {
 	wdmp = &DeleteRowWDMP{Command: CommandDeleteRow}
 
@@ -90,6 +91,7 @@ func (cw *ConversionWDMP) DeleteFlavorFormat(urlVars Vars, rowKey string) (wdmp 
 	return
 }
 
+//AddFlavorFormat supports the ADD_ROW command
 func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp *AddRowWDMP, err error) {
 	wdmp = &AddRowWDMP{Command: CommandAddRow}
 
@@ -107,6 +109,7 @@ func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableNa
 	return
 }
 
+//ReplaceFlavorFormat supports the REPLACE_ROWS command
 func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tableName string) (wdmp *ReplaceRowsWDMP, err error) {
 	wdmp = &ReplaceRowsWDMP{Command: CommandReplaceRows}
 
@@ -192,7 +195,7 @@ func (helper *EncodingHelper) EncodeJSON(v interface{}) (data []byte, err error)
 
 //ExtractPayload decodes an encoded wrp message and returns its payload
 func (helper *EncodingHelper) ExtractPayload(input io.Reader, format wrp.Format) (payload []byte, err error) {
-	wrpResponse := &wrp.Message{Type:wrp.SimpleRequestResponseMessageType}
+	wrpResponse := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
 
 	if err = wrp.NewDecoder(input, format).Decode(wrpResponse); err == nil {
 		payload = wrpResponse.Payload
