@@ -11,6 +11,7 @@ import (
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/gorilla/mux"
 )
 
 //Vars shortens frequently used type returned by mux.Vars()
@@ -51,6 +52,11 @@ type ConversionWDMP struct {
 //GetFlavorFormat constructs a WDMP object out of the contents of a given request. Supports the GET command
 func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
 	wdmp = new(GetWDMP)
+
+	if service, _ := cw.GetFromURLPath("service", mux.Vars(req)); service == "stat"{
+		return
+		//todo: maybe we need more validation here
+	}
 
 	if nameGroup := req.FormValue(namesKey); nameGroup != "" {
 		wdmp.Command = CommandGet
