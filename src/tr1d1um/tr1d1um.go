@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
 	"time"
+	"net/url"
 
-	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/secure/handler"
@@ -19,6 +18,8 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/Comcast/webpa-common/concurrent"
+	"github.com/Comcast/webpa-common/webhook"
 )
 
 //convenient global values
@@ -29,72 +30,105 @@ const (
 	version         = "v2" // TODO: Should these values change?
 )
 
-func tr1d1um(arguments []string) int {
+func tr1d1um(arguments []string) (exitCode int) {
+
 	var (
 		f                  = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 		v                  = viper.New()
 		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
+
 	if err != nil {
-		logging.Error(logger).Log(logging.MessageKey(), "Unable to initialize Viper environment",
-			logging.ErrorKey(), err)
-		fmt.Fprint(os.Stderr, "Unable to initialize viper"+err.Error())
+		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
 		return 1
 	}
-
+	
 	var (
-		messageKey  = logging.MessageKey()
-		errorKey    = logging.ErrorKey()
-		infoLogger  = logging.Info(logger)
-		errorLogger = logging.Error(logger)
+		infoLogger = logging.Info(logger)
 	)
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
 	tConfig := new(Tr1d1umConfig)
 	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
-	if err != nil {
-		errorLogger.Log(messageKey, "Unable to unmarshal configuration data into struct", errorKey, err)
 
-		fmt.Fprint(os.Stderr, "Unable to unmarshall config")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to unmarshall config data into struct: %s\n", err.Error())
 		return 1
 	}
 
 	preHandler, err := SetUpPreHandler(v, logger)
 
 	if err != nil {
-		infoLogger.Log(messageKey, "Error setting up pre handler", errorKey, err)
-
-		fmt.Fprint(os.Stderr, "error setting up prehandler")
+		fmt.Fprintf(os.Stderr, "error setting up prehandler: %s\n", err.Error())
 		return 1
 	}
 
 	conversionHandler := SetUpHandler(tConfig, logger)
+	
+	r := mux.NewRouter()
 
-	AddRoutes(preHandler, conversionHandler)
+	AddRoutes(r, preHandler, conversionHandler)
 
-	_, tr1d1umServer := webPA.Prepare(logger, nil, conversionHandler)
+	if exitCode = ConfigureWebHooks(r,preHandler,v,logger); exitCode != 0 {
+		return
+	}
 
-	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
+	var (
+		_, tr1d1umServer = webPA.Prepare(logger, nil, conversionHandler)
+		signals = make(chan os.Signal, 1)
+	)
 
-	signals := make(chan os.Signal, 1)
-
-	signal.Notify(signals)
-	<-signals
-	close(shutdown)
-
-	waitGroup.Wait()
+	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
+		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
+		return 4
+	}
 
 	return 0
 }
 
+//ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
+func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) int {
+	webHookFactory, err := webhook.NewFactory(v)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err)
+		return 1
+	}
+
+	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler()
+
+	// register webHook end points for api
+	r.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
+	r.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
+
+	selfURL := &url.URL{
+		Scheme: "https",
+		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
+	}
+
+	webHookFactory.Initialize(r, selfURL, webHookHandler, logger, nil)
+	webHookFactory.PrepareAndStart()
+
+	startChan := make(chan webhook.Result, 1)
+	webHookFactory.Start.GetCurrentSystemsHooks(startChan)
+
+	if webHookStartResults := <-startChan; webHookStartResults.Error == nil {
+		webHookFactory.SetList(webhook.NewList(webHookStartResults.Hooks))
+	} else {
+		logging.Error(logger).Log(logging.ErrorKey(),webHookStartResults.Error)
+	}
+
+	return 0
+}
+
+
 //AddRoutes configures the paths and connection rules to TR1D1UM
-func AddRoutes(preHandler *alice.Chain, conversionHandler *ConversionHandler) {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
 	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
 		return request.Body != nil
 	}
 
-	r := mux.NewRouter()
 	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, version)).Subrouter()
 
 	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
@@ -108,6 +142,8 @@ func AddRoutes(preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
+		
+	return r
 }
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
@@ -116,17 +152,17 @@ func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *Conversi
 	if err != nil {
 		timeOut = time.Second * 60 //default val
 	}
+
 	cHandler = &ConversionHandler{
-		timeOut:        timeOut,
-		targetURL:      tConfig.targetURL,
 		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
-		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: time.Second * 5}, NewHTTPRequest: http.NewRequest},
+		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut},
+		NewHTTPRequest: http.NewRequest},
 		encodingHelper: &EncodingHelper{},
 	}
 	//pass loggers
 	cHandler.errorLogger = logging.Error(logger)
 	cHandler.infoLogger = logging.Info(logger)
-	cHandler.targetURL = "https://xmidt.comcast.net" //todo: should we get this from the configs instead?
+	cHandler.targetURL = "https://api-cd.xmidt.comcast.net:8090"
 	return
 }
 

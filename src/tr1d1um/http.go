@@ -2,22 +2,16 @@ package main
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	//	"github.com/Comcast/webpa-common/wrp"
-	//	"encoding/json"
-	//	"bytes"
-	//	"fmt"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
 type ConversionHandler struct {
 	infoLogger     log.Logger
 	errorLogger    log.Logger
-	timeOut        time.Duration
 	targetURL      string
 	wdmpConvert    ConversionTool
 	sender         SendAndHandle
