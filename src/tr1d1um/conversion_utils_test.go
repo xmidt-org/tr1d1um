@@ -37,17 +37,27 @@ func TestGetFlavorFormat(t *testing.T) {
 	t.Run("IdealGet", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2", nil)
 
-		wdmp, err := c.GetFlavorFormat(req, "attributes", "names", ",")
+		wdmp, err := c.GetFlavorFormat(req, nil,"attributes", "names", ",")
 
 		assert.Nil(err)
 		assert.EqualValues(wdmpGet, wdmp)
 	})
 
+	t.Run("IdealGetStat", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://api/device/mac:112233445566/stat", nil)
+
+		wdmp, err := c.GetFlavorFormat(req, map[string]string{"service":"stat"},"attributes", "names", ",")
+
+		assert.Nil(err)
+		assert.EqualValues(new(GetWDMP), wdmp)
+	})
+
 	t.Run("IdealGetAttr", func(t *testing.T) {
+
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2&attributes=attr1",
 			nil)
 
-		wdmp, err := c.GetFlavorFormat(req, "attributes", "names", ",")
+		wdmp, err := c.GetFlavorFormat(req, nil,"attributes", "names", ",")
 
 		assert.Nil(err)
 		assert.EqualValues(wdmpGetAttrs, wdmp)
@@ -57,7 +67,7 @@ func TestGetFlavorFormat(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=",
 			nil)
 
-		_, err := c.GetFlavorFormat(req, "attributes", "names", ",")
+		_, err := c.GetFlavorFormat(req, nil,"attributes", "names", ",")
 
 		assert.NotNil(err)
 		assert.True(strings.HasPrefix(err.Error(), "names is a required"))

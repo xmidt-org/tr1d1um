@@ -22,7 +22,7 @@ func TestSend(t *testing.T) {
 	WRPPayload := []byte("payload")
 	validURL := "http://someValidURL"
 
-	tr1 := &Tr1SendAndHandle{log: &logTracker{}, timedClient: &http.Client{Timeout: time.Second}}
+	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
 	tr1.NewHTTPRequest = http.NewRequest
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL}
 
@@ -89,13 +89,11 @@ func TestSend(t *testing.T) {
 
 func TestHandleResponse(t *testing.T) {
 	assert := assert.New(t)
-	tr1 := &Tr1SendAndHandle{log: &logTracker{}, timedClient: &http.Client{Timeout: time.Second}}
+	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
 	tr1.NewHTTPRequest = http.NewRequest
 
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion}
 
-	//Cases
-	//incoming err
 	t.Run("IncomingErr", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		tr1.HandleResponse(nil, errors.New(errMsg), nil, recorder)

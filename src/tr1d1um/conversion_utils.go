@@ -11,7 +11,6 @@ import (
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
-	"github.com/gorilla/mux"
 )
 
 //Vars shortens frequently used type returned by mux.Vars()
@@ -19,7 +18,7 @@ type Vars map[string]string
 
 //ConversionTool lays out the definition of methods to build WDMP from content in an http request
 type ConversionTool interface {
-	GetFlavorFormat(*http.Request, string, string, string) (*GetWDMP, error)
+	GetFlavorFormat(*http.Request, Vars, string, string, string) (*GetWDMP, error)
 	SetFlavorFormat(*http.Request) (*SetWDMP, error)
 	DeleteFlavorFormat(Vars, string) (*DeleteRowWDMP, error)
 	AddFlavorFormat(io.Reader, Vars, string) (*AddRowWDMP, error)
@@ -46,14 +45,14 @@ type ConversionWDMP struct {
 	encodingHelper EncodingTool
 }
 
-//The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects based on
-//the commands they serve in TR181 devices
+//The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects
+// based on the commands they serve for Cloud <-> TR181 devices communication
 
 //GetFlavorFormat constructs a WDMP object out of the contents of a given request. Supports the GET command
-func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
+func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, pathVars Vars, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
 	wdmp = new(GetWDMP)
 
-	if service, _ := cw.GetFromURLPath("service", mux.Vars(req)); service == "stat"{
+	if service, _ := cw.GetFromURLPath("service", pathVars); service == "stat"{
 		return
 		//todo: maybe we need more validation here
 	}

@@ -49,6 +49,7 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 
 	//todo: any more headers to be added here
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
+	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 	respFromServer, err = tr1.timedClient.Do(requestToServer)
 	return
 }

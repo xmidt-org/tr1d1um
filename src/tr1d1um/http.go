@@ -22,11 +22,11 @@ type ConversionHandler struct {
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
 	var err error
 	var wdmp interface{}
-	var urlVars Vars
+	var urlVars = mux.Vars(req)
 
 	switch req.Method {
 	case http.MethodGet:
-		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, "attributes", "names", ",")
+		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, urlVars, "attributes", "names", ",")
 		break
 
 	case http.MethodPatch:
@@ -34,19 +34,17 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		break
 
 	case http.MethodDelete:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.DeleteFlavorFormat(urlVars, "parameter")
 		break
 
 	case http.MethodPut:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.ReplaceFlavorFormat(req.Body, urlVars, "parameter")
 		break
 
 	case http.MethodPost:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
 		break
+
 	}
 
 	if err != nil {

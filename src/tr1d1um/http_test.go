@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,11 +17,12 @@ var (
 	payload, body                            = []byte("SomePayload"), bytes.NewBufferString("body")
 	resp                                     = &http.Response{}
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
+	fakeLogger = &LightFakeLogger{}
 	ch                                       = &ConversionHandler{
 		wdmpConvert:    mockConversion,
 		sender:         mockSender,
 		encodingHelper: mockEncoding,
-		errorLogger:    &logTracker{}, //todo: temparary as webpacommon mock for logging is hard to follow
+		errorLogger:    fakeLogger,
 	}
 )
 
@@ -30,9 +30,10 @@ func TestConversionHandler(t *testing.T) {
 	assert := assert.New(t)
 	commonURL := "http://device/config?"
 	commonRequest := httptest.NewRequest(http.MethodGet, commonURL, nil)
+	var vars Vars = mux.Vars(commonRequest)
 
 	t.Run("ErrDataParse", func(testing *testing.T) {
-		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
+		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
 			Return(&GetWDMP{}, errors.New(errMsg)).Once()
 
 		recorder := httptest.NewRecorder()
@@ -44,7 +45,7 @@ func TestConversionHandler(t *testing.T) {
 
 	t.Run("ErrEncode", func(testing *testing.T) {
 		mockEncoding.On("EncodeJSON", wdmpGet).Return([]byte(""), errors.New(errMsg)).Once()
-		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").
+		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
 			Return(wdmpGet, nil).Once()
 
 		recorder := httptest.NewRecorder()
@@ -55,7 +56,8 @@ func TestConversionHandler(t *testing.T) {
 	})
 
 	t.Run("IdealGet", func(t *testing.T) {
-		mockConversion.On("GetFlavorFormat", commonRequest, "attributes", "names", ",").Return(wdmpGet, nil).Once()
+		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
+		Return(wdmpGet, nil).Once()
 
 		SetUpTest(wdmpGet, commonRequest)
 		AssertCommonCalls(t)
@@ -119,31 +121,8 @@ func AssertCommonCalls(t *testing.T) {
 	mockSender.AssertExpectations(t)
 }
 
-type Catcher struct {
-	LasResult         interface{}
-	SendRequestCalled bool
-}
+type LightFakeLogger struct {}
 
-func (catcher *Catcher) CatchResult(v interface{}) ([]byte, error) {
-	catcher.LasResult = v
-	return nil, nil
-}
-func (catcher *Catcher) InterceptRequest(_ *ConversionHandler, _ http.ResponseWriter, _ *wrp.Message) {
-	catcher.SendRequestCalled = true
-}
-
-type logTracker struct {
-	keys []interface{}
-	vals []interface{}
-}
-
-func (fake *logTracker) Log(keyVals ...interface{}) (err error) {
-	for i, keyVal := range keyVals {
-		if i%2 == 0 {
-			fake.keys = append(fake.keys, keyVal)
-		} else {
-			fake.vals = append(fake.vals, keyVal)
-		}
-	}
-	return
+func (fake *LightFakeLogger) Log(_ ...interface{}) error {
+	return nil
 }
