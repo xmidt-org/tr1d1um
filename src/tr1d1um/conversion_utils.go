@@ -52,7 +52,7 @@ type ConversionWDMP struct {
 func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, pathVars Vars, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
 	wdmp = new(GetWDMP)
 
-	if service, _ := cw.GetFromURLPath("service", pathVars); service == "stat"{
+	if service, _ := cw.GetFromURLPath("service", pathVars); service == "stat" {
 		return
 		//todo: maybe we need more validation here
 	}

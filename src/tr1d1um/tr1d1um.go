@@ -2,24 +2,25 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
-	"net/url"
 
+	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/secure/handler"
 	"github.com/Comcast/webpa-common/secure/key"
 	"github.com/Comcast/webpa-common/server"
+	"github.com/Comcast/webpa-common/webhook"
 	"github.com/SermoDigital/jose/jwt"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/Comcast/webpa-common/concurrent"
-	"github.com/Comcast/webpa-common/webhook"
 )
 
 //convenient global values
@@ -42,7 +43,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
 		return 1
 	}
-	
+
 	var (
 		infoLogger = logging.Info(logger)
 	)
@@ -65,18 +66,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	conversionHandler := SetUpHandler(tConfig, logger)
-	
+
 	r := mux.NewRouter()
 
 	AddRoutes(r, preHandler, conversionHandler)
 
-	if exitCode = ConfigureWebHooks(r,preHandler,v,logger); exitCode != 0 {
+	if exitCode = ConfigureWebHooks(r, preHandler, v, logger); exitCode != 0 {
 		return
 	}
 
 	var (
 		_, tr1d1umServer = webPA.Prepare(logger, nil, conversionHandler)
-		signals = make(chan os.Signal, 1)
+		signals          = make(chan os.Signal, 1)
 	)
 
 	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
@@ -116,17 +117,20 @@ func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, l
 	if webHookStartResults := <-startChan; webHookStartResults.Error == nil {
 		webHookFactory.SetList(webhook.NewList(webHookStartResults.Hooks))
 	} else {
-		logging.Error(logger).Log(logging.ErrorKey(),webHookStartResults.Error)
+		logging.Error(logger).Log(logging.ErrorKey(), webHookStartResults.Error)
 	}
 
 	return 0
 }
 
-
 //AddRoutes configures the paths and connection rules to TR1D1UM
 func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
-	var BodyNonNil = func(request *http.Request, match *mux.RouteMatch) bool {
-		return request.Body != nil
+	var BodyNonEmpty = func(request *http.Request, match *mux.RouteMatch) (accept bool) {
+		if request.Body != nil {
+			p, err := ioutil.ReadAll(request.Body)
+			accept = err == nil && len(p) > 0
+		}
+		return
 	}
 
 	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, version)).Subrouter()
@@ -135,14 +139,14 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 		Methods(http.MethodGet)
 
 	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodPatch).MatcherFunc(BodyNonNil)
+		Methods(http.MethodPatch).MatcherFunc(BodyNonEmpty)
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodDelete)
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonNil)
-		
+		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonEmpty)
+
 	return r
 }
 
@@ -154,15 +158,15 @@ func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *Conversi
 	}
 
 	cHandler = &ConversionHandler{
-		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
-		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut},
-		NewHTTPRequest: http.NewRequest},
+		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
+		sender: &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut},
+			NewHTTPRequest: http.NewRequest},
 		encodingHelper: &EncodingHelper{},
 	}
 	//pass loggers
 	cHandler.errorLogger = logging.Error(logger)
 	cHandler.infoLogger = logging.Info(logger)
-	cHandler.targetURL = "https://api-cd.xmidt.comcast.net:8090"
+	cHandler.targetURL = tConfig.TargetURL
 	return
 }
 

@@ -14,7 +14,7 @@ type MockConversionTool struct {
 	mock.Mock
 }
 
-func (m *MockConversionTool) GetFlavorFormat(req *http.Request, vars Vars,i string, i2 string, i3 string) (*GetWDMP, error) {
+func (m *MockConversionTool) GetFlavorFormat(req *http.Request, vars Vars, i string, i2 string, i3 string) (*GetWDMP, error) {
 	args := m.Called(req, vars, i, i2, i3)
 	return args.Get(0).(*GetWDMP), args.Error(1)
 }

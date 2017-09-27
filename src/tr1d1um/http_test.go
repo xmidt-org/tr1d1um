@@ -17,7 +17,7 @@ var (
 	payload, body                            = []byte("SomePayload"), bytes.NewBufferString("body")
 	resp                                     = &http.Response{}
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
-	fakeLogger = &LightFakeLogger{}
+	fakeLogger                               = &LightFakeLogger{}
 	ch                                       = &ConversionHandler{
 		wdmpConvert:    mockConversion,
 		sender:         mockSender,
@@ -57,7 +57,7 @@ func TestConversionHandler(t *testing.T) {
 
 	t.Run("IdealGet", func(t *testing.T) {
 		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
-		Return(wdmpGet, nil).Once()
+			Return(wdmpGet, nil).Once()
 
 		SetUpTest(wdmpGet, commonRequest)
 		AssertCommonCalls(t)
@@ -121,7 +121,7 @@ func AssertCommonCalls(t *testing.T) {
 	mockSender.AssertExpectations(t)
 }
 
-type LightFakeLogger struct {}
+type LightFakeLogger struct{}
 
 func (fake *LightFakeLogger) Log(_ ...interface{}) error {
 	return nil

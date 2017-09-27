@@ -64,4 +64,3 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	response, err := ch.sender.Send(ch, origin, wdmpPayload, req)
 	ch.sender.HandleResponse(ch, err, response, origin)
 }
-
