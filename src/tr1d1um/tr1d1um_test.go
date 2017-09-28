@@ -40,7 +40,7 @@ func TestRouteConfigurations(t *testing.T) {
 	fakePreHandler := new(alice.Chain)
 	fakeHandler := &ConversionHandler{}
 
-	r = AddRoutes(r, fakePreHandler, fakeHandler)
+	AddRoutes(r, fakePreHandler, fakeHandler)
 
 	var nonEmpty bytes.Buffer
 	nonEmpty.WriteString(`{empty: false}`)

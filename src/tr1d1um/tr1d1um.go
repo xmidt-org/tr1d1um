@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -51,7 +51,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
 	tConfig := new(Tr1d1umConfig)
-	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
+	err = v.Unmarshal(tConfig)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to unmarshall config data into struct: %s\n", err.Error())
@@ -71,12 +71,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	AddRoutes(r, preHandler, conversionHandler)
 
-	if exitCode = ConfigureWebHooks(r, preHandler, v, logger); exitCode != 0 {
+	if exitCode = ConfigureWebHooks(r, preHandler, v); exitCode != 0 {
 		return
 	}
 
 	var (
-		_, tr1d1umServer = webPA.Prepare(logger, nil, conversionHandler)
+		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
 		signals          = make(chan os.Signal, 1)
 	)
 
@@ -89,7 +89,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 }
 
 //ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
-func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) int {
+func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper) int {
 	webHookFactory, err := webhook.NewFactory(v)
 
 	if err != nil {
@@ -97,38 +97,26 @@ func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, l
 		return 1
 	}
 
-	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler()
+	webHookRegistry, _ := webHookFactory.NewRegistryAndHandler()
 
 	// register webHook end points for api
 	r.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
 	r.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
 
-	selfURL := &url.URL{
-		Scheme: "https",
-		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
-	}
-
-	webHookFactory.Initialize(r, selfURL, webHookHandler, logger, nil)
-	webHookFactory.PrepareAndStart()
-
-	startChan := make(chan webhook.Result, 1)
-	webHookFactory.Start.GetCurrentSystemsHooks(startChan)
-
-	if webHookStartResults := <-startChan; webHookStartResults.Error == nil {
-		webHookFactory.SetList(webhook.NewList(webHookStartResults.Hooks))
-	} else {
-		logging.Error(logger).Log(logging.ErrorKey(), webHookStartResults.Error)
-	}
-
 	return 0
 }
 
 //AddRoutes configures the paths and connection rules to TR1D1UM
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 	var BodyNonEmpty = func(request *http.Request, match *mux.RouteMatch) (accept bool) {
 		if request.Body != nil {
+			var tmp bytes.Buffer
 			p, err := ioutil.ReadAll(request.Body)
-			accept = err == nil && len(p) > 0
+			if accept = err == nil && len(p) > 0; accept {
+				//place back request's body
+				tmp.Write(p)
+				request.Body = ioutil.NopCloser(&tmp)
+			}
 		}
 		return
 	}
@@ -146,8 +134,6 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonEmpty)
-
-	return r
 }
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
