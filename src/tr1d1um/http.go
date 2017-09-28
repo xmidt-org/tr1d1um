@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
@@ -13,7 +12,6 @@ import (
 type ConversionHandler struct {
 	infoLogger     log.Logger
 	errorLogger    log.Logger
-	timeOut        time.Duration
 	targetURL      string
 	wdmpConvert    ConversionTool
 	sender         SendAndHandle
@@ -21,14 +19,14 @@ type ConversionHandler struct {
 }
 
 //ConversionHandler handles the different incoming tr1 requests
-func (ch *ConversionHandler) ConversionHandler(origin http.ResponseWriter, req *http.Request) {
+func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
 	var err error
 	var wdmp interface{}
-	var urlVars Vars
+	var urlVars = mux.Vars(req)
 
 	switch req.Method {
 	case http.MethodGet:
-		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, "attributes", "names", ",")
+		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, urlVars, "attributes", "names", ",")
 		break
 
 	case http.MethodPatch:
@@ -36,19 +34,17 @@ func (ch *ConversionHandler) ConversionHandler(origin http.ResponseWriter, req *
 		break
 
 	case http.MethodDelete:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.DeleteFlavorFormat(urlVars, "parameter")
 		break
 
 	case http.MethodPut:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.ReplaceFlavorFormat(req.Body, urlVars, "parameter")
 		break
 
 	case http.MethodPost:
-		urlVars = mux.Vars(req)
 		wdmp, err = ch.wdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
 		break
+
 	}
 
 	if err != nil {

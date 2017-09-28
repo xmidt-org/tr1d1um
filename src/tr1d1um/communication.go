@@ -38,7 +38,8 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 		return
 	}
 
-	requestToServer, err := tr1.NewHTTPRequest(http.MethodGet, ch.targetURL, bytes.NewBuffer(wrpPayload))
+	fullPath := ch.targetURL + baseURI + "/" + version + "/" + wrpMsg.Destination
+	requestToServer, err := tr1.NewHTTPRequest(http.MethodPost, fullPath, bytes.NewBuffer(wrpPayload))
 
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -48,6 +49,7 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 
 	//todo: any more headers to be added here
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
+	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 	respFromServer, err = tr1.timedClient.Do(requestToServer)
 	return
 }

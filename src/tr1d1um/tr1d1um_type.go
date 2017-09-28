@@ -5,6 +5,7 @@ import (
 	"github.com/Comcast/webpa-common/secure/key"
 )
 
+//Tr1d1umConfig wraps all the config
 type Tr1d1umConfig struct {
 	Addr              string   `json:"addr"`
 	PprofAddr         string   `json:"pprofaddr"`
@@ -12,14 +13,14 @@ type Tr1d1umConfig struct {
 	Key               string   `json:"key"`
 	AuthKey           []string `json:"authKey"`
 	HandlerTimeout    string   `json:"handlerTimeout"`
-	HttpTimeout       string   `json:"httpTimeout"`
+	HTTPTimeout       string   `json:"httpTimeout"`
 	HealthInterval    string   `json:"healthInterval"`
 	Version           string   `json:"version"`
-	MaxApiTcpConns    int64    `json:"maxApiTcpConnections"`
-	MaxHealthTcpConns int64    `json:"maxHealthTcpConnections"`
+	MaxTCPConns       int64    `json:"maxApiTcpConnections"`
+	MaxHealthTCPConns int64    `json:"maxHealthTcpConnections"`
 	ServiceList       []string `json:"serviceList"`
 	WrpSource         string   `json:"wrpSource"`
-	targetURL         string   `json:"targetUrl"`
+	TargetURL         string   `json:"targetURL"`
 
 	JWTValidators []struct {
 		// JWTKeys is used to create the key.Resolver for JWT verification keys
@@ -31,6 +32,7 @@ type Tr1d1umConfig struct {
 	} `json:"jwtValidators"`
 }
 
+//JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory
