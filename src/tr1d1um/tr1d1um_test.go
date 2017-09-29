@@ -11,27 +11,30 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSetUpHandler(t *testing.T) {
 	assert := assert.New(t)
-	tConfig := &Tr1d1umConfig{HTTPTimeout: "10s", TargetURL: "https://someCoolURL.com"}
+	v := viper.New()
+	v.Set("requestTimeout", "60s")
+	v.Set("targetURL", "https://someCoolURL.com")
 	logger := logging.DefaultLogger()
 
 	t.Run("NormalSetUp", func(t *testing.T) {
-		actualHandler := SetUpHandler(tConfig, logger)
-		AssertCommon(actualHandler, tConfig, assert)
+		actualHandler := SetUpHandler(v, logger)
+		AssertCommon(actualHandler, v, assert)
 	})
 
 	t.Run("IncompleteConfig", func(t *testing.T) {
-		tConfig.HTTPTimeout = "" //make config struct incomplete
+		v.Set("requestTimeOut", "") //make config incomplete
 
-		actualHandler := SetUpHandler(tConfig, logger)
+		actualHandler := SetUpHandler(v, logger)
 
 		realSender := actualHandler.sender.(*Tr1SendAndHandle)
 		assert.EqualValues(time.Second*60, realSender.timedClient.Timeout) //turn to default value
-		AssertCommon(actualHandler, tConfig, assert)
+		AssertCommon(actualHandler, v, assert)
 	})
 }
 
@@ -39,8 +42,10 @@ func TestRouteConfigurations(t *testing.T) {
 	r := mux.NewRouter()
 	fakePreHandler := new(alice.Chain)
 	fakeHandler := &ConversionHandler{}
+	v := viper.New()
+	v.Set("version", "v2")
 
-	r = AddRoutes(r, fakePreHandler, fakeHandler)
+	AddRoutes(r, fakePreHandler, fakeHandler, v)
 
 	var nonEmpty bytes.Buffer
 	nonEmpty.WriteString(`{empty: false}`)
@@ -94,12 +99,11 @@ func AssertConfiguredRoutes(r *mux.Router, t *testing.T, testCases []RouteTestBu
 	}
 }
 
-func AssertCommon(actualHandler *ConversionHandler, tConfig *Tr1d1umConfig, assert *assert.Assertions) {
+func AssertCommon(actualHandler *ConversionHandler, v *viper.Viper, assert *assert.Assertions) {
 	assert.NotNil(actualHandler.wdmpConvert)
 	assert.NotNil(actualHandler.encodingHelper)
-	assert.NotNil(actualHandler.errorLogger)
-	assert.NotNil(actualHandler.infoLogger)
-	assert.EqualValues(tConfig.TargetURL, actualHandler.targetURL)
+	assert.NotNil(actualHandler.logger)
+	assert.EqualValues(v.Get("targetURL"), actualHandler.targetURL)
 	assert.NotNil(actualHandler.sender)
 
 	realizedSender := actualHandler.sender.(*Tr1SendAndHandle)

@@ -10,9 +10,9 @@ import (
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
 type ConversionHandler struct {
-	infoLogger     log.Logger
-	errorLogger    log.Logger
+	logger         log.Logger
 	targetURL      string
+	serverVersion  string
 	wdmpConvert    ConversionTool
 	sender         SendAndHandle
 	encodingHelper EncodingTool
@@ -20,9 +20,11 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
-	var err error
-	var wdmp interface{}
-	var urlVars = mux.Vars(req)
+	var (
+		err     error
+		wdmp    interface{}
+		urlVars = mux.Vars(req)
+	)
 
 	switch req.Method {
 	case http.MethodGet:
@@ -49,7 +51,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
-		ch.errorLogger.Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
+		logging.Error(ch.logger).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
 
@@ -57,7 +59,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
-		ch.errorLogger.Log(logging.ErrorKey(), err.Error())
+		logging.Error(ch.logger).Log(logging.ErrorKey(), err.Error())
 		return
 	}
 

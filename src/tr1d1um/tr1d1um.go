@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -28,7 +29,6 @@ const (
 	applicationName = "tr1d1um"
 	DefaultKeyID    = "current"
 	baseURI         = "/api"
-	version         = "v2" // TODO: Should these values change?
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -50,9 +50,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	tConfig := new(Tr1d1umConfig)
-	err = v.Unmarshal(tConfig) //todo: decide best way to get current unexported fields from viper
-
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to unmarshall config data into struct: %s\n", err.Error())
 		return 1
@@ -65,18 +62,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	conversionHandler := SetUpHandler(tConfig, logger)
+	conversionHandler := SetUpHandler(v, logger)
 
 	r := mux.NewRouter()
 
-	AddRoutes(r, preHandler, conversionHandler)
+	AddRoutes(r, preHandler, conversionHandler, v)
 
 	if exitCode = ConfigureWebHooks(r, preHandler, v, logger); exitCode != 0 {
 		return
 	}
 
 	var (
-		_, tr1d1umServer = webPA.Prepare(logger, nil, conversionHandler)
+		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
 		signals          = make(chan os.Signal, 1)
 	)
 
@@ -111,29 +108,25 @@ func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, l
 	webHookFactory.Initialize(r, selfURL, webHookHandler, logger, nil)
 	webHookFactory.PrepareAndStart()
 
-	startChan := make(chan webhook.Result, 1)
-	webHookFactory.Start.GetCurrentSystemsHooks(startChan)
-
-	if webHookStartResults := <-startChan; webHookStartResults.Error == nil {
-		webHookFactory.SetList(webhook.NewList(webHookStartResults.Hooks))
-	} else {
-		logging.Error(logger).Log(logging.ErrorKey(), webHookStartResults.Error)
-	}
-
 	return 0
 }
 
 //AddRoutes configures the paths and connection rules to TR1D1UM
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) *mux.Router {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler, v *viper.Viper) {
 	var BodyNonEmpty = func(request *http.Request, match *mux.RouteMatch) (accept bool) {
 		if request.Body != nil {
+			var tmp bytes.Buffer
 			p, err := ioutil.ReadAll(request.Body)
-			accept = err == nil && len(p) > 0
+			if accept = err == nil && len(p) > 0; accept {
+				//place back request's body
+				tmp.Write(p)
+				request.Body = ioutil.NopCloser(&tmp)
+			}
 		}
 		return
 	}
 
-	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, version)).Subrouter()
+	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString("version"))).Subrouter()
 
 	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodGet)
@@ -146,27 +139,23 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonEmpty)
-
-	return r
 }
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
-func SetUpHandler(tConfig *Tr1d1umConfig, logger log.Logger) (cHandler *ConversionHandler) {
-	timeOut, err := time.ParseDuration(tConfig.HTTPTimeout)
+func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
+	timeOut, err := time.ParseDuration(v.GetString("requestTimeout"))
 	if err != nil {
 		timeOut = time.Second * 60 //default val
 	}
 
 	cHandler = &ConversionHandler{
-		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
-		sender: &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut},
-			NewHTTPRequest: http.NewRequest},
+		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
+		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut}, NewHTTPRequest: http.NewRequest},
 		encodingHelper: &EncodingHelper{},
+		logger:         logger,
+		targetURL:      v.GetString("targetURL"),
+		serverVersion:  v.GetString("version"),
 	}
-	//pass loggers
-	cHandler.errorLogger = logging.Error(logger)
-	cHandler.infoLogger = logging.Info(logger)
-	cHandler.targetURL = tConfig.TargetURL
 	return
 }
 
@@ -224,7 +213,6 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 		)
 	}
 
-	// TODO: This should really be part of the unmarshalled validators somehow
 	basicAuth := v.GetStringSlice("authHeader")
 	for _, authValue := range basicAuth {
 		validators = append(
