@@ -22,7 +22,7 @@ var (
 		wdmpConvert:    mockConversion,
 		sender:         mockSender,
 		encodingHelper: mockEncoding,
-		errorLogger:    fakeLogger,
+		logger:         fakeLogger,
 	}
 )
 
