@@ -38,7 +38,7 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 		return
 	}
 
-	fullPath := ch.targetURL + baseURI + "/" + ch.serverVersion + "/device"
+	fullPath := ch.targetURL + baseURI + "/" + ch.serverVersion + "/device/send"
 	requestToServer, err := tr1.NewHTTPRequest(http.MethodPost, fullPath, bytes.NewBuffer(wrpPayload))
 
 	if err != nil {
