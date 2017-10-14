@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
@@ -20,8 +23,9 @@ type SendAndHandle interface {
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
 	log            log.Logger
-	timedClient    *http.Client
+	client         *http.Client
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
+	timeout        time.Duration
 }
 
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
@@ -50,8 +54,24 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	//todo: any more headers to be added here
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-	respFromServer, err = tr1.timedClient.Do(requestToServer)
-	return
+
+	ctx, cancel := context.WithTimeout(context.Background(), tr1.timeout)
+	defer cancel()
+
+	requestWithContext := requestToServer.WithContext(ctx)
+	ready := make(chan bool)
+
+	go func() {
+		respFromServer, err = tr1.client.Do(requestWithContext)
+		ready <- true
+	}()
+
+	select {
+	case <-ready:
+		return
+	case <-ctx.Done():
+		return nil, errors.New("client time exceeded")
+	}
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)

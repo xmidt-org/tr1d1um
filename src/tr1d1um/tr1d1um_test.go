@@ -33,7 +33,7 @@ func TestSetUpHandler(t *testing.T) {
 		actualHandler := SetUpHandler(v, logger)
 
 		realSender := actualHandler.sender.(*Tr1SendAndHandle)
-		assert.EqualValues(time.Second*60, realSender.timedClient.Timeout) //turn to default value
+		assert.EqualValues(time.Second*60, realSender.timeout) //turn to default value
 		AssertCommon(actualHandler, v, assert)
 	})
 }
@@ -109,7 +109,7 @@ func AssertCommon(actualHandler *ConversionHandler, v *viper.Viper, assert *asse
 	realizedSender := actualHandler.sender.(*Tr1SendAndHandle)
 
 	//assert necessary inner methods are set in the method under test
-	assert.NotNil(realizedSender.timedClient)
+	assert.NotNil(realizedSender.client)
 	assert.NotNil(realizedSender.NewHTTPRequest)
 }
 
