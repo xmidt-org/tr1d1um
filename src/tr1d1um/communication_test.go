@@ -22,7 +22,8 @@ func TestSend(t *testing.T) {
 	WRPPayload := []byte("payload")
 	validURL := "http://someValidURL"
 
-	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
+	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, client: &http.Client{Timeout: time.Second}}
+
 	tr1.NewHTTPRequest = http.NewRequest
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL}
 
@@ -78,6 +79,7 @@ func TestSend(t *testing.T) {
 		gock.New(validURL).Reply(http.StatusOK)
 		recorder := httptest.NewRecorder()
 
+		tr1.timeout = time.Second //give it plenty of time so it does not time out
 		_, err := tr1.Send(ch, recorder, data, req)
 
 		assert.Nil(err)
@@ -85,11 +87,34 @@ func TestSend(t *testing.T) {
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
+
+	t.Run("SendTimeout", func(t *testing.T) {
+		defer gock.OffAll()
+
+		req := httptest.NewRequest(http.MethodGet, validURL, nil)
+
+		var URLVars Vars = mux.Vars(req)
+		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
+		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
+
+		tr1.timeout = time.Nanosecond
+
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second)
+		recorder := httptest.NewRecorder()
+
+		_, err := tr1.Send(ch, recorder, data, req)
+
+		assert.NotNil(err)
+		assert.Contains(err.Error(), "time exceeded")
+
+		mockConversion.AssertExpectations(t)
+		mockEncoding.AssertExpectations(t)
+	})
 }
 
 func TestHandleResponse(t *testing.T) {
 	assert := assert.New(t)
-	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
+	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, client: &http.Client{Timeout: time.Second}}
 	tr1.NewHTTPRequest = http.NewRequest
 
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion}

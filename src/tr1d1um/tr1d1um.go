@@ -143,14 +143,16 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
 func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
-	timeOut, err := time.ParseDuration(v.GetString("requestTimeout"))
+	timeout, err := time.ParseDuration(v.GetString("requestTimeout"))
 	if err != nil {
-		timeOut = time.Second * 60 //default val
+		timeout = time.Second * 60 //default val
 	}
 
 	cHandler = &ConversionHandler{
-		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
-		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut}, NewHTTPRequest: http.NewRequest},
+		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
+		//TODO: add needed elements into http.Client
+		sender: &Tr1SendAndHandle{client: &http.Client{}, log: logger, NewHTTPRequest: http.NewRequest,
+			timeout: timeout},
 		encodingHelper: &EncodingHelper{},
 		logger:         logger,
 		targetURL:      v.GetString("targetURL"),
