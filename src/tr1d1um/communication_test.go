@@ -76,10 +76,10 @@ func TestSend(t *testing.T) {
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
-		gock.New(validURL).Reply(http.StatusOK)
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second)
 		recorder := httptest.NewRecorder()
 
-		tr1.timeout = time.Second //give it plenty of time so it does not time out
+		tr1.respTimeout = time.Second * 3 //give it plenty of time so it does not time out
 		_, err := tr1.Send(ch, recorder, data, req)
 
 		assert.Nil(err)
@@ -97,15 +97,15 @@ func TestSend(t *testing.T) {
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
-		tr1.timeout = time.Nanosecond
+		tr1.respTimeout = time.Nanosecond // Super tight timeout
 
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second)
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
 		recorder := httptest.NewRecorder()
 
 		_, err := tr1.Send(ch, recorder, data, req)
 
 		assert.NotNil(err)
-		assert.Contains(err.Error(), "time exceeded")
+		assert.Contains(err.Error(), "deadline exceeded")
 
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)

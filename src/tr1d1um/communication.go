@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -25,7 +24,7 @@ type Tr1SendAndHandle struct {
 	log            log.Logger
 	client         *http.Client
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
-	timeout        time.Duration
+	respTimeout    time.Duration
 }
 
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
@@ -55,22 +54,22 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), tr1.timeout)
+	ctx, cancel := context.WithTimeout(requestToServer.Context(), tr1.respTimeout)
 	defer cancel()
 
 	requestWithContext := requestToServer.WithContext(ctx)
-	ready := make(chan bool)
+	responseReady := make(chan struct{})
 
 	go func() {
+		defer close(responseReady)
 		respFromServer, err = tr1.client.Do(requestWithContext)
-		ready <- true
 	}()
 
 	select {
-	case <-ready:
+	case <-responseReady:
 		return
 	case <-ctx.Done():
-		return nil, errors.New("client time exceeded")
+		return nil, ctx.Err()
 	}
 }
 
