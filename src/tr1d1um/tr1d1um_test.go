@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	"time"
 
 	"github.com/Comcast/webpa-common/logging"
@@ -18,8 +19,10 @@ import (
 func TestSetUpHandler(t *testing.T) {
 	assert := assert.New(t)
 	v := viper.New()
-	v.Set("requestTimeout", "60s")
 	v.Set("targetURL", "https://someCoolURL.com")
+	v.SetDefault("clientTimeout", defaultClientTimeout)
+	v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
+
 	logger := logging.DefaultLogger()
 
 	t.Run("NormalSetUp", func(t *testing.T) {
@@ -28,12 +31,12 @@ func TestSetUpHandler(t *testing.T) {
 	})
 
 	t.Run("IncompleteConfig", func(t *testing.T) {
-		v.Set("requestTimeOut", "") //make config incomplete
-
 		actualHandler := SetUpHandler(v, logger)
-
 		realSender := actualHandler.sender.(*Tr1SendAndHandle)
-		assert.EqualValues(time.Second*60, realSender.timeout) //turn to default value
+
+		//turn to default values
+		assert.EqualValues(time.Second*40, realSender.respTimeout)
+		assert.EqualValues(time.Second*30, realSender.client.Timeout)
 		AssertCommon(actualHandler, v, assert)
 	})
 }
