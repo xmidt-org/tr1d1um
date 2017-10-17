@@ -432,3 +432,18 @@ func TestGetConfiguredWRP(t *testing.T) {
 	assert.EqualValues(expectedSource, wrpMsg.Source)
 	assert.EqualValues(tid, wrpMsg.TransactionUUID)
 }
+
+
+func TestGetOrGenTID(t *testing.T) {
+	assert := assert.New(t)
+	t.Run("UseGivenTID", func(t *testing.T) {
+		header := http.Header{}
+		header.Set(HeaderWPATID, "SomeTID")
+		assert.EqualValues("SomeTID", GetOrGenTID(header))
+	})
+
+	t.Run("GenerateTID", func(t *testing.T) {
+		tid := GetOrGenTID(http.Header{})
+		assert.NotEmpty(tid)
+	})
+}
