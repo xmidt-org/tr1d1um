@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"crypto/rand"
+	"encoding/base64"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
@@ -132,9 +134,9 @@ func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tab
 	return
 }
 
-//ValidateAndDeduceSET attempts at defaulting to the SET command given that all the command property requirements are satisfied.
+//ValidateAndDeduceSET attempts at defaulting to the SET command given all command property requirements are satisfied
 // (name, value, dataType). Then, if the new_cid is provided, it is deduced that the command should be TEST_SET
-//else,
+//If the SET command properties are not satisfied, we attempt at validating the input for the SET_ATTRS command
 func (cw *ConversionWDMP) ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
 	if err = validation.Validate(wdmp.Parameters, validation.Required); err == nil {
 		wdmp.Command = CommandSet
@@ -176,7 +178,7 @@ func (cw *ConversionWDMP) GetConfiguredWRP(wdmp []byte, pathVars Vars, header ht
 		Payload:         wdmp,
 		Source:          WRPSource + "/" + service,
 		Destination:     deviceID + "/" + service,
-		TransactionUUID: header.Get(HeaderWPATID),
+		TransactionUUID: GetOrGenTID(header),
 	}
 	return
 }
@@ -214,5 +216,20 @@ func (helper *EncodingHelper) GenericEncode(v interface{}, f wrp.Format) (data [
 	var tmp bytes.Buffer
 	err = wrp.NewEncoder(&tmp, f).Encode(v)
 	data = tmp.Bytes()
+	return
+}
+
+
+//GetOrGenTID returns a Transaction ID for a given request.
+//If a TID was provided in the headers, such is used. Otherwise,
+//a new TID is generated and returned
+func GetOrGenTID(requestHeader http.Header) (tid string){
+	if tid = requestHeader.Get(HeaderWPATID); tid == ""{
+		buf := make([]byte, 16)
+		if _, err := rand.Read(buf); err == nil{
+			tid = base64.RawURLEncoding.EncodeToString(buf)
+		}
+	}
+	//TODO: any validation on the provided TID?
 	return
 }
