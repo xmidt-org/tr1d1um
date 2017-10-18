@@ -27,6 +27,11 @@ type Tr1SendAndHandle struct {
 	respTimeout    time.Duration
 }
 
+type ClientResponse struct {
+	resp *http.Response
+	err  error
+}
+
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
 //Its response is then handled in HandleResponse
 func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWriter, data []byte, req *http.Request) (respFromServer *http.Response, err error) {
@@ -50,7 +55,6 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 		return
 	}
 
-	//todo: any more headers to be added here
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 
@@ -58,15 +62,17 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	defer cancel()
 
 	requestWithContext := requestToServer.WithContext(ctx)
-	responseReady := make(chan struct{})
+	responseReady := make(chan ClientResponse)
 
 	go func() {
 		defer close(responseReady)
-		respFromServer, err = tr1.client.Do(requestWithContext)
+		respObj, respErr := tr1.client.Do(requestWithContext)
+		responseReady <- ClientResponse{respObj, respErr}
 	}()
 
 	select {
-	case <-responseReady:
+	case cResponse := <-responseReady:
+		respFromServer, err = cResponse.resp, cResponse.err
 		return
 	case <-ctx.Done():
 		return nil, ctx.Err()

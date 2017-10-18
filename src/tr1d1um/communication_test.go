@@ -26,13 +26,10 @@ func TestSend(t *testing.T) {
 
 	t.Run("SendEncodeErr", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
-
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, errors.New(errMsg)).Once()
-
 		recorder := httptest.NewRecorder()
-
 		tr1 := NewTR1()
 		_, err := tr1.Send(ch, recorder, data, req)
 
@@ -45,13 +42,11 @@ func TestSend(t *testing.T) {
 	t.Run("SendNewRequestErr", func(t *testing.T) {
 		tr1 := NewTR1()
 		tr1.NewHTTPRequest = NewHTTPRequestFail
-
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
 
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-
 		recorder := httptest.NewRecorder()
 		_, err := tr1.Send(ch, recorder, data, req)
 
@@ -71,51 +66,36 @@ func TestSend(t *testing.T) {
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second)
-		recorder := httptest.NewRecorder()
-
+		gock.New(validURL).Reply(http.StatusOK)
 		tr1 := NewTR1()
-		tr1.respTimeout = time.Second * 3 //give it plenty of time so it does not time out
-		_, err := tr1.Send(ch, recorder, data, req)
+		tr1.respTimeout = time.Second //give it plenty of time so it does not time out
+		resp, err := tr1.Send(ch, nil, data, req)
 
 		assert.Nil(err)
-		assert.EqualValues(http.StatusOK, recorder.Code)
+		assert.EqualValues(http.StatusOK, resp.StatusCode)
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
-}
 
-// Running this Test by its own due to asynchronous nature of Send() and how t.Run methods could be run in parallel
-func TestSendTimeout(t *testing.T){
-	defer gock.OffAll()
-	assert := assert.New(t)
+	t.Run("SendTimeout", func(t *testing.T) {
+		defer gock.OffAll()
 
-	data := []byte("data")
-	WRPMsg := &wrp.Message{}
-	WRPPayload := []byte("payload")
-	validURL := "http://someValidURL"
+		req := httptest.NewRequest(http.MethodGet, validURL, nil)
 
-	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL}
+		var URLVars Vars = mux.Vars(req)
+		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
+		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, validURL, nil)
+		tr1 := NewTR1()
+		tr1.respTimeout = time.Nanosecond                          // Super tight timeout
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
+		_, err := tr1.Send(ch, nil, data, req)
 
-	var URLVars Vars = mux.Vars(req)
-	mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-	mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-
-	tr1 := NewTR1()
-	tr1.respTimeout = time.Nanosecond // Super tight timeout
-
-	gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
-	recorder := httptest.NewRecorder()
-
-	_, err := tr1.Send(ch, recorder, data, req)
-
-	assert.NotNil(err)
-	assert.Contains(err.Error(), "deadline exceeded")
-
-	mockConversion.AssertExpectations(t)
-	mockEncoding.AssertExpectations(t)
+		assert.NotNil(err)
+		assert.Contains(err.Error(), "deadline exceeded")
+		mockConversion.AssertExpectations(t)
+		mockEncoding.AssertExpectations(t)
+	})
 }
 
 func TestHandleResponse(t *testing.T) {
@@ -167,7 +147,7 @@ func NewHTTPRequestFail(_, _ string, _ io.Reader) (*http.Request, error) {
 	return nil, errors.New(errMsg)
 }
 
-func NewTR1() (tr1 *Tr1SendAndHandle){
+func NewTR1() (tr1 *Tr1SendAndHandle) {
 	tr1 = &Tr1SendAndHandle{log: &LightFakeLogger{}, client: &http.Client{Timeout: time.Second}}
 	tr1.NewHTTPRequest = http.NewRequest
 	return tr1

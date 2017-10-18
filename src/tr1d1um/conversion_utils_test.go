@@ -433,7 +433,6 @@ func TestGetConfiguredWRP(t *testing.T) {
 	assert.EqualValues(tid, wrpMsg.TransactionUUID)
 }
 
-
 func TestGetOrGenTID(t *testing.T) {
 	assert := assert.New(t)
 	t.Run("UseGivenTID", func(t *testing.T) {
