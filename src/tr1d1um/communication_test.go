@@ -83,30 +83,39 @@ func TestSend(t *testing.T) {
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
+}
 
-	t.Run("SendTimeout", func(t *testing.T) {
-		defer gock.OffAll()
+// Running this Test by its own due to asynchronous nature of Send() and how t.Run methods could be run in parallel
+func TestSendTimeout(t *testing.T){
+	defer gock.OffAll()
+	assert := assert.New(t)
 
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
+	data := []byte("data")
+	WRPMsg := &wrp.Message{}
+	WRPPayload := []byte("payload")
+	validURL := "http://someValidURL"
 
-		var URLVars Vars = mux.Vars(req)
-		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
+	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL}
 
-		tr1 := NewTR1()
-		tr1.respTimeout = time.Nanosecond // Super tight timeout
+	req := httptest.NewRequest(http.MethodGet, validURL, nil)
 
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
-		recorder := httptest.NewRecorder()
+	var URLVars Vars = mux.Vars(req)
+	mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
+	mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
-		_, err := tr1.Send(ch, recorder, data, req)
+	tr1 := NewTR1()
+	tr1.respTimeout = time.Nanosecond // Super tight timeout
 
-		assert.NotNil(err)
-		assert.Contains(err.Error(), "deadline exceeded")
+	gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
+	recorder := httptest.NewRecorder()
 
-		mockConversion.AssertExpectations(t)
-		mockEncoding.AssertExpectations(t)
-	})
+	_, err := tr1.Send(ch, recorder, data, req)
+
+	assert.NotNil(err)
+	assert.Contains(err.Error(), "deadline exceeded")
+
+	mockConversion.AssertExpectations(t)
+	mockEncoding.AssertExpectations(t)
 }
 
 func TestHandleResponse(t *testing.T) {
