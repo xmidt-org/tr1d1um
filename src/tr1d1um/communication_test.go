@@ -60,7 +60,6 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("SendIdeal", func(t *testing.T) {
-		assert := assert.
 		defer gock.OffAll()
 
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
