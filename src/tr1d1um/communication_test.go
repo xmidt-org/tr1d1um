@@ -89,9 +89,13 @@ func TestSend(t *testing.T) {
 
 		tr1 := NewTR1()
 		ctx, cancel := context.WithCancel(req.Context())
-		cancel() // fake a timeout through a cancel even before Send() begins
 
 		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
+
+		go func () {
+			cancel() //fake a timeout through a cancel
+		}()
+
 		_, err := tr1.Send(ch, nil, data, req.WithContext(ctx))
 
 		assert.NotNil(err)
