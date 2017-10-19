@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-	"context"
+	"sync"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
@@ -59,6 +60,7 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("SendIdeal", func(t *testing.T) {
+		assert := assert.
 		defer gock.OffAll()
 
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
@@ -92,13 +94,25 @@ func TestSend(t *testing.T) {
 
 		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
 
-		go func () {
+		go func() {
 			cancel() //fake a timeout through a cancel
 		}()
 
-		_, err := tr1.Send(ch, nil, data, req.WithContext(ctx))
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 
-		assert.NotNil(err)
+		errChan := make(chan error)
+
+		go func() {
+			wg.Done()
+			_, err := tr1.Send(ch, nil, data, req.WithContext(ctx))
+			errChan <- err
+		}()
+
+		wg.Wait() //Wait until we know Send() is running
+		cancel()
+
+		assert.NotNil(<-errChan)
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
