@@ -107,6 +107,46 @@ func TestConversionHandler(t *testing.T) {
 	})
 }
 
+func TestForwardHeadersByPrefix(t *testing.T) {
+	t.Run("NoHeaders", func(t *testing.T) {
+		assert := assert.New(t)
+		origin := httptest.NewRecorder()
+
+		ForwardHeadersByPrefix("H", origin, resp)
+		assert.Empty(origin.Header())
+	})
+
+	t.Run("MultipleHeadersFiltered", func(t *testing.T) {
+		assert := assert.New(t)
+		origin := httptest.NewRecorder()
+		resp := &http.Response{Header:http.Header{}}
+
+		resp.Header.Add("Helium", "3")
+		resp.Header.Add("Hydrogen", "5")
+		resp.Header.Add("Hydrogen", "6")
+
+		ForwardHeadersByPrefix("He", origin, resp)
+		assert.NotEmpty(origin.Header())
+		assert.EqualValues(1, len(origin.Header()))
+		assert.EqualValues("3", origin.Header().Get("Helium"))
+	})
+
+	t.Run("MultipleHeadersFilteredFullArray", func(t *testing.T) {
+		assert := assert.New(t)
+		origin := httptest.NewRecorder()
+		resp := &http.Response{Header:http.Header{}}
+
+		resp.Header.Add("Helium", "3")
+		resp.Header.Add("Hydrogen", "5")
+		resp.Header.Add("Hydrogen", "6")
+
+		ForwardHeadersByPrefix("H", origin, resp)
+		assert.NotEmpty(origin.Header())
+		assert.EqualValues(2, len(origin.Header()))
+		assert.EqualValues([]string{"5","6"}, origin.Header()["Hydrogen"])
+	})
+}
+
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
 	timeout := time.Nanosecond
