@@ -7,6 +7,7 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+	"strings"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -67,5 +68,22 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
 	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
 	cancel()
+
+	ForwardHeadersByPrefix("X", origin, response)
+
 	ch.sender.HandleResponse(ch, err, response, origin)
+}
+
+// Helper functions
+
+//ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
+//into an responseWriter
+func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *http.Response){
+	for headerKey, headerValues := range resp.Header {
+		if strings.HasPrefix(headerKey, prefix) {
+			for _, headerValue := range headerValues {
+				origin.Header().Add(headerKey, headerValue)
+			}
+		}
+	}
 }
