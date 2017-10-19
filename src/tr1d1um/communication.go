@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"time"
@@ -17,6 +16,7 @@ import (
 type SendAndHandle interface {
 	Send(*ConversionHandler, http.ResponseWriter, []byte, *http.Request) (*http.Response, error)
 	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter)
+	GetRespTimeout() time.Duration
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
@@ -27,7 +27,7 @@ type Tr1SendAndHandle struct {
 	respTimeout    time.Duration
 }
 
-type ClientResponse struct {
+type clientResponse struct {
 	resp *http.Response
 	err  error
 }
@@ -58,16 +58,14 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 
-	ctx, cancel := context.WithTimeout(requestToServer.Context(), tr1.respTimeout)
-	defer cancel()
-
+	ctx := req.Context() // we expect this context to have some sort of deadline built in if any
 	requestWithContext := requestToServer.WithContext(ctx)
-	responseReady := make(chan ClientResponse)
+	responseReady := make(chan clientResponse)
 
 	go func() {
 		defer close(responseReady)
 		respObj, respErr := tr1.client.Do(requestWithContext)
-		responseReady <- ClientResponse{respObj, respErr}
+		responseReady <- clientResponse{respObj, respErr}
 	}()
 
 	select {
@@ -103,4 +101,10 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 		origin.WriteHeader(http.StatusInternalServerError)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
+}
+
+//GetRespTimeout returns the duration the sender should use while waiting
+//for a response from a server
+func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
+	return tr1.respTimeout
 }

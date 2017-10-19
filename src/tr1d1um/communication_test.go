@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"context"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
@@ -68,7 +69,7 @@ func TestSend(t *testing.T) {
 
 		gock.New(validURL).Reply(http.StatusOK)
 		tr1 := NewTR1()
-		tr1.respTimeout = time.Second //give it plenty of time so it does not time out
+
 		resp, err := tr1.Send(ch, nil, data, req)
 
 		assert.Nil(err)
@@ -87,12 +88,13 @@ func TestSend(t *testing.T) {
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
 		tr1 := NewTR1()
-		tr1.respTimeout = time.Nanosecond                          // Super tight timeout
+		ctx, cancel := context.WithCancel(req.Context())
+		cancel() // fake a timeout through a cancel even before Send() begins
+
 		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
-		_, err := tr1.Send(ch, nil, data, req)
+		_, err := tr1.Send(ch, nil, data, req.WithContext(ctx))
 
 		assert.NotNil(err)
-		assert.Contains(err.Error(), "deadline exceeded")
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})

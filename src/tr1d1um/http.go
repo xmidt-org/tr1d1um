@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"context"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
@@ -46,7 +47,6 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	case http.MethodPost:
 		wdmp, err = ch.wdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
 		break
-
 	}
 
 	if err != nil {
@@ -63,6 +63,9 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		return
 	}
 
-	response, err := ch.sender.Send(ch, origin, wdmpPayload, req)
+	//set timeout for response waiting
+	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
+	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
+	cancel()
 	ch.sender.HandleResponse(ch, err, response, origin)
 }
