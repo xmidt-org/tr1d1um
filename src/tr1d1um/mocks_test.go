@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 
+	"time"
+
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/mock"
 )
@@ -92,5 +94,7 @@ func (m *MockSendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWrit
 func (m *MockSendAndHandle) HandleResponse(ch *ConversionHandler, err error, resp *http.Response, origin http.ResponseWriter) {
 	m.Called(ch, err, resp, origin)
 }
-
-/* Mocks for Logger */
+func (m *MockSendAndHandle) GetRespTimeout() time.Duration {
+	args := m.Called()
+	return args.Get(0).(time.Duration)
+}

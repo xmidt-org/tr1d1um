@@ -26,9 +26,11 @@ import (
 
 //convenient global values
 const (
-	applicationName = "tr1d1um"
-	DefaultKeyID    = "current"
-	baseURI         = "/api"
+	applicationName        = "tr1d1um"
+	DefaultKeyID           = "current"
+	baseURI                = "/api"
+	defaultClientTimeout   = "30s"
+	defaultRespWaitTimeout = "40s"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -38,6 +40,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		v                  = viper.New()
 		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
+	//timeout defaults: //TODO: maybe this should be a common default among all xmidt/webpa servers
+	v.SetDefault("clientTimeout", defaultClientTimeout)
+	v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
@@ -143,18 +148,17 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
 func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
-	timeOut, err := time.ParseDuration(v.GetString("requestTimeout"))
-	if err != nil {
-		timeOut = time.Second * 60 //default val
-	}
+	clientTimeout, _ := time.ParseDuration(v.GetString("clientTimeout"))
+	respTimeout, _ := time.ParseDuration(v.GetString("respWaitTimeout"))
 
 	cHandler = &ConversionHandler{
-		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
-		sender:         &Tr1SendAndHandle{log: logger, timedClient: &http.Client{Timeout: timeOut}, NewHTTPRequest: http.NewRequest},
-		encodingHelper: &EncodingHelper{},
-		logger:         logger,
-		targetURL:      v.GetString("targetURL"),
-		serverVersion:  v.GetString("version"),
+		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
+		//TODO: add needed elements into http.Client
+		sender: &Tr1SendAndHandle{client: &http.Client{Timeout: clientTimeout}, log: logger,
+			NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
+		encodingHelper: &EncodingHelper{}, logger: logger,
+		targetURL:     v.GetString("targetURL"),
+		serverVersion: v.GetString("version"),
 	}
 	return
 }

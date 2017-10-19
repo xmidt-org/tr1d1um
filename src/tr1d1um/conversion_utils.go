@@ -2,14 +2,14 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"crypto/rand"
-	"encoding/base64"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
@@ -219,17 +219,15 @@ func (helper *EncodingHelper) GenericEncode(v interface{}, f wrp.Format) (data [
 	return
 }
 
-
 //GetOrGenTID returns a Transaction ID for a given request.
 //If a TID was provided in the headers, such is used. Otherwise,
 //a new TID is generated and returned
-func GetOrGenTID(requestHeader http.Header) (tid string){
-	if tid = requestHeader.Get(HeaderWPATID); tid == ""{
+func GetOrGenTID(requestHeader http.Header) (tid string) {
+	if tid = requestHeader.Get(HeaderWPATID); tid == "" {
 		buf := make([]byte, 16)
-		if _, err := rand.Read(buf); err == nil{
+		if _, err := rand.Read(buf); err == nil {
 			tid = base64.RawURLEncoding.EncodeToString(buf)
 		}
 	}
-	//TODO: any validation on the provided TID?
 	return
 }

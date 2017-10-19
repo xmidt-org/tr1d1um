@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+	"sync"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
@@ -22,19 +24,15 @@ func TestSend(t *testing.T) {
 	WRPPayload := []byte("payload")
 	validURL := "http://someValidURL"
 
-	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
-	tr1.NewHTTPRequest = http.NewRequest
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL}
 
 	t.Run("SendEncodeErr", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
-
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, errors.New(errMsg)).Once()
-
 		recorder := httptest.NewRecorder()
-
+		tr1 := NewTR1()
 		_, err := tr1.Send(ch, recorder, data, req)
 
 		assert.NotNil(err)
@@ -44,18 +42,13 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("SendNewRequestErr", func(t *testing.T) {
-		defer func() {
-			tr1.NewHTTPRequest = http.NewRequest
-		}()
-
+		tr1 := NewTR1()
 		tr1.NewHTTPRequest = NewHTTPRequestFail
-
 		req := httptest.NewRequest(http.MethodGet, validURL, nil)
 
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-
 		recorder := httptest.NewRecorder()
 		_, err := tr1.Send(ch, recorder, data, req)
 
@@ -76,12 +69,49 @@ func TestSend(t *testing.T) {
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
 
 		gock.New(validURL).Reply(http.StatusOK)
-		recorder := httptest.NewRecorder()
+		tr1 := NewTR1()
 
-		_, err := tr1.Send(ch, recorder, data, req)
+		resp, err := tr1.Send(ch, nil, data, req)
 
 		assert.Nil(err)
-		assert.EqualValues(http.StatusOK, recorder.Code)
+		assert.EqualValues(http.StatusOK, resp.StatusCode)
+		mockConversion.AssertExpectations(t)
+		mockEncoding.AssertExpectations(t)
+	})
+
+	t.Run("SendTimeout", func(t *testing.T) {
+		defer gock.OffAll()
+
+		req := httptest.NewRequest(http.MethodGet, validURL, nil)
+
+		var URLVars Vars = mux.Vars(req)
+		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
+		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
+
+		tr1 := NewTR1()
+		ctx, cancel := context.WithCancel(req.Context())
+
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
+
+		go func() {
+			cancel() //fake a timeout through a cancel
+		}()
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		errChan := make(chan error)
+
+		go func() {
+			wg.Done()
+			_, err := tr1.Send(ch, nil, data, req.WithContext(ctx))
+			errChan <- err
+		}()
+
+		wg.Wait() //Wait until we know Send() is running
+		cancel()
+
+		assert.NotNil(<-errChan)
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
@@ -89,7 +119,7 @@ func TestSend(t *testing.T) {
 
 func TestHandleResponse(t *testing.T) {
 	assert := assert.New(t)
-	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, timedClient: &http.Client{Timeout: time.Second}}
+	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}, client: &http.Client{Timeout: time.Second}}
 	tr1.NewHTTPRequest = http.NewRequest
 
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion}
@@ -134,4 +164,10 @@ func TestHandleResponse(t *testing.T) {
 
 func NewHTTPRequestFail(_, _ string, _ io.Reader) (*http.Request, error) {
 	return nil, errors.New(errMsg)
+}
+
+func NewTR1() (tr1 *Tr1SendAndHandle) {
+	tr1 = &Tr1SendAndHandle{log: &LightFakeLogger{}, client: &http.Client{Timeout: time.Second}}
+	tr1.NewHTTPRequest = http.NewRequest
+	return tr1
 }

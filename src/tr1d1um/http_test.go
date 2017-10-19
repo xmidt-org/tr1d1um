@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const errMsg = "shared failure"
@@ -107,10 +109,12 @@ func TestConversionHandler(t *testing.T) {
 
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
+	timeout := time.Nanosecond
 
 	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
-	mockSender.On("Send", ch, recorder, payload, req).Return(resp, nil).Once()
+	mockSender.On("Send", ch, recorder, payload, mock.AnythingOfType("*http.Request")).Return(resp, nil).Once()
 	mockSender.On("HandleResponse", ch, nil, resp, recorder).Once()
+	mockSender.On("GetRespTimeout").Return(timeout).Once()
 
 	ch.ServeHTTP(recorder, req)
 }

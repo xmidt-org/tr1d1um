@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
@@ -15,13 +16,20 @@ import (
 type SendAndHandle interface {
 	Send(*ConversionHandler, http.ResponseWriter, []byte, *http.Request) (*http.Response, error)
 	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter)
+	GetRespTimeout() time.Duration
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
 	log            log.Logger
-	timedClient    *http.Client
+	client         *http.Client
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
+	respTimeout    time.Duration
+}
+
+type clientResponse struct {
+	resp *http.Response
+	err  error
 }
 
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
@@ -47,11 +55,26 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 		return
 	}
 
-	//todo: any more headers to be added here
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-	respFromServer, err = tr1.timedClient.Do(requestToServer)
-	return
+
+	ctx := req.Context() // we expect this context to have some sort of deadline built in if any
+	requestWithContext := requestToServer.WithContext(ctx)
+	responseReady := make(chan clientResponse)
+
+	go func() {
+		defer close(responseReady)
+		respObj, respErr := tr1.client.Do(requestWithContext)
+		responseReady <- clientResponse{respObj, respErr}
+	}()
+
+	select {
+	case cResponse := <-responseReady:
+		respFromServer, err = cResponse.resp, cResponse.err
+		return
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
@@ -78,4 +101,10 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 		origin.WriteHeader(http.StatusInternalServerError)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
+}
+
+//GetRespTimeout returns the duration the sender should use while waiting
+//for a response from a server
+func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
+	return tr1.respTimeout
 }
