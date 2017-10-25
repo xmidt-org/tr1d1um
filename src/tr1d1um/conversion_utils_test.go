@@ -393,6 +393,10 @@ func TestExtractPayloadFromWrp(t *testing.T) {
 	})
 }
 
+/*
+This test is testing code that's already tested in webpa-common.
+there are too many layers of abstraction here.  Remove conversion_utils, and just use webpa-common
+
 func TestGenericEncode(t *testing.T) {
 	assert := assert.New(t)
 	e := EncodingHelper{}
@@ -404,6 +408,7 @@ func TestGenericEncode(t *testing.T) {
 	assert.Nil(err)
 	assert.EqualValues(expectedEncoding, actualEncoding)
 }
+*/
 
 func TestGetConfiguredWRP(t *testing.T) {
 	assert := assert.New(t)
