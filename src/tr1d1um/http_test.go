@@ -57,7 +57,7 @@ func TestConversionHandler(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 		ch.ServeHTTP(recorder, commonRequest)
-		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		assert.EqualValues(http.StatusBadRequest, recorder.Code)
 
 		mockConversion.AssertExpectations(t)
 	})

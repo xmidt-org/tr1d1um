@@ -21,10 +21,12 @@ import (
 	"context"
 	"net/http"
 
+	"fmt"
+	"strings"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"strings"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -68,7 +70,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	}
 
 	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
+		writeResponse(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
 		logging.Error(ch.logger).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
@@ -84,7 +86,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	//set timeout for response waiting
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
 	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-	cancel()
+	cancel() // we are done using the context timeout on the request
 
 	ForwardHeadersByPrefix("X", origin, response)
 
