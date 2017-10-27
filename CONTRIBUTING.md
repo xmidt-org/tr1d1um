@@ -14,7 +14,7 @@ Documentation
 -------------
 
 If you contribute anything that changes the behavior of the
-application, document it in the [README](https://github.com/Comcast/caduceus/blob/master/README.md) or [wiki](https://github.com/Comcast/caduceus/wiki)! This includes new features, additional variants of behavior and breaking changes.
+application, document it in the [README](https://github.com/Comcast/tr1d1um/blob/master/README.md) or [wiki](https://github.com/Comcast/tr1d1um/wiki)! This includes new features, additional variants of behavior and breaking changes.
 
 Testing
 -------
