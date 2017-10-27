@@ -141,6 +141,12 @@ func TestHandleResponse(t *testing.T) {
 
 	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion}
 
+	t.Run("IncomingTimeoutErr", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		tr1.HandleResponse(nil, context.DeadlineExceeded, nil, recorder)
+		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
+	})
+
 	t.Run("IncomingErr", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		tr1.HandleResponse(nil, errors.New(errMsg), nil, recorder)
@@ -162,6 +168,17 @@ func TestHandleResponse(t *testing.T) {
 		tr1.HandleResponse(ch, nil, fakeResponse, recorder)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		mockEncoding.AssertExpectations(t)
+	})
+
+	t.Run("ExtractPayloadTimeout", func(t *testing.T) {
+		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
+			context.Canceled).Once()
+		recorder := httptest.NewRecorder()
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder)
+
+		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
 		mockEncoding.AssertExpectations(t)
 	})
 

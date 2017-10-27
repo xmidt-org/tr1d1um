@@ -100,13 +100,13 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 	var errorLogger = logging.Error(tr1.log)
 
 	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
+		ReportError(err, origin)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
 	if respFromServer.StatusCode != http.StatusOK {
-		origin.WriteHeader(respFromServer.StatusCode)
+		writeResponse("Non-200 Response From Server", respFromServer.StatusCode, origin)
 		errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
@@ -115,7 +115,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 		origin.WriteHeader(http.StatusOK)
 		origin.Write(responsePayload)
 	} else {
-		origin.WriteHeader(http.StatusInternalServerError)
+		ReportError(err, origin)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
 }
