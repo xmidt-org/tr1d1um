@@ -153,6 +153,9 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodGet)
 
+	apiHandler.Handle("/device/{deviceid}/stat", preHandler.ThenFunc(conversionHandler.HandleStat)).
+		Methods(http.MethodGet)
+
 	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPatch).MatcherFunc(BodyNonEmpty)
 
@@ -169,10 +172,9 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 	respTimeout, _ := time.ParseDuration(v.GetString("respWaitTimeout"))
 
 	cHandler = &ConversionHandler{
-		wdmpConvert: &ConversionWDMP{&EncodingHelper{}},
-		//TODO: add needed elements into http.Client
-		sender: &Tr1SendAndHandle{client: &http.Client{Timeout: clientTimeout}, log: logger,
-			NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
+		Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
+		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
+		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
 		encodingHelper: &EncodingHelper{}, logger: logger,
 		targetURL:     v.GetString("targetURL"),
 		serverVersion: v.GetString("version"),

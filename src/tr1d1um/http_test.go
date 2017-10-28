@@ -36,6 +36,7 @@ var (
 	payload, body                            = []byte("SomePayload"), bytes.NewBufferString("body")
 	resp                                     = &http.Response{}
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
+	mockRequester                            = &MockRequester{}
 	fakeLogger                               = &LightFakeLogger{}
 	ch                                       = &ConversionHandler{
 		wdmpConvert:    mockConversion,
@@ -164,13 +165,30 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 	})
 }
 
+func TestHandleStat(t *testing.T) {
+	ch := &ConversionHandler{sender: mockSender, logger: fakeLogger, targetURL: "http://targetURL.com", Requester: mockRequester}
+
+	recorder := httptest.NewRecorder()
+	emptyResponse := &http.Response{}
+
+	req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
+
+	mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(emptyResponse, nil).Once()
+	mockSender.On("HandleResponse", ch, nil, emptyResponse, recorder, true).Once()
+	mockSender.On("GetRespTimeout").Return(time.Second).Once()
+
+	ch.HandleStat(recorder, req)
+	mockSender.AssertExpectations(t)
+	mockRequester.AssertExpectations(t)
+}
+
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
 	timeout := time.Nanosecond
 
 	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
 	mockSender.On("Send", ch, recorder, payload, mock.AnythingOfType("*http.Request")).Return(resp, nil).Once()
-	mockSender.On("HandleResponse", ch, nil, resp, recorder).Once()
+	mockSender.On("HandleResponse", ch, nil, resp, recorder, false).Once()
 	mockSender.On("GetRespTimeout").Return(timeout).Once()
 
 	ch.ServeHTTP(recorder, req)

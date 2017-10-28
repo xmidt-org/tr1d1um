@@ -37,6 +37,7 @@ type ConversionHandler struct {
 	wdmpConvert    ConversionTool
 	sender         SendAndHandle
 	encodingHelper EncodingTool
+	Requester
 }
 
 //ConversionHandler handles the different incoming tr1 requests
@@ -88,9 +89,32 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
 	cancel() // we are done using the context timeout on the request
 
-	ForwardHeadersByPrefix("X", origin, response)
+	ch.sender.HandleResponse(ch, err, response, origin, false)
+}
 
-	ch.sender.HandleResponse(ch, err, response, origin)
+//HandleStat handles the differentiated STAT command
+func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Request) {
+	var errorLogger = logging.Error(ch.logger)
+
+	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
+
+	fullPath := ch.targetURL + req.URL.RequestURI()
+	requestToServer, err := http.NewRequest(http.MethodGet, fullPath, nil)
+
+	if err != nil {
+		origin.WriteHeader(http.StatusInternalServerError)
+		errorLogger.Log(logging.ErrorKey(), err)
+		return
+	}
+
+	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
+	requestWithContext := requestToServer.WithContext(ctx)
+
+	response, err := ch.PerformRequest(requestWithContext)
+	cancel()
+
+	origin.Header().Set("Content-Type", "application/json")
+	ch.sender.HandleResponse(ch, err, response, origin, true)
 }
 
 // Helper functions
@@ -98,6 +122,10 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 //ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
 //into an responseWriter
 func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *http.Response) {
+	if resp == nil || resp.Header == nil {
+		return
+	}
+
 	for headerKey, headerValues := range resp.Header {
 		if strings.HasPrefix(headerKey, prefix) {
 			for _, headerValue := range headerValues {
