@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
 	"io/ioutil"
 
 	"github.com/Comcast/webpa-common/logging"

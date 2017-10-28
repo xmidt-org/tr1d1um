@@ -18,17 +18,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
-
-	"bytes"
-	"io/ioutil"
-	"sync"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
@@ -201,22 +200,18 @@ func TestPerformRequest(t *testing.T) {
 		defer gock.OffAll()
 		assert := assert.New(t)
 
-		validURL := "http://someValidURL"
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
+		validURL := "http://someValidURL.com"
+		req, _ := http.NewRequest(http.MethodGet, validURL, nil)
 		ctx, cancel := context.WithCancel(req.Context())
 
 		requester := &ContextTimeoutRequester{&http.Client{}}
 
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Second) // on purpose delaying response
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Minute) // on purpose delaying response
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
 		errChan := make(chan error)
-
-		go func() {
-			cancel()
-		}()
 
 		go func() {
 			wg.Done()
@@ -225,7 +220,9 @@ func TestPerformRequest(t *testing.T) {
 		}()
 
 		wg.Wait() //Wait until we know Send() is running
-		cancel()
+		go func() {
+			cancel()
+		}()
 
 		assert.NotNil(<-errChan)
 	})
