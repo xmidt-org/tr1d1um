@@ -20,9 +20,9 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
-	"io/ioutil"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"

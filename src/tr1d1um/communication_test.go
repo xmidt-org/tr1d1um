@@ -196,8 +196,11 @@ func TestHandleResponse(t *testing.T) {
 }
 
 func TestPerformRequest(t *testing.T) {
+	testWaitGroup := &sync.WaitGroup{}
+	testWaitGroup.Add(1)
+
 	t.Run("RequestTimeout", func(t *testing.T) {
-		defer gock.OffAll()
+		defer testWaitGroup.Done()
 		assert := assert.New(t)
 
 		validURL := "http://someValidURL.com"
@@ -206,7 +209,7 @@ func TestPerformRequest(t *testing.T) {
 
 		requester := &ContextTimeoutRequester{&http.Client{}}
 
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Minute) // on purpose delaying response
+		gock.New(validURL).Reply(http.StatusOK).Delay(time.Minute) // on purpose delaying response.
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -219,16 +222,15 @@ func TestPerformRequest(t *testing.T) {
 			errChan <- err
 		}()
 
-		wg.Wait() //Wait until we know Send() is running
-		go func() {
-			cancel()
-		}()
+		wg.Wait() //Wait until we know PerformRequest() is running
+		cancel()
 
 		assert.NotNil(<-errChan)
 	})
 
 	t.Run("RequestNoTimeout", func(t *testing.T) {
-		defer gock.OffAll()
+		testWaitGroup.Wait()
+		gock.OffAll()
 
 		assert := assert.New(t)
 
@@ -236,7 +238,7 @@ func TestPerformRequest(t *testing.T) {
 
 		someURL := "http://123.com"
 
-		req, err := http.NewRequest(http.MethodGet, someURL, nil)
+		req, _ := http.NewRequest(http.MethodGet, someURL, nil)
 
 		gock.New(someURL).Reply(http.StatusAccepted)
 
