@@ -139,9 +139,12 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		fakeResponse := &http.Response{StatusCode: http.StatusBadRequest}
+		var mockBody bytes.Buffer
+		mockBody.WriteString("expectMe")
+		fakeResponse := &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(&mockBody)}
 		tr1.HandleResponse(nil, nil, fakeResponse, recorder, false)
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
+		assert.EqualValues("expectMe", recorder.Body.String())
 	})
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
@@ -166,19 +169,6 @@ func TestHandleResponse(t *testing.T) {
 		mockEncoding.AssertExpectations(t)
 	})
 
-	t.Run("IdealCase", func(t *testing.T) {
-		fakeResponse := &http.Response{StatusCode: http.StatusOK}
-		extractedData := []byte("extract")
-
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
-
-		assert.EqualValues(http.StatusOK, recorder.Code)
-		assert.EqualValues(extractedData, recorder.Body.Bytes())
-		mockEncoding.AssertExpectations(t)
-	})
-
 	t.Run("IdealReadEntireBody", func(t *testing.T) {
 		var fakeBody bytes.Buffer
 		bodyString := "bodyString"
@@ -193,6 +183,33 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues(bodyString, recorder.Body.String())
 		mockEncoding.AssertNotCalled(t, "ExtractPayload", fakeResponse.Body, wrp.JSON)
 	})
+
+	t.Run("GoodRDKResponse", func(t *testing.T) {
+		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		extractedData := []byte(`{"statusCode": 202}`)
+
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
+		recorder := httptest.NewRecorder()
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+
+		assert.EqualValues(202, recorder.Code)
+		assert.EqualValues(extractedData, recorder.Body.Bytes())
+		mockEncoding.AssertExpectations(t)
+	})
+
+	t.Run("BadRDKResponse", func(t *testing.T) {
+		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		extractedData := []byte(`{"statusCode": 500}`)
+
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
+		recorder := httptest.NewRecorder()
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+
+		assert.EqualValues(http.StatusOK, recorder.Code) // reflect transaction instead of device status
+		assert.EqualValues(extractedData, recorder.Body.Bytes())
+		mockEncoding.AssertExpectations(t)
+	})
+
 }
 
 func TestPerformRequest(t *testing.T) {
@@ -276,6 +293,11 @@ func TestForwardInput(t *testing.T) {
 	})
 }
 
+func TestGetRespTimeout(t *testing.T) {
+	assert := assert.New(t)
+	tr1 := &Tr1SendAndHandle{respTimeout: time.Second * 3}
+	assert.EqualValues(time.Second*3, tr1.GetRespTimeout())
+}
 func NewHTTPRequestFail(_, _ string, _ io.Reader) (*http.Request, error) {
 	return nil, errors.New(errMsg)
 }
