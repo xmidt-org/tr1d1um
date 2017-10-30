@@ -41,7 +41,7 @@ const (
 
 	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
 
-	WRPSource = "dns:tr1d1um.webpa.comcast.net"
+	WRPSource = "dns:tr1d1um.xmidt.comcast.net"
 )
 
 //GetWDMP serves as container for data used for the GET-flavored commands
