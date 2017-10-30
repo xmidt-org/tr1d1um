@@ -108,10 +108,21 @@ func (m *MockSendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWrit
 	args := m.Called(ch, origin, data, req)
 	return args.Get(0).(*http.Response), args.Error(1)
 }
-func (m *MockSendAndHandle) HandleResponse(ch *ConversionHandler, err error, resp *http.Response, origin http.ResponseWriter) {
-	m.Called(ch, err, resp, origin)
+func (m *MockSendAndHandle) HandleResponse(ch *ConversionHandler, err error, resp *http.Response, origin http.ResponseWriter,
+	wholeBody bool) {
+	m.Called(ch, err, resp, origin, wholeBody)
 }
 func (m *MockSendAndHandle) GetRespTimeout() time.Duration {
 	args := m.Called()
 	return args.Get(0).(time.Duration)
+}
+
+/* Mock functions for Requester */
+type MockRequester struct {
+	mock.Mock
+}
+
+func (m *MockRequester) PerformRequest(req *http.Request) (*http.Response, error) {
+	args := m.Called(req)
+	return args.Get(0).(*http.Response), args.Error(1)
 }

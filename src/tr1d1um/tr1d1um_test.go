@@ -53,7 +53,6 @@ func TestSetUpHandler(t *testing.T) {
 
 		//turn to default values
 		assert.EqualValues(time.Second*40, realSender.respTimeout)
-		assert.EqualValues(time.Second*30, realSender.client.Timeout)
 		AssertCommon(actualHandler, v, assert)
 	})
 }
@@ -129,7 +128,6 @@ func AssertCommon(actualHandler *ConversionHandler, v *viper.Viper, assert *asse
 	realizedSender := actualHandler.sender.(*Tr1SendAndHandle)
 
 	//assert necessary inner methods are set in the method under test
-	assert.NotNil(realizedSender.client)
 	assert.NotNil(realizedSender.NewHTTPRequest)
 }
 

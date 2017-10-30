@@ -20,6 +20,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -32,14 +33,13 @@ import (
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
 type SendAndHandle interface {
 	Send(*ConversionHandler, http.ResponseWriter, []byte, *http.Request) (*http.Response, error)
-	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter)
+	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool)
 	GetRespTimeout() time.Duration
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
 	log            log.Logger
-	client         *http.Client
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
 	respTimeout    time.Duration
 }
@@ -75,29 +75,17 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
 	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
 
-	ctx := req.Context() // we expect this context to have some sort of deadline built in if any
-	requestWithContext := requestToServer.WithContext(ctx)
-	responseReady := make(chan clientResponse)
-
-	go func() {
-		defer close(responseReady)
-		respObj, respErr := tr1.client.Do(requestWithContext)
-		responseReady <- clientResponse{respObj, respErr}
-	}()
-
-	select {
-	case cResponse := <-responseReady:
-		respFromServer, err = cResponse.resp, cResponse.err
-		return
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	respFromServer, err = ch.PerformRequest(requestToServer.WithContext(req.Context())) //keep ancestor's context
+	return
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
 //based on the responses of a server we have contacted through Send
-func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter) {
+func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter,
+	wholeBody bool) {
 	var errorLogger = logging.Error(tr1.log)
+
+	ForwardHeadersByPrefix("X", origin, respFromServer)
 
 	if err != nil {
 		ReportError(err, origin)
@@ -108,6 +96,13 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 	if respFromServer.StatusCode != http.StatusOK {
 		writeResponse("Non-200 Response From Server", respFromServer.StatusCode, origin)
 		errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
+		return
+	}
+
+	// Do not attempt extracting payload, forward whole body
+	if wholeBody {
+		err = forwardInput(origin, respFromServer.Body)
+		ReportError(err, origin)
 		return
 	}
 
@@ -124,4 +119,49 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 //for a response from a server
 func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
 	return tr1.respTimeout
+}
+
+//Requester has the main functionality of taking a request, performing such request based on some internal client and
+// simply returning the response and potential err when applicable
+type Requester interface {
+	PerformRequest(*http.Request) (*http.Response, error)
+}
+
+//ContextTimeoutRequester is a Requester realization that executes an http request respecting any context deadlines (or
+// cancellations)
+type ContextTimeoutRequester struct {
+	client *http.Client
+}
+
+//PerformRequest makes its client execute the request asynchronously and guarantees that the cancellations or
+// timeouts of the request's context is respected
+func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *http.Response, err error) {
+	responseReady := make(chan clientResponse)
+	ctx := request.Context()
+
+	go func() {
+		defer close(responseReady)
+		respObj, respErr := c.client.Do(request)
+		responseReady <- clientResponse{respObj, respErr}
+	}()
+
+	select {
+	case cResponse := <-responseReady:
+		resp, err = cResponse.resp, cResponse.err
+		return
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+//forwardInput reads the given input into bytes and writes it to a given response writer
+func forwardInput(origin http.ResponseWriter, input io.Reader) (err error) {
+	if origin != nil && input != nil {
+		if body, readErr := ioutil.ReadAll(input); readErr == nil {
+			origin.Write(body)
+		} else {
+			err = readErr
+		}
+	}
+	return
 }
