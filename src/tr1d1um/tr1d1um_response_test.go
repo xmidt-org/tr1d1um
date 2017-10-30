@@ -41,3 +41,22 @@ func TestReportError(t *testing.T) {
 		assert.EqualValues(`{"message":"Error Timeout"}`, origin.Body.String())
 	})
 }
+
+func TestGetStatusCodeFromRDKResponse(t *testing.T) {
+	t.Run("IdealRDKResponse", func(t *testing.T) {
+		assert := assert.New(t)
+
+		RDKResponse := []byte(`{"statusCode": 200}`)
+		statusCode, err := GetStatusCodeFromRDKResponse(RDKResponse)
+		assert.EqualValues(200, statusCode)
+		assert.Nil(err)
+	})
+
+	t.Run("InvalidRDKResponse", func(t *testing.T) {
+		assert := assert.New(t)
+
+		statusCode, err := GetStatusCodeFromRDKResponse(nil)
+		assert.EqualValues(500, statusCode)
+		assert.NotNil(err)
+	})
+}

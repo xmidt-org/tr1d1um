@@ -94,21 +94,28 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 	}
 
 	if respFromServer.StatusCode != http.StatusOK {
-		writeResponse("Non-200 Response From Server", respFromServer.StatusCode, origin)
+		var bodyResp []byte
+		if responseBody, err := ioutil.ReadAll(respFromServer.Body); err == nil {
+			bodyResp = responseBody
+		}
+
+		origin.WriteHeader(respFromServer.StatusCode)
+		origin.Write(bodyResp)
 		errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
 
-	// Do not attempt extracting payload, forward whole body
-	if wholeBody {
+	if wholeBody { // Do not attempt extracting payload, forward whole body
 		err = forwardInput(origin, respFromServer.Body)
 		ReportError(err, origin)
 		return
 	}
 
-	if responsePayload, err := ch.encodingHelper.ExtractPayload(respFromServer.Body, wrp.JSON); err == nil {
-		origin.WriteHeader(http.StatusOK)
-		origin.Write(responsePayload)
+	if RDKResponse, err := ch.encodingHelper.ExtractPayload(respFromServer.Body, wrp.JSON); err == nil {
+		if RDKRespCode, err := GetStatusCodeFromRDKResponse(RDKResponse); err == nil && RDKRespCode != http.StatusInternalServerError {
+			origin.WriteHeader(RDKRespCode)
+		}
+		origin.Write(RDKResponse)
 	} else {
 		ReportError(err, origin)
 		errorLogger.Log(logging.ErrorKey(), err)
