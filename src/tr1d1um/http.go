@@ -19,9 +19,8 @@ package main
 
 import (
 	"context"
-	"net/http"
-
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/Comcast/webpa-common/logging"
@@ -86,9 +85,9 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	//set timeout for response waiting
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-	cancel() // we are done using the context timeout on the request
+	defer cancel()
 
+	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
 	ch.sender.HandleResponse(ch, err, response, origin, false)
 }
 
@@ -97,6 +96,7 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	var errorLogger = logging.Error(ch.logger)
 
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
+	defer cancel()
 
 	fullPath := ch.targetURL + req.URL.RequestURI()
 	requestToServer, err := http.NewRequest(http.MethodGet, fullPath, nil)
@@ -111,7 +111,6 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	requestWithContext := requestToServer.WithContext(ctx)
 
 	response, err := ch.PerformRequest(requestWithContext)
-	cancel()
 
 	origin.Header().Set("Content-Type", "application/json")
 	ch.sender.HandleResponse(ch, err, response, origin, true)

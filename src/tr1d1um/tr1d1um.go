@@ -87,10 +87,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 	conversionHandler := SetUpHandler(v, logger)
 
 	r := mux.NewRouter()
+	baseRouter := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString("version"))).Subrouter()
 
-	AddRoutes(r, preHandler, conversionHandler, v)
+	AddRoutes(baseRouter, preHandler, conversionHandler)
 
-	if exitCode = ConfigureWebHooks(r, preHandler, v, logger); exitCode != 0 {
+	if exitCode = ConfigureWebHooks(baseRouter, preHandler, v, logger); exitCode != 0 {
 		return
 	}
 
@@ -134,7 +135,7 @@ func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, l
 }
 
 //AddRoutes configures the paths and connection rules to TR1D1UM
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler, v *viper.Viper) {
+func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) {
 	var BodyNonEmpty = func(request *http.Request, match *mux.RouteMatch) (accept bool) {
 		if request.Body != nil {
 			var tmp bytes.Buffer
@@ -148,21 +149,19 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 		return
 	}
 
-	apiHandler := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString("version"))).Subrouter()
-
-	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
+	r.Handle("/device/{deviceid}/stat", preHandler.ThenFunc(conversionHandler.HandleStat)).
 		Methods(http.MethodGet)
 
-	apiHandler.Handle("/device/{deviceid}/stat", preHandler.ThenFunc(conversionHandler.HandleStat)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodGet)
 
-	apiHandler.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
+	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPatch).MatcherFunc(BodyNonEmpty)
 
-	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
+	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodDelete)
 
-	apiHandler.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
+	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonEmpty)
 }
 

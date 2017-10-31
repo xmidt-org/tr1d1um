@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
 	"time"
 
 	"github.com/Comcast/webpa-common/logging"
@@ -64,7 +63,7 @@ func TestRouteConfigurations(t *testing.T) {
 	v := viper.New()
 	v.Set("version", "v2")
 
-	AddRoutes(r, fakePreHandler, fakeHandler, v)
+	AddRoutes(r.PathPrefix("/api/v2").Subrouter(), fakePreHandler, fakeHandler)
 
 	var nonEmpty bytes.Buffer
 	nonEmpty.WriteString(`{empty: false}`)
