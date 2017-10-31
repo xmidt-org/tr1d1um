@@ -18,7 +18,7 @@ const (
 //RDKResponse will serve as the struct to read in
 //results coming from some RDK device
 type RDKResponse struct {
-	StatusCode int `json:"StatusCode"`
+	StatusCode int `json:"statusCode"`
 }
 
 //writeResponse is a tiny helper function that passes responses (In Json format only for now)
