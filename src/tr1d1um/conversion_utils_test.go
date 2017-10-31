@@ -93,7 +93,7 @@ func TestGetFlavorFormat(t *testing.T) {
 
 func TestSetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	c := ConversionWDMP{&EncodingHelper{}}
+	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
 	commonURL := "http://device/config?k=v"
 	var req *http.Request
 
@@ -163,7 +163,7 @@ func TestSetFlavorFormat(t *testing.T) {
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
-	c := ConversionWDMP{&EncodingHelper{}}
+	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("NoRowName", func(t *testing.T) {
 		_, err := c.DeleteFlavorFormat(Vars{}, "param")
@@ -188,7 +188,7 @@ func TestReplaceFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
-	c := ConversionWDMP{&EncodingHelper{}}
+	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.ReplaceFlavorFormat(nil, emptyVars, "uThere?")
@@ -226,7 +226,7 @@ func TestAddFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	emptyVars := Vars{}
 
-	c := ConversionWDMP{&EncodingHelper{}}
+	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.AddFlavorFormat(nil, emptyVars, "uThere?")
@@ -433,7 +433,7 @@ func TestGetConfiguredWRP(t *testing.T) {
 	service := "webpaService"
 	tid := "uniqueVal"
 
-	c := ConversionWDMP{}
+	c := ConversionWDMP{WRPSource:"dns:source"}
 
 	inputVars := Vars{"service": service, "deviceid": deviceID}
 	inputHeader := http.Header{}
@@ -441,7 +441,7 @@ func TestGetConfiguredWRP(t *testing.T) {
 	inputHeader.Set(HeaderWPATID, tid)
 	inputWdmpPayload := []byte(`{irrelevantFormat}`)
 
-	expectedSource := WRPSource + "/" + service
+	expectedSource := "dns:source/" + service
 	expectedDest := deviceID + "/" + service
 
 	wrpMsg := c.GetConfiguredWRP(inputWdmpPayload, inputVars, inputHeader)
