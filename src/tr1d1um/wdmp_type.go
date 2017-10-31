@@ -40,8 +40,6 @@ const (
 	HeaderWPATID        = "X-WebPA-Transaction-Id"
 
 	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
-
-	WRPSource = "dns:tr1d1um.xmidt.comcast.net"
 )
 
 //GetWDMP serves as container for data used for the GET-flavored commands

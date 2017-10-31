@@ -173,7 +173,7 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 
 	cHandler = &ConversionHandler{
 		Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
-		wdmpConvert:    &ConversionWDMP{&EncodingHelper{}},
+		wdmpConvert:    &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
 		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
 		encodingHelper: &EncodingHelper{}, logger: logger,
 		targetURL:     v.GetString("targetURL"),

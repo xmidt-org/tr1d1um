@@ -62,6 +62,7 @@ type EncodingHelper struct{}
 //ConversionWDMP implements the definitions defined in ConversionTool
 type ConversionWDMP struct {
 	encodingHelper EncodingTool
+	WRPSource string
 }
 
 //The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects
@@ -193,11 +194,17 @@ func (cw *ConversionWDMP) GetConfiguredWRP(wdmp []byte, pathVars Vars, header ht
 		Type:            wrp.SimpleRequestResponseMessageType,
 		ContentType:     header.Get("Content-Type"),
 		Payload:         wdmp,
-		Source:          WRPSource + "/" + service,
+		Source:          cw.GetWRPSource() + "/" + service,
 		Destination:     deviceID + "/" + service,
 		TransactionUUID: GetOrGenTID(header),
 	}
 	return
+}
+
+// GetWRPSource returns the Source that should be used in every
+// WRP transaction message
+func (cw *ConversionWDMP) GetWRPSource() string {
+	return cw.WRPSource
 }
 
 /*   Encoding Helper methods below */
