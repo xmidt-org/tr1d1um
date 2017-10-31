@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"encoding/json"
+	"errors"
 
 	"github.com/Comcast/webpa-common/wrp"
 )
@@ -14,6 +15,8 @@ import (
 const (
 	Tr1StatusTimeout = 503
 )
+
+var unexpectedRKDResponse = errors.New("unexpectedRDKResponse")
 
 //RDKResponse will serve as the struct to read in
 //results coming from some RDK device
@@ -42,12 +45,16 @@ func ReportError(err error, w http.ResponseWriter) {
 }
 
 //GetStatusCodeFromRDKResponse returns the status code given a well-formatted
-//RDK response. Otherwise, it defaults to 500 as code and returns an error
+//RDK response. Otherwise, it defaults to 500 as code and returns a pertinent error
 func GetStatusCodeFromRDKResponse(RDKPayload []byte) (statusCode int, err error) {
 	RDKResp := new(RDKResponse)
 	statusCode = http.StatusInternalServerError
 	if err = json.Unmarshal(RDKPayload, RDKResp); err == nil {
-		statusCode, err = RDKResp.StatusCode, nil
+		if RDKResp.StatusCode != 0 { // some statusCode was actually provided
+			statusCode = RDKResp.StatusCode
+		} else {
+			err = unexpectedRKDResponse
+		}
 	}
 	return
 }
