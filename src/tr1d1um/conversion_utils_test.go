@@ -60,15 +60,6 @@ func TestGetFlavorFormat(t *testing.T) {
 		assert.EqualValues(wdmpGet, wdmp)
 	})
 
-	t.Run("IdealGetStat", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "http://api/device/mac:112233445566/stat", nil)
-
-		wdmp, err := c.GetFlavorFormat(req, map[string]string{"service": "stat"}, "attributes", "names", ",")
-
-		assert.Nil(err)
-		assert.EqualValues(new(GetWDMP), wdmp)
-	})
-
 	t.Run("IdealGetAttr", func(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "http://api/device/config?names=p1,p2&attributes=attr1",
@@ -87,13 +78,13 @@ func TestGetFlavorFormat(t *testing.T) {
 		_, err := c.GetFlavorFormat(req, nil, "attributes", "names", ",")
 
 		assert.NotNil(err)
-		assert.True(strings.HasPrefix(err.Error(), "names is a required"))
+		assert.True(strings.HasSuffix(err.Error(), "is required to be valid"))
 	})
 }
 
 func TestSetFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
-	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
 	commonURL := "http://device/config?k=v"
 	var req *http.Request
 
@@ -163,7 +154,7 @@ func TestSetFlavorFormat(t *testing.T) {
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
-	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("NoRowName", func(t *testing.T) {
 		_, err := c.DeleteFlavorFormat(Vars{}, "param")
@@ -188,7 +179,7 @@ func TestReplaceFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
-	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.ReplaceFlavorFormat(nil, emptyVars, "uThere?")
@@ -226,7 +217,7 @@ func TestAddFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	emptyVars := Vars{}
 
-	c := ConversionWDMP{encodingHelper:&EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		_, err := c.AddFlavorFormat(nil, emptyVars, "uThere?")
@@ -433,7 +424,7 @@ func TestGetConfiguredWRP(t *testing.T) {
 	service := "webpaService"
 	tid := "uniqueVal"
 
-	c := ConversionWDMP{WRPSource:"dns:source"}
+	c := ConversionWDMP{WRPSource: "dns:source"}
 
 	inputVars := Vars{"service": service, "deviceid": deviceID}
 	inputHeader := http.Header{}

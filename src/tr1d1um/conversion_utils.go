@@ -35,6 +35,8 @@ import (
 //Vars shortens frequently used type returned by mux.Vars()
 type Vars map[string]string
 
+var emptyNamesErr = errors.New("names parameter is required to be valid")
+
 //ConversionTool lays out the definition of methods to build WDMP from content in an http request
 type ConversionTool interface {
 	GetFlavorFormat(*http.Request, Vars, string, string, string) (*GetWDMP, error)
@@ -62,7 +64,7 @@ type EncodingHelper struct{}
 //ConversionWDMP implements the definitions defined in ConversionTool
 type ConversionWDMP struct {
 	encodingHelper EncodingTool
-	WRPSource string
+	WRPSource      string
 }
 
 //The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects
@@ -72,16 +74,11 @@ type ConversionWDMP struct {
 func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, pathVars Vars, attr, namesKey, sep string) (wdmp *GetWDMP, err error) {
 	wdmp = new(GetWDMP)
 
-	if service, _ := cw.GetFromURLPath("service", pathVars); service == "stat" {
-		return
-		//todo: maybe we need more validation here
-	}
-
 	if nameGroup := req.FormValue(namesKey); nameGroup != "" {
 		wdmp.Command = CommandGet
 		wdmp.Names = strings.Split(nameGroup, sep)
 	} else {
-		err = errors.New("names is a required property for GET")
+		err = emptyNamesErr
 		return
 	}
 
