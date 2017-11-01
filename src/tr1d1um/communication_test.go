@@ -40,7 +40,9 @@ func TestSend(t *testing.T) {
 	assert := assert.New(t)
 
 	data := []byte("data")
-	WRPMsg := &wrp.Message{}
+	tid := "someTID"
+	WRPMsg := &wrp.Message{TransactionUUID: tid}
+
 	WRPPayload := []byte("payload")
 	validURL := "http://someValidURL.com"
 
@@ -52,12 +54,14 @@ func TestSend(t *testing.T) {
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, errors.New(errMsg)).Once()
-		recorder := httptest.NewRecorder()
+
+		origin := httptest.NewRecorder()
 		tr1 := NewTR1()
-		_, err := tr1.Send(ch, recorder, data, req)
+		_, err := tr1.Send(ch, origin, data, req)
 
 		assert.NotNil(err)
-		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		assert.EqualValues(http.StatusInternalServerError, origin.Code)
+		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 	})
@@ -70,11 +74,13 @@ func TestSend(t *testing.T) {
 		var URLVars Vars = mux.Vars(req)
 		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
 		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-		recorder := httptest.NewRecorder()
-		_, err := tr1.Send(ch, recorder, data, req)
+
+		origin := httptest.NewRecorder()
+		_, err := tr1.Send(ch, origin, data, req)
 
 		assert.NotNil(err)
-		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		assert.EqualValues(http.StatusInternalServerError, origin.Code)
+		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 
@@ -90,11 +96,12 @@ func TestSend(t *testing.T) {
 			StatusCode: http.StatusOK}, nil).Once()
 
 		tr1 := NewTR1()
-
-		resp, err := tr1.Send(ch, nil, data, req)
+		origin := httptest.NewRecorder()
+		resp, err := tr1.Send(ch, origin, data, req)
 
 		assert.Nil(err)
 		assert.EqualValues(http.StatusOK, resp.StatusCode)
+		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 		mockRequester.AssertExpectations(t)
@@ -109,9 +116,11 @@ func TestSend(t *testing.T) {
 		mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, context.DeadlineExceeded).Once()
 
 		tr1 := NewTR1()
+		origin := httptest.NewRecorder()
+		_, err := tr1.Send(ch, origin, data, req)
 
-		_, err := tr1.Send(ch, nil, data, req)
 		assert.EqualValues(context.DeadlineExceeded, err)
+		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
 		mockConversion.AssertExpectations(t)
 		mockEncoding.AssertExpectations(t)
 		mockRequester.AssertExpectations(t)
