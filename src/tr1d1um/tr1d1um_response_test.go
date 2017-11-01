@@ -59,4 +59,12 @@ func TestGetStatusCodeFromRDKResponse(t *testing.T) {
 		assert.EqualValues(500, statusCode)
 		assert.NotNil(err)
 	})
+	t.Run("RDKResponseNoStatusCode", func(t *testing.T) {
+		assert := assert.New(t)
+
+		RDKResponse := []byte(`{"something": "irrelevant"}`)
+		statusCode, err := GetStatusCodeFromRDKResponse(RDKResponse)
+		assert.EqualValues(500, statusCode)
+		assert.NotNil(err)
+	})
 }
