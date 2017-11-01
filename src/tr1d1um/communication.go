@@ -51,14 +51,17 @@ type clientResponse struct {
 
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
 //Its response is then handled in HandleResponse
-func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWriter, data []byte, req *http.Request) (respFromServer *http.Response, err error) {
+func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWriter, data []byte, req *http.Request) (respFromServer *http.Response, err error) {
 	var errorLogger = logging.Error(tr1.log)
 	wrpMsg := ch.wdmpConvert.GetConfiguredWRP(data, mux.Vars(req), req.Header)
+
+	//Forward transaction id being used in Request
+	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
 
 	wrpPayload, err := ch.encodingHelper.GenericEncode(wrpMsg, wrp.JSON)
 
 	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
+		origin.WriteHeader(http.StatusInternalServerError)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
@@ -67,7 +70,7 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, resp http.ResponseWrite
 	requestToServer, err := tr1.NewHTTPRequest(http.MethodPost, fullPath, bytes.NewBuffer(wrpPayload))
 
 	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
+		origin.WriteHeader(http.StatusInternalServerError)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
