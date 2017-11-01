@@ -20,7 +20,6 @@ package main
 import (
 	"io"
 	"net/http"
-
 	"time"
 
 	"github.com/Comcast/webpa-common/wrp"
