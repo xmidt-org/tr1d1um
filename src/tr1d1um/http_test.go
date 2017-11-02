@@ -38,11 +38,13 @@ var (
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
 	mockRequester                            = &MockRequester{}
 	fakeLogger                               = &LightFakeLogger{}
+	mockRequestValidator = &MockRequestValidator{}
 	ch                                       = &ConversionHandler{
 		wdmpConvert:    mockConversion,
 		sender:         mockSender,
 		encodingHelper: mockEncoding,
 		logger:         fakeLogger,
+		RequestValidator: mockRequestValidator,
 	}
 )
 
@@ -53,13 +55,28 @@ func TestConversionHandler(t *testing.T) {
 	var vars Vars = mux.Vars(commonRequest)
 
 	t.Run("ErrDataParse", func(testing *testing.T) {
+		recorder := httptest.NewRecorder()
+
 		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
 			Return(&GetWDMP{}, errors.New(errMsg)).Once()
+		mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
 
-		recorder := httptest.NewRecorder()
 		ch.ServeHTTP(recorder, commonRequest)
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
 
+		mockConversion.AssertExpectations(t)
+		mockRequestValidator.AssertExpectations(t)
+	})
+
+	t.Run("InvalidRequest", func(testing *testing.T) {
+		recorder := httptest.NewRecorder()
+		getRequest := httptest.NewRequest(http.MethodGet, "http://someURL", nil)
+
+		mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(false).Once()
+		mockConversion.AssertNotCalled(t,"GetFlavorFormat", getRequest, vars, "attributes", "names", ",")
+
+		ch.ServeHTTP(recorder, commonRequest)
+		mockRequestValidator.AssertExpectations(t)
 		mockConversion.AssertExpectations(t)
 	})
 
@@ -67,12 +84,14 @@ func TestConversionHandler(t *testing.T) {
 		mockEncoding.On("EncodeJSON", wdmpGet).Return([]byte(""), errors.New(errMsg)).Once()
 		mockConversion.On("GetFlavorFormat", commonRequest, vars, "attributes", "names", ",").
 			Return(wdmpGet, nil).Once()
+		mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
 
 		recorder := httptest.NewRecorder()
 		ch.ServeHTTP(recorder, commonRequest)
 
 		mockEncoding.AssertExpectations(t)
 		mockConversion.AssertExpectations(t)
+		mockRequestValidator.AssertExpectations(t)
 	})
 
 	t.Run("IdealGet", func(t *testing.T) {
@@ -190,6 +209,7 @@ func SetUpTest(encodeArg interface{}, req *http.Request) {
 	mockSender.On("Send", ch, recorder, payload, mock.AnythingOfType("*http.Request")).Return(resp, nil).Once()
 	mockSender.On("HandleResponse", ch, nil, resp, recorder, false).Once()
 	mockSender.On("GetRespTimeout").Return(timeout).Once()
+	mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
 
 	ch.ServeHTTP(recorder, req)
 }
@@ -198,6 +218,7 @@ func AssertCommonCalls(t *testing.T) {
 	mockConversion.AssertExpectations(t)
 	mockEncoding.AssertExpectations(t)
 	mockSender.AssertExpectations(t)
+	mockRequestValidator.AssertExpectations(t)
 }
 
 type LightFakeLogger struct{}
