@@ -37,6 +37,7 @@ type ConversionHandler struct {
 	sender         SendAndHandle
 	encodingHelper EncodingTool
 	Requester
+	RequestValidator
 }
 
 //ConversionHandler handles the different incoming tr1 requests
@@ -46,6 +47,11 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		wdmp    interface{}
 		urlVars = mux.Vars(req)
 	)
+
+	if !ch.isValidRequest(req, origin){
+		fmt.Print("returning")
+		return
+	}
 
 	switch req.Method {
 	case http.MethodGet:
@@ -116,6 +122,38 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	ch.sender.HandleResponse(ch, err, response, origin, true)
 }
 
+type RequestValidator interface {
+	isValidRequest(*http.Request, http.ResponseWriter) bool
+	isValidService(string) bool
+}
+
+type TR1RequestValidator struct {
+	supportedServices map[string]struct{}
+	log.Logger
+}
+
+//isValid returns true if and only if service is a supported one
+func (validator *TR1RequestValidator) isValidRequest(req *http.Request, origin http.ResponseWriter) (isValid bool) {
+	URLVars := mux.Vars(req)
+
+	//check request contains a valid service
+	if isValid = validator.isValidService(URLVars["service"]); !isValid {
+		writeResponse(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
+		logging.Error(validator).Log(logging.ErrorKey(), "unsupported service", "service", URLVars["service"])
+		return
+	}
+
+
+	//todo: need to add validations for device id and such
+
+	return
+}
+func (validator *TR1RequestValidator) isValidService(service string) (isValid bool) {
+	_, isValid = validator.supportedServices[service]
+	return
+}
+
+
 // Helper functions
 
 //ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
@@ -133,3 +171,4 @@ func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *htt
 		}
 	}
 }
+
