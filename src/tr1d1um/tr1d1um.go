@@ -91,7 +91,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	AddRoutes(baseRouter, preHandler, conversionHandler)
 
-	if exitCode = ConfigureWebHooks(baseRouter, preHandler, v, logger); exitCode != 0 {
+	if exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
 		return
 	}
 
@@ -109,7 +109,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 }
 
 //ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
-func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) int {
+//baseRouter is pre-configured with the api/v2 prefix path
+//root is the original router used by webHookFactory.Initialize()
+func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) int {
 	webHookFactory, err := webhook.NewFactory(v)
 
 	if err != nil {
@@ -120,15 +122,15 @@ func ConfigureWebHooks(r *mux.Router, preHandler *alice.Chain, v *viper.Viper, l
 	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler()
 
 	// register webHook end points for api
-	r.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
-	r.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
+	baseRouter.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
+	baseRouter.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
 
 	selfURL := &url.URL{
 		Scheme: "https",
 		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
 	}
 
-	webHookFactory.Initialize(r, selfURL, webHookHandler, logger, nil)
+	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, nil)
 	webHookFactory.PrepareAndStart()
 
 	return 0
