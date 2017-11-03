@@ -26,6 +26,7 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+	"github.com/Comcast/webpa-common/device"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -42,6 +43,8 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
+	logging.Debug(ch.logger).Log(logging.MessageKey(), "ServeHTTP called")
+
 	var (
 		err     error
 		wdmp    interface{}
@@ -49,7 +52,6 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	)
 
 	if !ch.isValidRequest(req, origin){
-		fmt.Print("returning")
 		return
 	}
 
@@ -99,6 +101,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 //HandleStat handles the differentiated STAT command
 func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Request) {
+	logging.Debug(ch.logger).Log(logging.MessageKey(), "HandleStat called")
 	var errorLogger = logging.Error(ch.logger)
 
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
@@ -143,7 +146,12 @@ func (validator *TR1RequestValidator) isValidRequest(req *http.Request, origin h
 		return
 	}
 
-	//todo: need to add validations for device id and such
+	//check device id
+	if _, err := device.ParseID(URLVars["deviceid"]); err != nil {
+		writeResponse(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
+		logging.Error(validator).Log(logging.ErrorKey(), err.Error(), logging.MessageKey(), "Invalid deviceID")
+		return false
+	}
 
 	return
 }
@@ -151,7 +159,6 @@ func (validator *TR1RequestValidator) isValidService(service string) (isValid bo
 	_, isValid = validator.supportedServices[service]
 	return
 }
-
 
 // Helper functions
 
