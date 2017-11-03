@@ -30,6 +30,7 @@ import (
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/Comcast/webpa-common/device"
 )
 
 //Vars shortens frequently used type returned by mux.Vars()
@@ -185,6 +186,7 @@ func (cw *ConversionWDMP) GetFromURLPath(key string, urlVars Vars) (val string, 
 //GetConfiguredWRP Set the necessary fields in the wrp and return it
 func (cw *ConversionWDMP) GetConfiguredWRP(wdmp []byte, pathVars Vars, header http.Header) (wrpMsg *wrp.Message) {
 	deviceID, _ := cw.GetFromURLPath("deviceid", pathVars)
+	canonicalDeviceID, _ := device.ParseID(deviceID)
 	service, _ := cw.GetFromURLPath("service", pathVars)
 
 	wrpMsg = &wrp.Message{
@@ -192,7 +194,7 @@ func (cw *ConversionWDMP) GetConfiguredWRP(wdmp []byte, pathVars Vars, header ht
 		ContentType:     header.Get("Content-Type"),
 		Payload:         wdmp,
 		Source:          cw.GetWRPSource() + "/" + service,
-		Destination:     deviceID + "/" + service,
+		Destination:     string(canonicalDeviceID) + "/" + service,
 		TransactionUUID: GetOrGenTID(header),
 	}
 	return
