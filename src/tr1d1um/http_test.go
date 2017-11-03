@@ -201,6 +201,44 @@ func TestHandleStat(t *testing.T) {
 	mockRequester.AssertExpectations(t)
 }
 
+func TestIsValidRequest(t *testing.T){
+	t.Run("NilURLVars", func(t *testing.T) {
+		assert := assert.New(t)
+		TR1RequestValidator := TR1RequestValidator{Logger:fakeLogger}
+		assert.False(TR1RequestValidator.isValidRequest(nil, nil))
+	})
+
+	t.Run("InvalidService", func(t *testing.T) {
+		assert := assert.New(t)
+		TR1RequestValidator := TR1RequestValidator{Logger:fakeLogger}
+		URLVars := map[string]string{"service": "wutService?"}
+		origin := httptest.NewRecorder()
+		assert.False(TR1RequestValidator.isValidRequest(URLVars, origin))
+		assert.EqualValues(http.StatusBadRequest, origin.Code)
+	})
+
+	t.Run("InvalidDeviceID", func(t *testing.T) {
+		assert := assert.New(t)
+		supportedServices := map[string]struct{}{"goodService":{}}
+		TR1RequestValidator := TR1RequestValidator{Logger:fakeLogger, supportedServices:supportedServices}
+		URLVars := map[string]string{"service": "goodService", "deviceid": "wutDevice?"}
+		origin := httptest.NewRecorder()
+		assert.False(TR1RequestValidator.isValidRequest(URLVars, origin))
+		assert.EqualValues(http.StatusBadRequest, origin.Code)
+	})
+
+	t.Run("IdealCase", func(t *testing.T) {
+		assert := assert.New(t)
+		supportedServices := map[string]struct{}{"goodService":{}}
+		TR1RequestValidator := TR1RequestValidator{Logger:fakeLogger, supportedServices:supportedServices}
+		URLVars := map[string]string{"service": "goodService", "deviceid": "mac:112233445566"}
+		origin := httptest.NewRecorder()
+		assert.True(TR1RequestValidator.isValidRequest(URLVars, origin))
+		assert.EqualValues(http.StatusOK, origin.Code) // check origin's statusCode hasn't been changed from default
+	})
+}
+
+// Test Helpers //
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
 	timeout := time.Nanosecond

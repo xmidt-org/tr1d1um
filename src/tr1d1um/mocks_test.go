@@ -133,8 +133,8 @@ type MockRequestValidator struct{
 	mock.Mock
 }
 
-func (m *MockRequestValidator) isValidRequest(req *http.Request, origin http.ResponseWriter) bool {
-	args := m.Called(origin, req)
+func (m *MockRequestValidator) isValidRequest(reqVars map[string]string, origin http.ResponseWriter) bool {
+	args := m.Called(reqVars, origin)
 	return args.Bool(0)
 }
 

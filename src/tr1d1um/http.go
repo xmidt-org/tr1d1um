@@ -51,7 +51,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		urlVars = mux.Vars(req)
 	)
 
-	if !ch.isValidRequest(req, origin){
+	if !ch.isValidRequest(urlVars, origin){
 		return
 	}
 
@@ -126,8 +126,7 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 }
 
 type RequestValidator interface {
-	isValidRequest(*http.Request, http.ResponseWriter) bool
-	isValidService(string) bool
+	isValidRequest(map[string]string, http.ResponseWriter) bool
 }
 
 type TR1RequestValidator struct {
@@ -136,11 +135,13 @@ type TR1RequestValidator struct {
 }
 
 //isValid returns true if and only if service is a supported one
-func (validator *TR1RequestValidator) isValidRequest(req *http.Request, origin http.ResponseWriter) (isValid bool) {
-	URLVars := mux.Vars(req)
+func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, origin http.ResponseWriter) (isValid bool) {
+	if URLVars == nil {
+		return false
+	}
 
 	//check request contains a valid service
-	if isValid = validator.isValidService(URLVars["service"]); !isValid {
+	if _, isValid = validator.supportedServices[URLVars["service"]]; !isValid {
 		writeResponse(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), "unsupported service", "service", URLVars["service"])
 		return
@@ -153,10 +154,6 @@ func (validator *TR1RequestValidator) isValidRequest(req *http.Request, origin h
 		return false
 	}
 
-	return
-}
-func (validator *TR1RequestValidator) isValidService(service string) (isValid bool) {
-	_, isValid = validator.supportedServices[service]
 	return
 }
 
