@@ -143,7 +143,6 @@ func (validator *TR1RequestValidator) isValidRequest(req *http.Request, origin h
 		return
 	}
 
-
 	//todo: need to add validations for device id and such
 
 	return

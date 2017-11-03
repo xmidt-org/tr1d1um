@@ -48,6 +48,7 @@ const (
 	baseURI                = "/api"
 	defaultClientTimeout   = "30s"
 	defaultRespWaitTimeout = "40s"
+	supportedServicesKey   = "supportedServices"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -176,9 +177,14 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 		Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
 		wdmpConvert:    &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
 		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
-		encodingHelper: &EncodingHelper{}, logger: logger,
+		encodingHelper: &EncodingHelper{},
+		logger: logger,
 		targetURL:     v.GetString("targetURL"),
 		serverVersion: v.GetString("version"),
+		RequestValidator: &TR1RequestValidator{
+			supportedServices:getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
+			Logger: logger,
+		},
 	}
 	return
 }
@@ -247,6 +253,16 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 
 	validator = validators
 
+	return
+}
+
+func getSupportedServicesMap(supportedServices []string) (supportedServicesMap map[string]struct{}){
+	supportedServicesMap = map[string]struct{}{}
+	if supportedServices != nil {
+		for _, supportedService := range supportedServices {
+			supportedServicesMap[supportedService] = struct{}{}
+		}
+	}
 	return
 }
 
