@@ -1,5 +1,5 @@
 hash: 97dcde1afbef368868c8c1f6ccd9294ac2f75795fe395751de8fa0a414a7e9dd
-updated: 2017-10-24T18:33:05.596151126-07:00
+updated: 2017-11-03T11:53:12.711289463-07:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -37,6 +37,7 @@ imports:
   version: 312031c04577e73353e9529a8955ad194fe1e62c
   subpackages:
   - concurrent
+  - device
   - health
   - httperror
   - logging
@@ -72,6 +73,8 @@ imports:
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
   version: 392c28fe23e1c45ddba891b0320b3b5df220beea
+- name: github.com/gorilla/websocket
+  version: 3ab3a8b8831546bd18fd182c20687ca853b2bb13
 - name: github.com/hashicorp/hcl
   version: 8f6b1344a92ff8877cf24a5de9177bf7d0a2a187
   subpackages:
