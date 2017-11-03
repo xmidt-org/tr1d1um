@@ -125,3 +125,20 @@ func (m *MockRequester) PerformRequest(req *http.Request) (*http.Response, error
 	args := m.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
 }
+
+
+/* Mocks for RequestValidator */
+
+type MockRequestValidator struct{
+	mock.Mock
+}
+
+func (m *MockRequestValidator) isValidRequest(req *http.Request, origin http.ResponseWriter) bool {
+	args := m.Called(origin, req)
+	return args.Bool(0)
+}
+
+func (m *MockRequestValidator) isValidService(service string) bool {
+	args := m.Called(service)
+	return args.Bool(0)
+}

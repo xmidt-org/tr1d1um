@@ -104,6 +104,28 @@ func TestRouteConfigurations(t *testing.T) {
 	AssertConfiguredRoutes(r, t, testsCases)
 }
 
+
+func TestGetSupportedDevices(t *testing.T){
+	t.Run("TypicalCase", func(t *testing.T) {
+		assert := assert.New(t)
+		services := []string{"a","b"}
+		result := getSupportedServicesMap(services)
+		assert.EqualValues(2, len(result))
+		_, aExists := result["a"]
+		_, bExists := result["b"]
+		assert.True(aExists)
+		assert.True(bExists)
+	})
+
+	t.Run("EdgeCases", func(t *testing.T) {
+		assert := assert.New(t)
+		resultFromNil := getSupportedServicesMap(nil) // nil case
+		resultFromEmpty := getSupportedServicesMap([]string{}) // empty list case
+		assert.Empty(resultFromEmpty)
+		assert.Empty(resultFromNil)
+	})
+}
+
 //AssertConfiguredRoutes checks that all given tests cases pass with regards to requests that should be
 //allowed to hit our handler
 func AssertConfiguredRoutes(r *mux.Router, t *testing.T, testCases []RouteTestBundle) {
