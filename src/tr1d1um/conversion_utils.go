@@ -28,9 +28,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-ozzo/ozzo-validation"
-	"github.com/Comcast/webpa-common/device"
 )
 
 //Vars shortens frequently used type returned by mux.Vars()

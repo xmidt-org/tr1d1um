@@ -24,6 +24,8 @@ import (
 
 	"errors"
 
+	"strings"
+
 	"github.com/Comcast/webpa-common/wrp"
 )
 
@@ -54,7 +56,8 @@ func ReportError(err error, w http.ResponseWriter) {
 		return
 	}
 	message, statusCode := "", http.StatusInternalServerError
-	if err == context.Canceled || err == context.DeadlineExceeded {
+	if err == context.Canceled || err == context.DeadlineExceeded ||
+		strings.Contains(err.Error(), "Client.Timeout exceeded") {
 		message, statusCode = "Error Timeout", Tr1StatusTimeout
 	}
 	writeResponse(message, statusCode, w)

@@ -126,10 +126,9 @@ func (m *MockRequester) PerformRequest(req *http.Request) (*http.Response, error
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
-
 /* Mocks for RequestValidator */
 
-type MockRequestValidator struct{
+type MockRequestValidator struct {
 	mock.Mock
 }
 

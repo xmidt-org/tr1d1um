@@ -23,10 +23,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"github.com/Comcast/webpa-common/device"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -51,7 +51,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		urlVars = mux.Vars(req)
 	)
 
-	if !ch.isValidRequest(urlVars, origin){
+	if !ch.isValidRequest(urlVars, origin) {
 		return
 	}
 
@@ -174,4 +174,3 @@ func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *htt
 		}
 	}
 }
-

@@ -178,12 +178,12 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 		wdmpConvert:    &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
 		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
 		encodingHelper: &EncodingHelper{},
-		logger: logger,
-		targetURL:     v.GetString("targetURL"),
-		serverVersion: v.GetString("version"),
+		logger:         logger,
+		targetURL:      v.GetString("targetURL"),
+		serverVersion:  v.GetString("version"),
 		RequestValidator: &TR1RequestValidator{
-			supportedServices:getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
-			Logger: logger,
+			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
+			Logger:            logger,
 		},
 	}
 	return
@@ -256,7 +256,7 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 	return
 }
 
-func getSupportedServicesMap(supportedServices []string) (supportedServicesMap map[string]struct{}){
+func getSupportedServicesMap(supportedServices []string) (supportedServicesMap map[string]struct{}) {
 	supportedServicesMap = map[string]struct{}{}
 	if supportedServices != nil {
 		for _, supportedService := range supportedServices {
