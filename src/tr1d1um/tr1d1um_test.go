@@ -104,11 +104,10 @@ func TestRouteConfigurations(t *testing.T) {
 	AssertConfiguredRoutes(r, t, testsCases)
 }
 
-
-func TestGetSupportedDevices(t *testing.T){
+func TestGetSupportedDevices(t *testing.T) {
 	t.Run("TypicalCase", func(t *testing.T) {
 		assert := assert.New(t)
-		services := []string{"a","b"}
+		services := []string{"a", "b"}
 		result := getSupportedServicesMap(services)
 		assert.EqualValues(2, len(result))
 		_, aExists := result["a"]
@@ -119,7 +118,7 @@ func TestGetSupportedDevices(t *testing.T){
 
 	t.Run("EdgeCases", func(t *testing.T) {
 		assert := assert.New(t)
-		resultFromNil := getSupportedServicesMap(nil) // nil case
+		resultFromNil := getSupportedServicesMap(nil)          // nil case
 		resultFromEmpty := getSupportedServicesMap([]string{}) // empty list case
 		assert.Empty(resultFromEmpty)
 		assert.Empty(resultFromNil)

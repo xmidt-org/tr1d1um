@@ -50,11 +50,22 @@ func TestReportError(t *testing.T) {
 
 	t.Run("TimeoutErr", func(t *testing.T) {
 		assert := assert.New(t)
-		origin := httptest.NewRecorder()
-		ReportError(context.Canceled, origin)
+		timeoutErrors := []error{context.Canceled, context.DeadlineExceeded, errors.New("error!: Client.Timeout exceeded")}
 
-		assert.EqualValues(Tr1StatusTimeout, origin.Code)
-		assert.EqualValues(`{"message":"Error Timeout"}`, origin.Body.String())
+		for _, timeoutError := range timeoutErrors {
+			origin := httptest.NewRecorder()
+			ReportError(timeoutError, origin)
+			assert.EqualValues(Tr1StatusTimeout, origin.Code)
+			assert.EqualValues(`{"message":"Error Timeout"}`, origin.Body.String())
+		}
+	})
+
+	t.Run("NilError", func(t *testing.T) {
+		assert := assert.New(t)
+
+		origin := httptest.NewRecorder()
+		ReportError(nil, origin)
+		assert.EqualValues(http.StatusOK, origin.Code) //assert for default value
 	})
 }
 
