@@ -42,7 +42,7 @@ func TestReportError(t *testing.T) {
 	t.Run("InternalErr", func(t *testing.T) {
 		assert := assert.New(t)
 		origin := httptest.NewRecorder()
-		ReportError(errors.New("internal"), origin)
+		assert.False(ShouldRetryOnError(errors.New("internal"), origin, true))
 
 		assert.EqualValues(http.StatusInternalServerError, origin.Code)
 		assert.EqualValues(`{"message":""}`, origin.Body.String())

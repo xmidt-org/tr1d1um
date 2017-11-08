@@ -50,17 +50,24 @@ func writeResponse(message string, statusCode int, w http.ResponseWriter) {
 	w.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
 }
 
-//ReportError writes back to the caller responses based on the given error. Error must be non-nil to be reported.
-func ReportError(err error, w http.ResponseWriter) {
+//ShouldRetryOnError returns true if the given error is related to some timeout and such error is not being reporting back to
+//some origin. Otherwise, it returns false. Note that such reporting is invoked in this function.
+func ShouldRetryOnError(err error, origin http.ResponseWriter, writeOnTimeoutError bool) (shouldRetry bool) {
 	if err == nil {
 		return
 	}
 	message, statusCode := "", http.StatusInternalServerError
 	if err == context.Canceled || err == context.DeadlineExceeded ||
 		strings.Contains(err.Error(), "Client.Timeout exceeded") {
-		message, statusCode = "Error Timeout", Tr1StatusTimeout
+		message, statusCode, shouldRetry = "Error Timeout", Tr1StatusTimeout, !writeOnTimeoutError
+		// if already writing back to origin about the error, don't retry
 	}
-	writeResponse(message, statusCode, w)
+
+	if writeOnTimeoutError {
+		writeResponse(message, statusCode, origin)
+	}
+
+	return
 }
 
 //GetStatusCodeFromRDKResponse returns the status code given a well-formatted

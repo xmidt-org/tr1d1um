@@ -27,6 +27,7 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+	"github.com/Comcast/webpa-common/wrp"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -91,12 +92,39 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		return
 	}
 
+	//todo: do set up here
+	wrpMsg := ch.wdmpConvert.GetConfiguredWRP(wdmpPayload, urlVars, req.Header)
+
+	//Forward transaction id being used in Request
+	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
+
+	wrpPayload, err := ch.encodingHelper.GenericEncode(wrpMsg, wrp.JSON)
+
+	if err != nil {
+		origin.WriteHeader(http.StatusInternalServerError)
+		logging.Error(ch.logger).Log(logging.ErrorKey(), err)
+		return
+	}
+
+	//todo: wrap this one try into re-try block - might want to make operation to retry generic
+
+	//todo: (1) get new request ready
 	//set timeout for response waiting
 	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	defer cancel()
-
-	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-	ch.sender.HandleResponse(ch, err, response, origin, false)
+	defer cancel() //todo: call this at the end of each retry
+	newRequest, err := ch.sender.ConfigureRequest(ctx, origin, wrpPayload)
+	if err != nil {
+		return
+	}
+	//todo: (1.1) set desired headers
+	newRequest.Header.Set("Content-Type", wrp.JSON.ContentType())
+	newRequest.Header.Set("Authorization", req.Header.Get("Authorization"))
+	//todo: (2) perform such request
+	//resp, err := ch.PerformRequest(newRequest)
+	//todo: (3) read in response
+	//todo: (4) if there was a timeout error, retry
+	//response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
+	//ch.sender.HandleResponse(ch, err, response, origin, false)
 }
 
 //HandleStat handles the differentiated STAT command
@@ -122,7 +150,7 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	response, err := ch.PerformRequest(requestWithContext)
 
 	origin.Header().Set("Content-Type", "application/json")
-	ch.sender.HandleResponse(ch, err, response, origin, true)
+	//ch.sender.HandleResponse(ch, err, response, origin, true)
 }
 
 type RequestValidator interface {

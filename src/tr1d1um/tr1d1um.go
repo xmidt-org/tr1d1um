@@ -176,11 +176,10 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 	cHandler = &ConversionHandler{
 		Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
 		wdmpConvert:    &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
-		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout},
+		sender:         &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout,
+		wrpURL: fmt.Sprintf("%s%s/%s/device",v.GetString("targetURL"), baseURI , v.GetString("version"))},
 		encodingHelper: &EncodingHelper{},
 		logger:         logger,
-		targetURL:      v.GetString("targetURL"),
-		serverVersion:  v.GetString("version"),
 		RequestValidator: &TR1RequestValidator{
 			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
 			Logger:            logger,

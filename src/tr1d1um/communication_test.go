@@ -136,13 +136,13 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("IncomingTimeoutErr", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(nil, context.DeadlineExceeded, nil, recorder, false)
+		tr1.HandleResponse(nil, context.DeadlineExceeded, nil, recorder, false, true)
 		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
 	})
 
 	t.Run("IncomingErr", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(nil, errors.New(errMsg), nil, recorder, false)
+		tr1.HandleResponse(nil, errors.New(errMsg), nil, recorder, false, true)
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 	})
 
@@ -151,7 +151,7 @@ func TestHandleResponse(t *testing.T) {
 		var mockBody bytes.Buffer
 		mockBody.WriteString("expectMe")
 		fakeResponse := &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(&mockBody)}
-		tr1.HandleResponse(nil, nil, fakeResponse, recorder, false)
+		tr1.HandleResponse(nil, nil, fakeResponse, recorder, false, true)
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
 		assert.EqualValues("expectMe", recorder.Body.String())
 	})
@@ -161,7 +161,7 @@ func TestHandleResponse(t *testing.T) {
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
 			errors.New(errMsg)).Once()
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 		mockEncoding.AssertExpectations(t)
@@ -172,7 +172,7 @@ func TestHandleResponse(t *testing.T) {
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
 			context.Canceled).Once()
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
 
 		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
 		mockEncoding.AssertExpectations(t)
@@ -186,7 +186,7 @@ func TestHandleResponse(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(&fakeBody)}
 
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, true)
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, true, true)
 
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues(bodyString, recorder.Body.String())
@@ -199,7 +199,7 @@ func TestHandleResponse(t *testing.T) {
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
 
 		assert.EqualValues(202, recorder.Code)
 		assert.EqualValues(extractedData, recorder.Body.Bytes())
@@ -212,7 +212,7 @@ func TestHandleResponse(t *testing.T) {
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
 		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false)
+		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
 
 		assert.EqualValues(http.StatusOK, recorder.Code) // reflect transaction instead of device status
 		assert.EqualValues(extractedData, recorder.Body.Bytes())

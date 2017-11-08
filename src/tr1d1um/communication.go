@@ -27,14 +27,15 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
-	"github.com/gorilla/mux"
+	"context"
 )
 
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
 type SendAndHandle interface {
-	Send(*ConversionHandler, http.ResponseWriter, []byte, *http.Request) (*http.Response, error)
-	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool)
+	ConfigureRequest(context.Context, http.ResponseWriter, []byte) (*http.Request, error)
+	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool, bool) bool
 	GetRespTimeout() time.Duration
+	GetWrpURL() string
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
@@ -42,6 +43,7 @@ type Tr1SendAndHandle struct {
 	log            log.Logger
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
 	respTimeout    time.Duration
+	wrpURL string
 }
 
 type clientResponse struct {
@@ -49,16 +51,16 @@ type clientResponse struct {
 	err  error
 }
 
+//func (tr1 *Tr1SendAndHandle) PrepareWRPMessag//`e
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
 //Its response is then handled in HandleResponse
-func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWriter, data []byte, req *http.Request) (respFromServer *http.Response, err error) {
+//todo: update description
+func (tr1 *Tr1SendAndHandle) ConfigureRequest(ctx context.Context, origin http.ResponseWriter, data []byte) (request *http.Request, err error) {
 	var errorLogger = logging.Error(tr1.log)
-	wrpMsg := ch.wdmpConvert.GetConfiguredWRP(data, mux.Vars(req), req.Header)
 
-	//Forward transaction id being used in Request
-	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
-
-	wrpPayload, err := ch.encodingHelper.GenericEncode(wrpMsg, wrp.JSON)
+	//* This is the core of the request */
+	//inputs for section: (fullPath, wrpPayload)
+	request, err = tr1.NewHTTPRequest(http.MethodPost, tr1.GetWrpURL(), bytes.NewBuffer(data))
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
@@ -66,32 +68,19 @@ func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWri
 		return
 	}
 
-	fullPath := ch.targetURL + baseURI + "/" + ch.serverVersion + "/device"
-	requestToServer, err := tr1.NewHTTPRequest(http.MethodPost, fullPath, bytes.NewBuffer(wrpPayload))
-
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
-		return
-	}
-
-	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
-	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-
-	respFromServer, err = ch.PerformRequest(requestToServer.WithContext(req.Context())) //keep ancestor's context
+	request = request.WithContext(ctx)
 	return
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
 //based on the responses of a server we have contacted through Send
 func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter,
-	wholeBody bool) {
+	wholeBody, writeOnTimeoutError bool) (shouldRetry bool) {
 	var errorLogger = logging.Error(tr1.log)
 
-	ForwardHeadersByPrefix("X", origin, respFromServer)
 
 	if err != nil {
-		ReportError(err, origin)
+		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
@@ -110,7 +99,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 
 	if wholeBody { // Do not attempt extracting payload, forward whole body
 		err = forwardInput(origin, respFromServer.Body)
-		ReportError(err, origin)
+		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError) //todo: err -> check for timeout
 		return
 	}
 
@@ -120,15 +109,24 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, re
 		}
 		origin.Write(RDKResponse)
 	} else {
-		ReportError(err, origin)
+		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError) //todo: err -> check for timeout
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
+
+	if writeOnTimeoutError {
+		ForwardHeadersByPrefix("X", origin, respFromServer)
+	}
+	return
 }
 
 //GetRespTimeout returns the duration the sender should use while waiting
 //for a response from a server
 func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
 	return tr1.respTimeout
+}
+
+func (tr1 *Tr1SendAndHandle) GetWrpURL() string{
+	return tr1.wrpURL
 }
 
 //Requester has the main functionality of taking a request, performing such request based on some internal client and
