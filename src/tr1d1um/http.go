@@ -25,9 +25,9 @@ import (
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"github.com/Comcast/webpa-common/wrp"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -44,7 +44,8 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
-	logging.Debug(ch.logger).Log(logging.MessageKey(), "ServeHTTP called")
+	var debugLogger = logging.Debug(ch.logger)
+	debugLogger.Log(logging.MessageKey(), "ServeHTTP called")
 
 	var (
 		err     error
@@ -116,15 +117,23 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	if err != nil {
 		return
 	}
-	//todo: (1.1) set desired headers
-	newRequest.Header.Set("Content-Type", wrp.JSON.ContentType())
-	newRequest.Header.Set("Authorization", req.Header.Get("Authorization"))
-	//todo: (2) perform such request
-	//resp, err := ch.PerformRequest(newRequest)
-	//todo: (3) read in response
-	//todo: (4) if there was a timeout error, retry
-	//response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-	//ch.sender.HandleResponse(ch, err, response, origin, false)
+
+	authorizationHeaderVal := req.Header.Get("Authorization")
+
+	maxAttempts := 2
+
+	for attempt := 1; attempt < maxAttempts; attempt++ {
+		debugLogger.Log(logging.MessageKey(), "Attempting request", "AttemptNumber", attempt)
+		//todo: (1.1) set desired headers
+		newRequest.Header.Set("Content-Type", wrp.JSON.ContentType())
+		newRequest.Header.Set("Authorization", authorizationHeaderVal)
+		//todo: (2) perform such request
+		resp, err := ch.PerformRequest(newRequest)
+		//todo: (3) read in response:
+		//todo: (4) if there was a timeout error, retry
+		//response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
+		//ch.sender.HandleResponse(ch, err, response, origin, false)
+	}
 }
 
 //HandleStat handles the differentiated STAT command

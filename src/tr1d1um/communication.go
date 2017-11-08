@@ -24,10 +24,11 @@ import (
 	"net/http"
 	"time"
 
+	"context"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
-	"context"
 )
 
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
@@ -43,7 +44,7 @@ type Tr1SendAndHandle struct {
 	log            log.Logger
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
 	respTimeout    time.Duration
-	wrpURL string
+	wrpURL         string
 }
 
 type clientResponse struct {
@@ -77,7 +78,6 @@ func (tr1 *Tr1SendAndHandle) ConfigureRequest(ctx context.Context, origin http.R
 func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter,
 	wholeBody, writeOnTimeoutError bool) (shouldRetry bool) {
 	var errorLogger = logging.Error(tr1.log)
-
 
 	if err != nil {
 		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError)
@@ -125,7 +125,7 @@ func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
 	return tr1.respTimeout
 }
 
-func (tr1 *Tr1SendAndHandle) GetWrpURL() string{
+func (tr1 *Tr1SendAndHandle) GetWrpURL() string {
 	return tr1.wrpURL
 }
 
