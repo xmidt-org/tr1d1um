@@ -28,6 +28,7 @@ import (
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+	"bytes"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -102,7 +103,8 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	//Forward transaction id being used in Request
 	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
 
-	wrpPayload, err := ch.EncodingHelper.GenericEncode(wrpMsg, wrp.JSON)
+	var wrpPayloadBuffer bytes.Buffer
+	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.JSON).Encode(wrpMsg)
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
@@ -115,7 +117,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		method:      http.MethodPost,
 		URL:         ch.WRPRequestURL,
 		headers:     http.Header{},
-		body:        wrpPayload,
+		body:        wrpPayloadBuffer.Bytes(),
 	}
 	//
 	tr1Request.headers.Set("Content-Type", wrp.JSON.ContentType())

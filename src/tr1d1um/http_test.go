@@ -143,6 +143,26 @@ func TestConversionHandler(t *testing.T) {
 		SetUpTest(wdmpDel, commonRequest)
 		AssertCommonCalls(t)
 	})
+
+	t.Run("DeleteInternalError", func(t *testing.T) {
+		commonRequest = httptest.NewRequest(http.MethodDelete, commonURL, body)
+		var urlVars Vars = mux.Vars(commonRequest)
+
+		mockConversion.On("DeleteFlavorFormat", urlVars, "parameter").Return(wdmpDel, nil).Once()
+
+		recorder := httptest.NewRecorder()
+
+		wrpMsg := &wrp.Message{}
+		payload := []byte("")
+		mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
+		mockEncoding.On("EncodeJSON", wdmpDel).Return(payload, nil).Once()
+		mockConversion.On("GetConfiguredWRP", payload, mock.Anything, commonRequest.Header).Return(wrpMsg).Once()
+		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(resp, errors.New("some internal " +
+			"error")).Once()
+
+		ch.ServeHTTP(recorder, commonRequest)
+		AssertCommonCalls(t)
+	})
 }
 
 func TestForwardHeadersByPrefix(t *testing.T) {
@@ -185,6 +205,13 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		assert.EqualValues(2, len(to.Headers))
 		assert.EqualValues([]string{"5", "6"}, to.Headers["Hydrogen"])
 	})
+
+	t.Run("NilCases", func(t *testing.T) {
+		to, resp := Tr1d1umResponse{}.New(), &http.Response{}
+		//none of these should panic
+		ForwardHeadersByPrefix("", nil, nil)
+		ForwardHeadersByPrefix("", resp, to)
+	})
 }
 
 func TestHandleStat(t *testing.T) {
@@ -195,15 +222,30 @@ func TestHandleStat(t *testing.T) {
 		RetryStrategy: mockRetryStrategy,
 	}
 
-	recorder := httptest.NewRecorder()
+	t.Run("ExecuteNoError", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
-	tr1Resp := Tr1d1umResponse{}.New()
+		req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
+		tr1Resp := Tr1d1umResponse{}.New()
 
-	mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, nil).Once()
+		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, nil).Once()
 
-	ch.HandleStat(recorder, req)
-	mockRetryStrategy.AssertExpectations(t)
+		ch.HandleStat(recorder, req)
+		mockRetryStrategy.AssertExpectations(t)
+	})
+
+	t.Run("ExecuteError", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+
+		req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
+		tr1Resp := Tr1d1umResponse{}.New()
+
+		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, errors.New("internal" +
+			" error")).Once()
+
+		ch.HandleStat(recorder, req)
+		mockRetryStrategy.AssertExpectations(t)
+	})
 }
 
 func TestIsValidRequest(t *testing.T) {
@@ -243,6 +285,41 @@ func TestIsValidRequest(t *testing.T) {
 	})
 }
 
+func TestOnRetryInternalFailure(t *testing.T) {
+	assert := assert.New(t)
+	result := OnRetryInternalFailure()
+	tr1Resp := result.(*Tr1d1umResponse)
+
+	assert.NotNil(tr1Resp.Headers)
+	assert.EqualValues(http.StatusInternalServerError, tr1Resp.Code)
+	assert.Empty(tr1Resp.Body)
+}
+
+func TestShouldRetryOnResponse(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.False(ShouldRetryOnResponse(Tr1d1umResponse{}.New(), nil)) // statusOK case
+
+	tr1Resp := Tr1d1umResponse{}.New()
+	tr1Resp.Code = Tr1StatusTimeout
+	assert.True(ShouldRetryOnResponse(tr1Resp, nil))
+}
+
+func TestTransferResponse(t *testing.T) {
+	assert := assert.New(t)
+	from, to := Tr1d1umResponse{}.New(), httptest.NewRecorder()
+
+	from.Body = []byte("body")
+	from.Headers.Add("k1", "v1")
+	from.Headers.Add("k2", "v2")
+
+	TransferResponse(from, to)
+	assert.EqualValues(from.Body, to.Body.Bytes())
+	assert.EqualValues(from.Code, to.Code)
+	assert.EqualValues(to.Header().Get("k1"), "v1")
+	assert.EqualValues(to.Header().Get("k2"), "v2")
+}
+
 // Test Helpers //
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
@@ -252,7 +329,6 @@ func SetUpTest(encodeArg interface{}, req *http.Request) {
 	mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
 	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
 	mockConversion.On("GetConfiguredWRP", payload, mock.Anything, req.Header).Return(wrpMsg).Once()
-	mockEncoding.On("GenericEncode", mock.Anything, wrp.JSON).Return(payload, nil).Once()
 	mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(resp, nil).Once()
 
 	ch.ServeHTTP(recorder, req)
@@ -264,5 +340,4 @@ func AssertCommonCalls(t *testing.T) {
 	mockSender.AssertExpectations(t)
 	mockRequestValidator.AssertExpectations(t)
 	mockRetryStrategy.AssertExpectations(t)
-
 }
