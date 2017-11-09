@@ -18,11 +18,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"./retryUtilities"
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
@@ -38,8 +38,8 @@ type ConversionHandler struct {
 	wdmpConvert    ConversionTool
 	sender         SendAndHandle
 	encodingHelper EncodingTool
-	Requester
 	RequestValidator
+	retryUtilities.RetryStrategy
 }
 
 //ConversionHandler handles the different incoming tr1 requests
@@ -93,7 +93,6 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		return
 	}
 
-	//todo: do set up here
 	wrpMsg := ch.wdmpConvert.GetConfiguredWRP(wdmpPayload, urlVars, req.Header)
 
 	//Forward transaction id being used in Request
@@ -107,33 +106,20 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		return
 	}
 
-	//todo: wrap this one try into re-try block - might want to make operation to retry generic
-
-	//todo: (1) get new request ready
-	//set timeout for response waiting
-	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	defer cancel() //todo: call this at the end of each retry
-	newRequest, err := ch.sender.ConfigureRequest(ctx, origin, wrpPayload)
-	if err != nil {
-		return
+	tr1Request := Tr1d1umRequest{
+		ancestorCtx: req.Context(),
+		method:      http.MethodPost,
+		URL:         ch.sender.GetWrpURL(),
+		headers:     http.Header{},
+		body:        wrpPayload,
 	}
 
-	authorizationHeaderVal := req.Header.Get("Authorization")
+	tr1Request.headers.Set("Content-Type", wrp.JSON.ContentType())
+	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
-	maxAttempts := 2
+	tr1Resp, err := ch.Execute(ch.sender.MakeRequest, tr1Request)
+	//todo: tr1Resp contains all the final results we need to write back to our origin
 
-	for attempt := 1; attempt < maxAttempts; attempt++ {
-		debugLogger.Log(logging.MessageKey(), "Attempting request", "AttemptNumber", attempt)
-		//todo: (1.1) set desired headers
-		newRequest.Header.Set("Content-Type", wrp.JSON.ContentType())
-		newRequest.Header.Set("Authorization", authorizationHeaderVal)
-		//todo: (2) perform such request
-		resp, err := ch.PerformRequest(newRequest)
-		//todo: (3) read in response:
-		//todo: (4) if there was a timeout error, retry
-		//response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-		//ch.sender.HandleResponse(ch, err, response, origin, false)
-	}
 }
 
 //HandleStat handles the differentiated STAT command
@@ -141,25 +127,17 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	logging.Debug(ch.logger).Log(logging.MessageKey(), "HandleStat called")
 	var errorLogger = logging.Error(ch.logger)
 
-	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	defer cancel()
-
-	fullPath := ch.targetURL + req.URL.RequestURI()
-	requestToServer, err := http.NewRequest(http.MethodGet, fullPath, nil)
-
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
-		return
+	tr1Request := Tr1d1umRequest{
+		ancestorCtx: req.Context(),
+		method:      http.MethodGet,
+		URL:         ch.targetURL + req.URL.RequestURI(),
+		headers:     http.Header{},
 	}
 
-	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-	requestWithContext := requestToServer.WithContext(ctx)
+	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
-	response, err := ch.PerformRequest(requestWithContext)
-
-	origin.Header().Set("Content-Type", "application/json")
-	//ch.sender.HandleResponse(ch, err, response, origin, true)
+	tr1Resp, err := ch.Execute(ch.sender.MakeRequest, tr1Request)
+	//todo:
 }
 
 type RequestValidator interface {
@@ -198,7 +176,7 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 //ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
 //into an responseWriter
-func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *http.Response) {
+func ForwardHeadersByPrefix(prefix string, tr1Resp *Tr1d1umResponse, resp *http.Response) {
 	if resp == nil || resp.Header == nil {
 		return
 	}
@@ -206,7 +184,7 @@ func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *htt
 	for headerKey, headerValues := range resp.Header {
 		if strings.HasPrefix(headerKey, prefix) {
 			for _, headerValue := range headerValues {
-				origin.Header().Add(headerKey, headerValue)
+				tr1Resp.Headers.Add(headerKey, headerValue)
 			}
 		}
 	}

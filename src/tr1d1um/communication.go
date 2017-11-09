@@ -19,12 +19,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"context"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
@@ -37,6 +36,7 @@ type SendAndHandle interface {
 	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool, bool) bool
 	GetRespTimeout() time.Duration
 	GetWrpURL() string
+	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
@@ -45,6 +45,8 @@ type Tr1SendAndHandle struct {
 	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
 	respTimeout    time.Duration
 	wrpURL         string
+	Requester
+	EncodingTool
 }
 
 type clientResponse struct {
@@ -52,70 +54,85 @@ type clientResponse struct {
 	err  error
 }
 
+type Tr1d1umRequest struct {
+	ancestorCtx context.Context
+	method      string
+	URL         string
+	body        []byte
+	headers     http.Header
+}
+
+func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
+	if tr1Req != nil && tr1Req.body != nil {
+		body = bytes.NewBuffer(tr1Req.body)
+	}
+	return
+}
+
 //func (tr1 *Tr1SendAndHandle) PrepareWRPMessag//`e
 //Send prepares and subsequently sends a WRP encoded message to a predefined server
 //Its response is then handled in HandleResponse
 //todo: update description
-func (tr1 *Tr1SendAndHandle) ConfigureRequest(ctx context.Context, origin http.ResponseWriter, data []byte) (request *http.Request, err error) {
-	var errorLogger = logging.Error(tr1.log)
+func (tr1 *Tr1SendAndHandle) ConfigureRequest(ctx context.Context, tr1Response *Tr1d1umResponse, data io.Reader, method, URL string) (request *http.Request, err error) {
 
-	//* This is the core of the request */
-	//inputs for section: (fullPath, wrpPayload)
-	request, err = tr1.NewHTTPRequest(http.MethodPost, tr1.GetWrpURL(), bytes.NewBuffer(data))
+	return
+}
 
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
+//requestArgs = ctx, WRPData[],
+//interface{}
+func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error) {
+	tr1Request := requestArgs[0].(Tr1d1umRequest)
+	newRequest, newRequestErr := tr1.NewHTTPRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
+
+	tr1Response := Tr1d1umResponse{}.New()
+
+	if newRequestErr != nil {
+		tr1Response.Code = http.StatusInternalServerError
+		err = newRequestErr
 		return
 	}
 
-	request = request.WithContext(ctx)
+	ctx, cancel := context.WithTimeout(tr1Request.ancestorCtx, tr1.GetRespTimeout())
+	defer cancel()
+
+	newRequest = newRequest.WithContext(ctx)
+
+	httpResp, err := tr1.PerformRequest(newRequest)
+	tr1.HandleResponse(err, httpResp, tr1Response, tr1Request.method == http.MethodGet)
+	tr1Resp = tr1Response
 	return
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
 //based on the responses of a server we have contacted through Send
-func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter,
-	wholeBody, writeOnTimeoutError bool) (shouldRetry bool) {
+func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
 	var errorLogger = logging.Error(tr1.log)
+	var debugLogger = logging.Debug(tr1.log)
 
 	if err != nil {
-		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError)
+		tr1Resp.err = err
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
-	if respFromServer.StatusCode != http.StatusOK {
-		var bodyResp []byte
-		if responseBody, err := ioutil.ReadAll(respFromServer.Body); err == nil {
-			bodyResp = responseBody
-		}
-
-		origin.WriteHeader(respFromServer.StatusCode)
-		origin.Write(bodyResp)
-		errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
+	if respFromServer.StatusCode != http.StatusOK || wholeBody {
+		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
+		tr1Resp.Code = respFromServer.StatusCode
+		debugLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
 
-	if wholeBody { // Do not attempt extracting payload, forward whole body
-		err = forwardInput(origin, respFromServer.Body)
-		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError) //todo: err -> check for timeout
-		return
-	}
-
-	if RDKResponse, err := ch.encodingHelper.ExtractPayload(respFromServer.Body, wrp.JSON); err == nil {
-		if RDKRespCode, err := GetStatusCodeFromRDKResponse(RDKResponse); err == nil && RDKRespCode != http.StatusInternalServerError {
-			origin.WriteHeader(RDKRespCode)
+	if RDKResponse, encodingErr := tr1.ExtractPayload(respFromServer.Body, wrp.JSON); encodingErr == nil {
+		if RDKRespCode, RDKErr := GetStatusCodeFromRDKResponse(RDKResponse); RDKErr == nil && RDKRespCode != http.StatusInternalServerError {
+			tr1Resp.Code = RDKRespCode
 		}
-		origin.Write(RDKResponse)
+		tr1Resp.Body = RDKResponse
 	} else {
-		shouldRetry = ShouldRetryOnError(err, origin, writeOnTimeoutError) //todo: err -> check for timeout
+		tr1Resp.err = encodingErr
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
 
-	if writeOnTimeoutError {
-		ForwardHeadersByPrefix("X", origin, respFromServer)
-	}
+	ForwardHeadersByPrefix("X", tr1Resp, respFromServer)
 	return
 }
 
@@ -162,11 +179,11 @@ func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *h
 	}
 }
 
-//forwardInput reads the given input into bytes and writes it to a given response writer
-func forwardInput(origin http.ResponseWriter, input io.Reader) (err error) {
-	if origin != nil && input != nil {
+//forwardInput reads the given input into bytes and writes it to a given response struct
+func forwardInput(tr1Resp *Tr1d1umResponse, input io.Reader) {
+	if tr1Resp != nil && input != nil {
 		if body, readErr := ioutil.ReadAll(input); readErr == nil {
-			origin.Write(body)
+			tr1Resp.Body = body
 		} else {
 			err = readErr
 		}

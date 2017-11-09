@@ -15,7 +15,7 @@
  *
  */
 
-package retry_utilities
+package retryUtilities
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRetry_Execute(t *testing.T) {
+func TestRetryExecute(t *testing.T) {
 
 	t.Run("MaxRetries", func(t *testing.T) {
 		assert := assert.New(t)
@@ -108,3 +108,6 @@ func TestRetryCheckDependencies(t *testing.T){
 	})
 }
 
+
+
+/* TODO: add  methods for RetryStrategy*/

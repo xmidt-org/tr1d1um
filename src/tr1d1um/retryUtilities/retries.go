@@ -15,7 +15,7 @@
  *
  */
 
-package retry_utilities
+package retryUtilities
 
 import (
 	"time"
@@ -29,7 +29,7 @@ var (
 	undefinedLogger = errors.New("logger is undefined")
 	undefinedRetryOp = errors.New("operation to retry is undefined")
 )
-type RetryModel interface {
+type RetryStrategy interface {
 	Execute(func(... interface{})(interface{}, error), ... interface{}) (interface{}, error)
 }
 

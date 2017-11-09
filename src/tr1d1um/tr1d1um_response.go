@@ -42,30 +42,39 @@ type RDKResponse struct {
 	StatusCode int `json:"statusCode"`
 }
 
+type Tr1d1umResponse struct {
+	Body    []byte
+	Code    int
+	Headers http.Header
+	err     error
+}
+
+func (tr1Resp *Tr1d1umResponse) New() *Tr1d1umResponse {
+	tr1Resp.Headers, tr1Resp.Body, tr1Resp.Code = http.Header{}, []byte{}, http.StatusOK
+	return tr1Resp
+}
+
 //writeResponse is a tiny helper function that passes responses (In Json format only for now)
 //to a caller
-func writeResponse(message string, statusCode int, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", wrp.JSON.ContentType())
-	w.WriteHeader(statusCode)
-	w.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
+func writeResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
+	tr1Resp.Headers.Set("Content-Type", wrp.JSON.ContentType())
+	tr1Resp.Code = statusCode
+	tr1Resp.Body = []byte(fmt.Sprintf(`{"message":"%s"}`, message))
 }
 
 //ShouldRetryOnError returns true if the given error is related to some timeout and such error is not being reporting back to
 //some origin. Otherwise, it returns false. Note that such reporting is invoked in this function.
-func ShouldRetryOnError(err error, origin http.ResponseWriter, writeOnTimeoutError bool) (shouldRetry bool) {
+func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 	if err == nil {
 		return
 	}
 	message, statusCode := "", http.StatusInternalServerError
 	if err == context.Canceled || err == context.DeadlineExceeded ||
 		strings.Contains(err.Error(), "Client.Timeout exceeded") {
-		message, statusCode, shouldRetry = "Error Timeout", Tr1StatusTimeout, !writeOnTimeoutError
-		// if already writing back to origin about the error, don't retry
+		message, statusCode = "Error Timeout", Tr1StatusTimeout
 	}
 
-	if writeOnTimeoutError {
-		writeResponse(message, statusCode, origin)
-	}
+	writeResponse(message, statusCode, tr1Resp)
 
 	return
 }
