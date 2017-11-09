@@ -20,6 +20,7 @@ package retryUtilities
 import (
 	"testing"
 	"time"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,9 +30,9 @@ func TestRetryExecute(t *testing.T) {
 	t.Run("MaxRetries", func(t *testing.T) {
 		assert := assert.New(t)
 		retry := Retry{
-			Logger: logging.DefaultLogger(),
-			maxRetries: 2,
-			shouldRetry: func(_ interface{}, _ error) bool {return true},
+			Logger:      logging.DefaultLogger(),
+			maxRetries:  2,
+			shouldRetry: func(_ interface{}, _ error) bool { return true },
 		}
 
 		countOp := func(args ...interface{}) (count interface{}, err error) {
@@ -46,14 +47,14 @@ func TestRetryExecute(t *testing.T) {
 	t.Run("FailInBetween", func(t *testing.T) {
 		assert := assert.New(t)
 		retry := Retry{
-			Logger: logging.DefaultLogger(),
+			Logger:     logging.DefaultLogger(),
 			maxRetries: 2,
 			shouldRetry: func(c interface{}, _ error) bool {
 				if c.(int) < 1 {
 					return true
 				}
 				return false
-				},
+			},
 		}
 
 		countOp := func(args ...interface{}) (count interface{}, err error) {
@@ -62,20 +63,20 @@ func TestRetryExecute(t *testing.T) {
 		}
 		resp, err := retry.Execute(countOp, 0)
 		assert.Nil(err)
-		assert.EqualValues(retry.maxRetries - 1, resp.(int))
+		assert.EqualValues(retry.maxRetries-1, resp.(int))
 	})
 }
 
-func TestRetryCheckDependencies(t *testing.T){
+func TestRetryCheckDependencies(t *testing.T) {
 	t.Run("shouldRetryUndefined", func(t *testing.T) {
 		assert := assert.New(t)
 		retry := Retry{
-			interval:time.Second,
+			interval:   time.Second,
 			maxRetries: 3,
-			Logger: logging.DefaultLogger(),
+			Logger:     logging.DefaultLogger(),
 		}
 
-		result, err := retry.Execute(nil,"")
+		result, err := retry.Execute(nil, "")
 		assert.Nil(result)
 		assert.EqualValues(undefinedShouldRetryErr, err)
 	})
@@ -83,13 +84,13 @@ func TestRetryCheckDependencies(t *testing.T){
 	t.Run("InvalidmaxRetries", func(t *testing.T) {
 		assert := assert.New(t)
 		retry := Retry{
-			interval:time.Second,
-			maxRetries: 0,
-			Logger: logging.DefaultLogger(),
-			shouldRetry: func(_ interface{}, _ error) bool {return true},
+			interval:    time.Second,
+			maxRetries:  0,
+			Logger:      logging.DefaultLogger(),
+			shouldRetry: func(_ interface{}, _ error) bool { return true },
 		}
 
-		result, err := retry.Execute(nil,"")
+		result, err := retry.Execute(nil, "")
 		assert.Nil(result)
 		assert.EqualValues(invalidMaxRetriesValErr, err)
 	})
@@ -97,17 +98,13 @@ func TestRetryCheckDependencies(t *testing.T){
 	t.Run("undefinedLogger", func(t *testing.T) {
 		assert := assert.New(t)
 		retry := Retry{
-			interval:time.Second,
-			maxRetries: 1,
-			shouldRetry: func(_ interface{}, _ error) bool {return true},
+			interval:    time.Second,
+			maxRetries:  1,
+			shouldRetry: func(_ interface{}, _ error) bool { return true },
 		}
 
-		result, err := retry.Execute(nil,"")
+		result, err := retry.Execute(nil, "")
 		assert.Nil(result)
 		assert.EqualValues(undefinedLogger, err)
 	})
 }
-
-
-
-/* TODO: add  methods for RetryStrategy*/

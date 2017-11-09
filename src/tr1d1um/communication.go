@@ -35,17 +35,28 @@ type SendAndHandle interface {
 	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
 	HandleResponse(error, *http.Response, *Tr1d1umResponse, bool)
 	GetRespTimeout() time.Duration
-	GetWrpURL() string
+}
+
+type SendAndHandleFactory struct{}
+
+func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string, requester Requester, encoding EncodingTool,
+	logger log.Logger) SendAndHandle {
+	return &Tr1SendAndHandle{
+		RespTimeout:  respTimeout,
+		WrpURL:       wrpURL,
+		Requester:    requester,
+		EncodingTool: encoding,
+		Logger:       logger,
+	}
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
-	log            log.Logger
-	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
-	respTimeout    time.Duration
-	wrpURL         string
+	RespTimeout time.Duration
+	WrpURL      string
 	Requester
 	EncodingTool
+	log.Logger
 }
 
 type clientResponse struct {
@@ -68,11 +79,9 @@ func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 	return
 }
 
-//requestArgs = ctx, WRPData[],
-//interface{}
 func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error) {
 	tr1Request := requestArgs[0].(Tr1d1umRequest)
-	newRequest, newRequestErr := tr1.NewHTTPRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
+	newRequest, newRequestErr := http.NewRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
 
 	tr1Response := Tr1d1umResponse{}.New()
 
@@ -103,8 +112,8 @@ func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp in
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
 //based on the responses of a server we have contacted through Send
 func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
-	var errorLogger = logging.Error(tr1.log)
-	var debugLogger = logging.Debug(tr1.log)
+	var errorLogger = logging.Error(tr1)
+	var debugLogger = logging.Debug(tr1)
 
 	if err != nil {
 		ReportError(err, tr1Resp)
@@ -130,18 +139,14 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
 
-	ForwardHeadersByPrefix("X", tr1Resp, respFromServer)
+	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)
 	return
 }
 
 //GetRespTimeout returns the duration the sender should use while waiting
 //for a response from a server
 func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
-	return tr1.respTimeout
-}
-
-func (tr1 *Tr1SendAndHandle) GetWrpURL() string {
-	return tr1.wrpURL
+	return tr1.RespTimeout
 }
 
 //Requester has the main functionality of taking a request, performing such request based on some internal client and

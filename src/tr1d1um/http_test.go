@@ -23,8 +23,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,17 +35,17 @@ const errMsg = "shared failure"
 
 var (
 	payload, body                            = []byte("SomePayload"), bytes.NewBufferString("body")
-	resp                                     = &http.Response{}
+	resp                                     = Tr1d1umResponse{}.New()
 	mockConversion, mockEncoding, mockSender = &MockConversionTool{}, &MockEncodingTool{}, &MockSendAndHandle{}
-	mockRequester                            = &MockRequester{}
-	fakeLogger                               = &LightFakeLogger{}
 	mockRequestValidator                     = &MockRequestValidator{}
+	mockRetryStrategy                        = &MockRetry{}
 	ch                                       = &ConversionHandler{
-		wdmpConvert:      mockConversion,
-		sender:           mockSender,
-		encodingHelper:   mockEncoding,
-		logger:           fakeLogger,
+		WdmpConvert:      mockConversion,
+		Sender:           mockSender,
+		EncodingHelper:   mockEncoding,
+		Logger:           logging.DefaultLogger(),
 		RequestValidator: mockRequestValidator,
+		RetryStrategy:    mockRetryStrategy,
 	}
 )
 
@@ -147,70 +148,74 @@ func TestConversionHandler(t *testing.T) {
 func TestForwardHeadersByPrefix(t *testing.T) {
 	t.Run("NoHeaders", func(t *testing.T) {
 		assert := assert.New(t)
-		origin := httptest.NewRecorder()
 
-		ForwardHeadersByPrefix("H", origin, resp)
-		assert.Empty(origin.Header())
+		to := Tr1d1umResponse{}.New()
+		resp := &http.Response{Header: http.Header{}}
+
+		ForwardHeadersByPrefix("H", resp, to)
+		assert.Empty(to.Headers)
 	})
 
 	t.Run("MultipleHeadersFiltered", func(t *testing.T) {
 		assert := assert.New(t)
-		origin := httptest.NewRecorder()
+		to := Tr1d1umResponse{}.New()
 		resp := &http.Response{Header: http.Header{}}
 
 		resp.Header.Add("Helium", "3")
 		resp.Header.Add("Hydrogen", "5")
 		resp.Header.Add("Hydrogen", "6")
 
-		ForwardHeadersByPrefix("He", origin, resp)
-		assert.NotEmpty(origin.Header())
-		assert.EqualValues(1, len(origin.Header()))
-		assert.EqualValues("3", origin.Header().Get("Helium"))
+		ForwardHeadersByPrefix("He", resp, to)
+		assert.NotEmpty(to.Headers)
+		assert.EqualValues(1, len(to.Headers))
+		assert.EqualValues("3", to.Headers.Get("Helium"))
 	})
 
 	t.Run("MultipleHeadersFilteredFullArray", func(t *testing.T) {
 		assert := assert.New(t)
-		origin := httptest.NewRecorder()
+		to := Tr1d1umResponse{}.New()
 		resp := &http.Response{Header: http.Header{}}
 
 		resp.Header.Add("Helium", "3")
 		resp.Header.Add("Hydrogen", "5")
 		resp.Header.Add("Hydrogen", "6")
 
-		ForwardHeadersByPrefix("H", origin, resp)
-		assert.NotEmpty(origin.Header())
-		assert.EqualValues(2, len(origin.Header()))
-		assert.EqualValues([]string{"5", "6"}, origin.Header()["Hydrogen"])
+		ForwardHeadersByPrefix("H", resp, to)
+		assert.NotEmpty(to.Headers)
+		assert.EqualValues(2, len(to.Headers))
+		assert.EqualValues([]string{"5", "6"}, to.Headers["Hydrogen"])
 	})
 }
 
 func TestHandleStat(t *testing.T) {
-	ch := &ConversionHandler{sender: mockSender, logger: fakeLogger, targetURL: "http://targetURL.com", Requester: mockRequester}
+	ch := &ConversionHandler{
+		Sender:        mockSender,
+		Logger:        logging.DefaultLogger(),
+		TargetURL:     "http://targetURL.com",
+		RetryStrategy: mockRetryStrategy,
+	}
 
 	recorder := httptest.NewRecorder()
-	emptyResponse := &http.Response{}
 
 	req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
+	tr1Resp := Tr1d1umResponse{}.New()
 
-	mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(emptyResponse, nil).Once()
-	mockSender.On("HandleResponse", ch, nil, emptyResponse, recorder, true).Once()
-	mockSender.On("GetRespTimeout").Return(time.Second).Once()
+	mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, nil).Once()
 
 	ch.HandleStat(recorder, req)
-	mockSender.AssertExpectations(t)
-	mockRequester.AssertExpectations(t)
+	mockRetryStrategy.AssertExpectations(t)
 }
 
 func TestIsValidRequest(t *testing.T) {
 	t.Run("NilURLVars", func(t *testing.T) {
 		assert := assert.New(t)
-		TR1RequestValidator := TR1RequestValidator{Logger: fakeLogger}
+		TR1RequestValidator := TR1RequestValidator{Logger: logging.DefaultLogger()}
 		assert.False(TR1RequestValidator.isValidRequest(nil, nil))
 	})
 
 	t.Run("InvalidService", func(t *testing.T) {
 		assert := assert.New(t)
-		TR1RequestValidator := TR1RequestValidator{Logger: fakeLogger}
+		TR1RequestValidator := TR1RequestValidator{Logger: logging.DefaultLogger()}
 		URLVars := map[string]string{"service": "wutService?"}
 		origin := httptest.NewRecorder()
 		assert.False(TR1RequestValidator.isValidRequest(URLVars, origin))
@@ -220,7 +225,7 @@ func TestIsValidRequest(t *testing.T) {
 	t.Run("InvalidDeviceID", func(t *testing.T) {
 		assert := assert.New(t)
 		supportedServices := map[string]struct{}{"goodService": {}}
-		TR1RequestValidator := TR1RequestValidator{Logger: fakeLogger, supportedServices: supportedServices}
+		TR1RequestValidator := TR1RequestValidator{Logger: logging.DefaultLogger(), supportedServices: supportedServices}
 		URLVars := map[string]string{"service": "goodService", "deviceid": "wutDevice?"}
 		origin := httptest.NewRecorder()
 		assert.False(TR1RequestValidator.isValidRequest(URLVars, origin))
@@ -230,7 +235,7 @@ func TestIsValidRequest(t *testing.T) {
 	t.Run("IdealCase", func(t *testing.T) {
 		assert := assert.New(t)
 		supportedServices := map[string]struct{}{"goodService": {}}
-		TR1RequestValidator := TR1RequestValidator{Logger: fakeLogger, supportedServices: supportedServices}
+		TR1RequestValidator := TR1RequestValidator{Logger: logging.DefaultLogger(), supportedServices: supportedServices}
 		URLVars := map[string]string{"service": "goodService", "deviceid": "mac:112233445566"}
 		origin := httptest.NewRecorder()
 		assert.True(TR1RequestValidator.isValidRequest(URLVars, origin))
@@ -241,13 +246,14 @@ func TestIsValidRequest(t *testing.T) {
 // Test Helpers //
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()
-	timeout := time.Nanosecond
 
-	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
-	mockSender.On("Send", ch, recorder, payload, mock.AnythingOfType("*http.Request")).Return(resp, nil).Once()
-	mockSender.On("HandleResponse", ch, nil, resp, recorder, false).Once()
-	mockSender.On("GetRespTimeout").Return(timeout).Once()
+	wrpMsg := &wrp.Message{}
+	payload := []byte("")
 	mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
+	mockEncoding.On("EncodeJSON", encodeArg).Return(payload, nil).Once()
+	mockConversion.On("GetConfiguredWRP", payload, mock.Anything, req.Header).Return(wrpMsg).Once()
+	mockEncoding.On("GenericEncode", mock.Anything, wrp.JSON).Return(payload, nil).Once()
+	mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(resp, nil).Once()
 
 	ch.ServeHTTP(recorder, req)
 }
@@ -257,10 +263,6 @@ func AssertCommonCalls(t *testing.T) {
 	mockEncoding.AssertExpectations(t)
 	mockSender.AssertExpectations(t)
 	mockRequestValidator.AssertExpectations(t)
-}
+	mockRetryStrategy.AssertExpectations(t)
 
-type LightFakeLogger struct{}
-
-func (fake *LightFakeLogger) Log(_ ...interface{}) error {
-	return nil
 }

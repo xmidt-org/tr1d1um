@@ -25,8 +25,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+	"tr1d1um/src/tr1d1um/retryUtilities"
 
-	"./retryUtilities"
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
@@ -44,12 +44,17 @@ import (
 
 //convenient global values
 const (
-	applicationName        = "tr1d1um"
+	applicationName = "tr1d1um"
+	baseURI         = "/api"
+
 	DefaultKeyID           = "current"
-	baseURI                = "/api"
 	defaultClientTimeout   = "30s"
 	defaultRespWaitTimeout = "40s"
-	supportedServicesKey   = "supportedServices"
+	defaultRetryInterval   = "2s"
+	defaultMaxRetries      = 2
+
+	supportedServicesKey = "supportedServices"
+	targetURLKey         = "targetURL"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -59,9 +64,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 		v                  = viper.New()
 		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
-	//timeout defaults: //TODO: maybe this should be a common default among all xmidt/webpa servers
+	// set config file value defaults
 	v.SetDefault("clientTimeout", defaultClientTimeout)
 	v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
+	v.SetDefault("requestRetryInterval", defaultRetryInterval)
+	v.SetDefault("requestMaxRetries", defaultMaxRetries)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
@@ -177,28 +184,22 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 	maxRetries := v.GetInt("requestMaxRetries")
 
 	cHandler = &ConversionHandler{
-		wdmpConvert: &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
-		sender: &Tr1SendAndHandle{
-			log:            logger,
-			NewHTTPRequest: http.NewRequest,
-			respTimeout:    respTimeout,
-			wrpURL:         fmt.Sprintf("%s%s/%s/device", v.GetString("targetURL"), baseURI, v.GetString("version")),
-			Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
-			EncodingTool:   &EncodingHelper{},
-		},
-		encodingHelper: &EncodingHelper{},
-		logger:         logger,
+		WdmpConvert: &ConversionWDMP{
+			encodingHelper: &EncodingHelper{},
+			WRPSource:      v.GetString("WRPSource")},
+		Sender: SendAndHandleFactory{}.New(respTimeout,
+			fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
+			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}}, &EncodingHelper{}, logger),
+		EncodingHelper: &EncodingHelper{},
+		Logger:         logger,
 		RequestValidator: &TR1RequestValidator{
 			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
 			Logger:            logger,
 		},
-		RetryStrategy: &retryUtilities.Retry{
-			Logger:         logger,
-			Interval:       retryInterval,
-			MaxRetries:     maxRetries,
-			ShouldRetry:    ShouldRetryOnResponse,
-			OnInternalFail: OnRetryInternalFailure,
-		},
+		RetryStrategy: retryUtilities.RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
+			ShouldRetryOnResponse, OnRetryInternalFailure),
+		WRPRequestURL: fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
+		TargetURL:     v.GetString(targetURLKey),
 	}
 
 	return

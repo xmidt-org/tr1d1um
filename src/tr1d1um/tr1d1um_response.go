@@ -49,9 +49,9 @@ type Tr1d1umResponse struct {
 	err     error
 }
 
-func (tr1Resp *Tr1d1umResponse) New() *Tr1d1umResponse {
+func (tr1Resp Tr1d1umResponse) New() *Tr1d1umResponse {
 	tr1Resp.Headers, tr1Resp.Body, tr1Resp.Code = http.Header{}, []byte{}, http.StatusOK
-	return tr1Resp
+	return &tr1Resp
 }
 
 //WriteResponse is a tiny helper function that passes responses (In Json format only for now)

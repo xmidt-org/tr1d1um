@@ -17,25 +17,24 @@
 
 package main
 
-import (
-	"bytes"
-	"context"
-	"errors"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"sync"
-	"testing"
-	"time"
+//"bytes"
+//"context"
+//"errors"
+//"io"
+//"io/ioutil"
+//"net/http"
+//"net/http/httptest"
+//"sync"
+//"testing"
+//"time"
+//
+//"github.com/Comcast/webpa-common/wrp"
+//"github.com/gorilla/mux"
+//"github.com/stretchr/testify/assert"
+//"github.com/stretchr/testify/mock"
+//"gopkg.in/h2non/gock.v1"
 
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/gorilla/mux"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"gopkg.in/h2non/gock.v1"
-)
-
+/*
 func TestSend(t *testing.T) {
 	assert := assert.New(t)
 
@@ -316,3 +315,4 @@ func NewTR1() (tr1 *Tr1SendAndHandle) {
 	tr1.NewHTTPRequest = http.NewRequest
 	return tr1
 }
+*/
