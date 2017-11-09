@@ -32,11 +32,10 @@ import (
 
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
 type SendAndHandle interface {
-	ConfigureRequest(context.Context, http.ResponseWriter, []byte) (*http.Request, error)
-	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool, bool) bool
+	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
+	HandleResponse(error, *http.Response, *Tr1d1umResponse, bool)
 	GetRespTimeout() time.Duration
 	GetWrpURL() string
-	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
@@ -69,15 +68,6 @@ func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 	return
 }
 
-//func (tr1 *Tr1SendAndHandle) PrepareWRPMessag//`e
-//Send prepares and subsequently sends a WRP encoded message to a predefined server
-//Its response is then handled in HandleResponse
-//todo: update description
-func (tr1 *Tr1SendAndHandle) ConfigureRequest(ctx context.Context, tr1Response *Tr1d1umResponse, data io.Reader, method, URL string) (request *http.Request, err error) {
-
-	return
-}
-
 //requestArgs = ctx, WRPData[],
 //interface{}
 func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error) {
@@ -90,6 +80,13 @@ func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp in
 		tr1Response.Code = http.StatusInternalServerError
 		err = newRequestErr
 		return
+	}
+
+	//transfer headers to request
+	for headerKey := range tr1Request.headers {
+		for _, headerValue := range tr1Request.headers[headerKey] {
+			newRequest.Header.Add(headerKey, headerValue)
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(tr1Request.ancestorCtx, tr1.GetRespTimeout())
@@ -110,7 +107,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 	var debugLogger = logging.Debug(tr1.log)
 
 	if err != nil {
-		tr1Resp.err = err
+		ReportError(err, tr1Resp)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
@@ -118,6 +115,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 	if respFromServer.StatusCode != http.StatusOK || wholeBody {
 		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
 		tr1Resp.Code = respFromServer.StatusCode
+		ReportError(tr1Resp.err, tr1Resp)
 		debugLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
@@ -128,7 +126,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		}
 		tr1Resp.Body = RDKResponse
 	} else {
-		tr1Resp.err = encodingErr
+		ReportError(err, tr1Resp)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
 
@@ -177,16 +175,4 @@ func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *h
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-}
-
-//forwardInput reads the given input into bytes and writes it to a given response struct
-func forwardInput(tr1Resp *Tr1d1umResponse, input io.Reader) {
-	if tr1Resp != nil && input != nil {
-		if body, readErr := ioutil.ReadAll(input); readErr == nil {
-			tr1Resp.Body = body
-		} else {
-			err = readErr
-		}
-	}
-	return
 }

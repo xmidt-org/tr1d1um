@@ -26,6 +26,7 @@ import (
 	"os"
 	"time"
 
+	"./retryUtilities"
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
@@ -172,19 +173,34 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
 	clientTimeout, _ := time.ParseDuration(v.GetString("clientTimeout"))
 	respTimeout, _ := time.ParseDuration(v.GetString("respWaitTimeout"))
+	retryInterval, _ := time.ParseDuration(v.GetString("requestRetryInterval"))
+	maxRetries := v.GetInt("requestMaxRetries")
 
 	cHandler = &ConversionHandler{
-		Requester:   &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
 		wdmpConvert: &ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: v.GetString("WRPSource")},
-		sender: &Tr1SendAndHandle{log: logger, NewHTTPRequest: http.NewRequest, respTimeout: respTimeout,
-			wrpURL: fmt.Sprintf("%s%s/%s/device", v.GetString("targetURL"), baseURI, v.GetString("version"))},
+		sender: &Tr1SendAndHandle{
+			log:            logger,
+			NewHTTPRequest: http.NewRequest,
+			respTimeout:    respTimeout,
+			wrpURL:         fmt.Sprintf("%s%s/%s/device", v.GetString("targetURL"), baseURI, v.GetString("version")),
+			Requester:      &ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
+			EncodingTool:   &EncodingHelper{},
+		},
 		encodingHelper: &EncodingHelper{},
 		logger:         logger,
 		RequestValidator: &TR1RequestValidator{
 			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
 			Logger:            logger,
 		},
+		RetryStrategy: &retryUtilities.Retry{
+			Logger:     logger,
+			Interval:   retryInterval,
+			MaxRetries: maxRetries,
+			ShouldRetry: ShouldRetryOnResponse,
+			OnInternalFail:OnRetryInternalFailure,
+		},
 	}
+
 	return
 }
 
@@ -264,6 +280,7 @@ func getSupportedServicesMap(supportedServices []string) (supportedServicesMap m
 	}
 	return
 }
+
 
 func main() {
 	os.Exit(tr1d1um(os.Args))

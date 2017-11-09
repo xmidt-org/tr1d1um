@@ -24,10 +24,10 @@ import (
 )
 
 var (
-	invalidMaxRetriesValErr = errors.New("maxRetries should be >= 1")
-	undefinedShouldRetryErr = errors.New("shouldRetry function is required")
-	undefinedLogger = errors.New("logger is undefined")
-	undefinedRetryOp = errors.New("operation to retry is undefined")
+	invalidMaxRetriesValErr = errors.New("retry: MaxRetries should be >= 1")
+	undefinedShouldRetryErr = errors.New("retry: ShouldRetry function is required")
+	undefinedLogger = errors.New("retry: logger is undefined")
+	undefinedRetryOp = errors.New("retry: operation to retry is undefined")
 )
 type RetryStrategy interface {
 	Execute(func(... interface{})(interface{}, error), ... interface{}) (interface{}, error)
@@ -35,13 +35,21 @@ type RetryStrategy interface {
 
 type Retry struct {
 	log.Logger
-	interval time.Duration // time we wait between retries
-	maxRetries int //maximum number of retries
-	shouldRetry func(interface{}, error) bool // provided function to determine whether or not to retry
+	Interval time.Duration // time we wait between retries
+	MaxRetries int //maximum number of retries
+	ShouldRetry func(interface{}, error) bool // provided function to determine whether or not to retry
+	OnInternalFail func() interface{} // provided function to define some result in the case of failure
 }
 
 func (r *Retry) Execute(op func(... interface{}) (interface{}, error), arguments ... interface{}) (result interface{}, err error) {
+	var (
+		//todo: add logs
+		//errorLogger = logging.Error(r.Logger)
+		//debugLogger = logging.Debug(r.Logger)
+	)
+
 	if err = r.checkDependencies(); err != nil {
+		result = r.OnInternalFail()
 		return
 	}
 
@@ -50,23 +58,23 @@ func (r *Retry) Execute(op func(... interface{}) (interface{}, error), arguments
 		return
 	}
 
-	for attempt := 0; attempt < r.maxRetries; attempt++ {
+	for attempt := 0; attempt < r.MaxRetries; attempt++ {
 		result, err = op(arguments...)
-		if !r.shouldRetry(result, err) {
+		if !r.ShouldRetry(result, err) {
 			break
 		}
-		time.Sleep(r.interval)
+		time.Sleep(r.Interval)
 	}
 	return
 }
 
 func (r *Retry) checkDependencies() (err error) {
-	if r.shouldRetry == nil{
+	if r.ShouldRetry == nil{
 		err = undefinedShouldRetryErr
 		return
 	}
 
-	if r.maxRetries < 1 {
+	if r.MaxRetries < 1 {
 		err = invalidMaxRetriesValErr
 		return
 	}

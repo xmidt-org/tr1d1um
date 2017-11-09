@@ -80,7 +80,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	}
 
 	if err != nil {
-		writeResponse(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
 		logging.Error(ch.logger).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
@@ -118,8 +118,8 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
 	tr1Resp, err := ch.Execute(ch.sender.MakeRequest, tr1Request)
-	//todo: tr1Resp contains all the final results we need to write back to our origin
 
+	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
 //HandleStat handles the differentiated STAT command
@@ -137,7 +137,12 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
 	tr1Resp, err := ch.Execute(ch.sender.MakeRequest, tr1Request)
-	//todo:
+
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "")
+	}
+
+	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
 type RequestValidator interface {
@@ -157,14 +162,14 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 	//check request contains a valid service
 	if _, isValid = validator.supportedServices[URLVars["service"]]; !isValid {
-		writeResponse(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), "unsupported service", "service", URLVars["service"])
 		return
 	}
 
 	//check device id
 	if _, err := device.ParseID(URLVars["deviceid"]); err != nil {
-		writeResponse(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), err.Error(), logging.MessageKey(), "Invalid deviceID")
 		return false
 	}
@@ -188,4 +193,30 @@ func ForwardHeadersByPrefix(prefix string, tr1Resp *Tr1d1umResponse, resp *http.
 			}
 		}
 	}
+}
+
+
+//Helper function which determines whether or not to retry sending making another request
+func ShouldRetryOnResponse(tr1Resp interface{}, err error) (retry bool) {
+	tr1Response := tr1Resp.(*Tr1d1umResponse)
+	retry = tr1Response.Code == Tr1StatusTimeout
+	return
+}
+
+func OnRetryInternalFailure() (result interface{}) {
+	tr1Resp := Tr1d1umResponse{}.New()
+	tr1Resp.Code = http.StatusInternalServerError
+	return tr1Resp
+}
+
+//todo
+func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter){
+	// Headers
+
+
+	// Code
+
+
+	// Body
+
 }

@@ -54,16 +54,22 @@ func (tr1Resp *Tr1d1umResponse) New() *Tr1d1umResponse {
 	return tr1Resp
 }
 
-//writeResponse is a tiny helper function that passes responses (In Json format only for now)
+//WriteResponse is a tiny helper function that passes responses (In Json format only for now)
 //to a caller
-func writeResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
+func WriteResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
 	tr1Resp.Headers.Set("Content-Type", wrp.JSON.ContentType())
 	tr1Resp.Code = statusCode
 	tr1Resp.Body = []byte(fmt.Sprintf(`{"message":"%s"}`, message))
 }
 
-//ShouldRetryOnError returns true if the given error is related to some timeout and such error is not being reporting back to
-//some origin. Otherwise, it returns false. Note that such reporting is invoked in this function.
+func WriteResponseWriter(message string, statusCode int, origin http.ResponseWriter) {
+	origin.Header().Set("Content-Type", wrp.JSON.ContentType())
+	origin.WriteHeader(statusCode)
+	origin.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
+}
+
+//ReportError, given that the given error is not nil, checks if the error is related to a timeout. If it is, it marks it as so.
+//Else, it defaults to an InternalError
 func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 	if err == nil {
 		return
@@ -74,7 +80,7 @@ func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 		message, statusCode = "Error Timeout", Tr1StatusTimeout
 	}
 
-	writeResponse(message, statusCode, tr1Resp)
+	WriteResponse(message, statusCode, tr1Resp)
 
 	return
 }
