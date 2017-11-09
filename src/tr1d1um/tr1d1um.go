@@ -193,11 +193,11 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 			Logger:            logger,
 		},
 		RetryStrategy: &retryUtilities.Retry{
-			Logger:     logger,
-			Interval:   retryInterval,
-			MaxRetries: maxRetries,
-			ShouldRetry: ShouldRetryOnResponse,
-			OnInternalFail:OnRetryInternalFailure,
+			Logger:         logger,
+			Interval:       retryInterval,
+			MaxRetries:     maxRetries,
+			ShouldRetry:    ShouldRetryOnResponse,
+			OnInternalFail: OnRetryInternalFailure,
 		},
 	}
 
@@ -280,7 +280,6 @@ func getSupportedServicesMap(supportedServices []string) (supportedServicesMap m
 	}
 	return
 }
-
 
 func main() {
 	os.Exit(tr1d1um(os.Args))

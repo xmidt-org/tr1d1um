@@ -181,23 +181,21 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 //ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
 //into an responseWriter
-func ForwardHeadersByPrefix(prefix string, tr1Resp *Tr1d1umResponse, resp *http.Response) {
+func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *http.Response) {
 	if resp == nil || resp.Header == nil {
 		return
 	}
-
 	for headerKey, headerValues := range resp.Header {
 		if strings.HasPrefix(headerKey, prefix) {
 			for _, headerValue := range headerValues {
-				tr1Resp.Headers.Add(headerKey, headerValue)
+				origin.Header().Add(headerKey, headerValue)
 			}
 		}
 	}
 }
 
-
 //Helper function which determines whether or not to retry sending making another request
-func ShouldRetryOnResponse(tr1Resp interface{}, err error) (retry bool) {
+func ShouldRetryOnResponse(tr1Resp interface{}, _ error) (retry bool) {
 	tr1Response := tr1Resp.(*Tr1d1umResponse)
 	retry = tr1Response.Code == Tr1StatusTimeout
 	return
@@ -209,14 +207,18 @@ func OnRetryInternalFailure() (result interface{}) {
 	return tr1Resp
 }
 
-//todo
-func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter){
+func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 	// Headers
-
+	for headerKey, headerValues := range from.Headers {
+		for _, headerValue := range headerValues {
+			to.Header().Add(headerKey, headerValue)
+		}
+	}
 
 	// Code
-
+	to.WriteHeader(from.Code)
 
 	// Body
+	to.Write(from.Body)
 
 }
