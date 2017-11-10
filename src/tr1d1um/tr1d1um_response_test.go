@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,22 +29,22 @@ func TestWriteResponse(t *testing.T) {
 	assert := assert.New(t)
 
 	myMessage, statusCode, expectedBody := "RespMsg", 200, `{"message":"RespMsg"}`
-	origin := httptest.NewRecorder()
+	origin := Tr1d1umResponse{}.New()
 
-	writeResponse(myMessage, statusCode, origin)
+	WriteResponse(myMessage, statusCode, origin)
 
-	assert.EqualValues(expectedBody, origin.Body.String())
+	assert.EqualValues(expectedBody, string(origin.Body))
 	assert.EqualValues(200, origin.Code)
 }
 
 func TestReportError(t *testing.T) {
 	t.Run("InternalErr", func(t *testing.T) {
 		assert := assert.New(t)
-		origin := httptest.NewRecorder()
+		origin := Tr1d1umResponse{}.New()
 		ReportError(errors.New("internal"), origin)
 
 		assert.EqualValues(http.StatusInternalServerError, origin.Code)
-		assert.EqualValues(`{"message":""}`, origin.Body.String())
+		assert.EqualValues(`{"message":""}`, string(origin.Body))
 	})
 
 	t.Run("TimeoutErr", func(t *testing.T) {
@@ -53,17 +52,17 @@ func TestReportError(t *testing.T) {
 		timeoutErrors := []error{context.Canceled, context.DeadlineExceeded, errors.New("error!: Client.Timeout exceeded")}
 
 		for _, timeoutError := range timeoutErrors {
-			origin := httptest.NewRecorder()
+			origin := Tr1d1umResponse{}.New()
 			ReportError(timeoutError, origin)
 			assert.EqualValues(Tr1StatusTimeout, origin.Code)
-			assert.EqualValues(`{"message":"Error Timeout"}`, origin.Body.String())
+			assert.EqualValues(`{"message":"Error Timeout"}`, string(origin.Body))
 		}
 	})
 
 	t.Run("NilError", func(t *testing.T) {
 		assert := assert.New(t)
 
-		origin := httptest.NewRecorder()
+		origin := Tr1d1umResponse{}.New()
 		ReportError(nil, origin)
 		assert.EqualValues(http.StatusOK, origin.Code) //assert for default value
 	})

@@ -103,14 +103,14 @@ type MockSendAndHandle struct {
 	mock.Mock
 }
 
-func (m *MockSendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWriter, data []byte, req *http.Request) (*http.Response, error) {
-	args := m.Called(ch, origin, data, req)
-	return args.Get(0).(*http.Response), args.Error(1)
+func (m *MockSendAndHandle) MakeRequest(request ...interface{}) (interface{}, error) {
+	args := m.Called(request...)
+	return args.Get(0), args.Error(1)
 }
-func (m *MockSendAndHandle) HandleResponse(ch *ConversionHandler, err error, resp *http.Response, origin http.ResponseWriter,
-	wholeBody bool) {
-	m.Called(ch, err, resp, origin, wholeBody)
+func (m *MockSendAndHandle) HandleResponse(err error, resp *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
+	m.Called(err, resp, tr1Resp, wholeBody)
 }
+
 func (m *MockSendAndHandle) GetRespTimeout() time.Duration {
 	args := m.Called()
 	return args.Get(0).(time.Duration)
@@ -140,4 +140,16 @@ func (m *MockRequestValidator) isValidRequest(reqVars map[string]string, origin 
 func (m *MockRequestValidator) isValidService(service string) bool {
 	args := m.Called(service)
 	return args.Bool(0)
+}
+
+/* Mocks for RetryStrategy */
+// * Mocks for RetryStrategy*//
+
+type MockRetry struct {
+	mock.Mock
+}
+
+func (m *MockRetry) Execute(op func(...interface{}) (interface{}, error), opArgs ...interface{}) (interface{}, error) {
+	args := m.Called(op, opArgs)
+	return args.Get(0), args.Error(1)
 }

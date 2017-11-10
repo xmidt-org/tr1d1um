@@ -19,11 +19,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-
-	"errors"
-
 	"strings"
 
 	"github.com/Comcast/webpa-common/wrp"
@@ -42,16 +40,35 @@ type RDKResponse struct {
 	StatusCode int `json:"statusCode"`
 }
 
-//writeResponse is a tiny helper function that passes responses (In Json format only for now)
-//to a caller
-func writeResponse(message string, statusCode int, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", wrp.JSON.ContentType())
-	w.WriteHeader(statusCode)
-	w.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
+type Tr1d1umResponse struct {
+	Body    []byte
+	Code    int
+	Headers http.Header
+	err     error
 }
 
-//ReportError writes back to the caller responses based on the given error. Error must be non-nil to be reported.
-func ReportError(err error, w http.ResponseWriter) {
+func (tr1Resp Tr1d1umResponse) New() *Tr1d1umResponse {
+	tr1Resp.Headers, tr1Resp.Body, tr1Resp.Code = http.Header{}, []byte{}, http.StatusOK
+	return &tr1Resp
+}
+
+//WriteResponse is a tiny helper function that passes responses (In Json format only for now)
+//to a caller
+func WriteResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
+	tr1Resp.Headers.Set("Content-Type", wrp.JSON.ContentType())
+	tr1Resp.Code = statusCode
+	tr1Resp.Body = []byte(fmt.Sprintf(`{"message":"%s"}`, message))
+}
+
+func WriteResponseWriter(message string, statusCode int, origin http.ResponseWriter) {
+	origin.Header().Set("Content-Type", wrp.JSON.ContentType())
+	origin.WriteHeader(statusCode)
+	origin.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
+}
+
+//ReportError, given that the given error is not nil, checks if the error is related to a timeout. If it is, it marks it as so.
+//Else, it defaults to an InternalError
+func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 	if err == nil {
 		return
 	}
@@ -60,7 +77,10 @@ func ReportError(err error, w http.ResponseWriter) {
 		strings.Contains(err.Error(), "Client.Timeout exceeded") {
 		message, statusCode = "Error Timeout", Tr1StatusTimeout
 	}
-	writeResponse(message, statusCode, w)
+
+	WriteResponse(message, statusCode, tr1Resp)
+
+	return
 }
 
 //GetStatusCodeFromRDKResponse returns the status code given a well-formatted

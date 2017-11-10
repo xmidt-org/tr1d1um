@@ -18,7 +18,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -53,7 +52,6 @@ type ConversionTool interface {
 
 //EncodingTool lays out the definition of methods used for encoding/decoding between WDMP and WRP
 type EncodingTool interface {
-	GenericEncode(interface{}, wrp.Format) ([]byte, error)
 	DecodeJSON(io.Reader, interface{}) error
 	EncodeJSON(interface{}) ([]byte, error)
 	ExtractPayload(io.Reader, wrp.Format) ([]byte, error)
@@ -231,14 +229,6 @@ func (helper *EncodingHelper) ExtractPayload(input io.Reader, format wrp.Format)
 		payload = wrpResponse.Payload
 	}
 
-	return
-}
-
-//GenericEncode wraps a WRP encoder. Using a temporary buffer, simply returns the encoded data and error when applicable
-func (helper *EncodingHelper) GenericEncode(v interface{}, f wrp.Format) (data []byte, err error) {
-	var tmp bytes.Buffer
-	err = wrp.NewEncoder(&tmp, f).Encode(v)
-	data = tmp.Bytes()
 	return
 }
 

@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/gorilla/mux"
@@ -33,26 +32,27 @@ import (
 )
 
 func TestSetUpHandler(t *testing.T) {
-	assert := assert.New(t)
-	v := viper.New()
-	v.Set("targetURL", "https://someCoolURL.com")
-	v.SetDefault("clientTimeout", defaultClientTimeout)
-	v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
-
 	logger := logging.DefaultLogger()
 
-	t.Run("NormalSetUp", func(t *testing.T) {
+	t.Run("CompleteConfigSetUp", func(t *testing.T) {
+		assert := assert.New(t)
+		v := viper.New()
+		v.Set("targetURL", "https://someCoolURL.com")
+		v.SetDefault("clientTimeout", defaultClientTimeout)
+		v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
 		actualHandler := SetUpHandler(v, logger)
-		AssertCommon(actualHandler, v, assert)
+
+		AssertCommon(actualHandler, assert)
 	})
 
-	t.Run("IncompleteConfig", func(t *testing.T) {
-		actualHandler := SetUpHandler(v, logger)
-		realSender := actualHandler.sender.(*Tr1SendAndHandle)
+	t.Run("IncompleteConfigSetup", func(t *testing.T) {
+		assert := assert.New(t)
+		v := viper.New()
+		v.Set("targetURL", "https://someCoolURL.com")
 
-		//turn to default values
-		assert.EqualValues(time.Second*40, realSender.respTimeout)
-		AssertCommon(actualHandler, v, assert)
+		actualHandler := SetUpHandler(v, logger)
+
+		AssertCommon(actualHandler, assert)
 	})
 }
 
@@ -138,17 +138,15 @@ func AssertConfiguredRoutes(r *mux.Router, t *testing.T, testCases []RouteTestBu
 	}
 }
 
-func AssertCommon(actualHandler *ConversionHandler, v *viper.Viper, assert *assert.Assertions) {
-	assert.NotNil(actualHandler.wdmpConvert)
-	assert.NotNil(actualHandler.encodingHelper)
-	assert.NotNil(actualHandler.logger)
-	assert.EqualValues(v.Get("targetURL"), actualHandler.targetURL)
-	assert.NotNil(actualHandler.sender)
-
-	realizedSender := actualHandler.sender.(*Tr1SendAndHandle)
-
-	//assert necessary inner methods are set in the method under test
-	assert.NotNil(realizedSender.NewHTTPRequest)
+func AssertCommon(actualHandler *ConversionHandler, assert *assert.Assertions) {
+	assert.NotEmpty(actualHandler.TargetURL)
+	assert.NotEmpty(actualHandler.WRPRequestURL)
+	assert.NotNil(actualHandler.WdmpConvert)
+	assert.NotNil(actualHandler.Sender)
+	assert.NotNil(actualHandler.EncodingHelper)
+	assert.NotNil(actualHandler.RequestValidator)
+	assert.NotNil(actualHandler.RetryStrategy)
+	assert.NotNil(actualHandler.Logger)
 }
 
 type RouteTestBundle struct {

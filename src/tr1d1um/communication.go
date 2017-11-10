@@ -19,6 +19,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -27,21 +28,33 @@ import (
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
-	"github.com/gorilla/mux"
 )
 
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
 type SendAndHandle interface {
-	Send(*ConversionHandler, http.ResponseWriter, []byte, *http.Request) (*http.Response, error)
-	HandleResponse(*ConversionHandler, error, *http.Response, http.ResponseWriter, bool)
+	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
+	HandleResponse(error, *http.Response, *Tr1d1umResponse, bool)
 	GetRespTimeout() time.Duration
+}
+
+type SendAndHandleFactory struct{}
+
+func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string, requester Requester, encoding EncodingTool,
+	logger log.Logger) SendAndHandle {
+	return &Tr1SendAndHandle{
+		RespTimeout:  respTimeout,
+		Requester:    requester,
+		EncodingTool: encoding,
+		Logger:       logger,
+	}
 }
 
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
-	log            log.Logger
-	NewHTTPRequest func(string, string, io.Reader) (*http.Request, error)
-	respTimeout    time.Duration
+	RespTimeout time.Duration
+	Requester
+	EncodingTool
+	log.Logger
 }
 
 type clientResponse struct {
@@ -49,86 +62,86 @@ type clientResponse struct {
 	err  error
 }
 
-//Send prepares and subsequently sends a WRP encoded message to a predefined server
-//Its response is then handled in HandleResponse
-func (tr1 *Tr1SendAndHandle) Send(ch *ConversionHandler, origin http.ResponseWriter, data []byte, req *http.Request) (respFromServer *http.Response, err error) {
-	var errorLogger = logging.Error(tr1.log)
-	wrpMsg := ch.wdmpConvert.GetConfiguredWRP(data, mux.Vars(req), req.Header)
+type Tr1d1umRequest struct {
+	ancestorCtx context.Context
+	method      string
+	URL         string
+	body        []byte
+	headers     http.Header
+}
 
-	//Forward transaction id being used in Request
-	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
-
-	wrpPayload, err := ch.encodingHelper.GenericEncode(wrpMsg, wrp.JSON)
-
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
-		return
+func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
+	if tr1Req != nil && tr1Req.body != nil {
+		body = bytes.NewBuffer(tr1Req.body)
 	}
-
-	fullPath := ch.targetURL + baseURI + "/" + ch.serverVersion + "/device"
-	requestToServer, err := tr1.NewHTTPRequest(http.MethodPost, fullPath, bytes.NewBuffer(wrpPayload))
-
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
-		return
-	}
-
-	requestToServer.Header.Set("Content-Type", wrp.JSON.ContentType())
-	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-
-	respFromServer, err = ch.PerformRequest(requestToServer.WithContext(req.Context())) //keep ancestor's context
 	return
+}
+
+func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{}, error) {
+	tr1Request := requestArgs[0].(Tr1d1umRequest)
+	newRequest, newRequestErr := http.NewRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
+	tr1Response := Tr1d1umResponse{}.New()
+
+	if newRequestErr != nil {
+		tr1Response.Code = http.StatusInternalServerError
+		return tr1Response, newRequestErr
+	}
+
+	//transfer headers to request
+	for headerKey := range tr1Request.headers {
+		for _, headerValue := range tr1Request.headers[headerKey] {
+			newRequest.Header.Add(headerKey, headerValue)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(tr1Request.ancestorCtx, tr1.GetRespTimeout())
+	defer cancel()
+
+	newRequest = newRequest.WithContext(ctx)
+
+	httpResp, responseErr := tr1.PerformRequest(newRequest)
+	tr1.HandleResponse(responseErr, httpResp, tr1Response, tr1Request.method == http.MethodGet)
+	return tr1Response, responseErr
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
 //based on the responses of a server we have contacted through Send
-func (tr1 *Tr1SendAndHandle) HandleResponse(ch *ConversionHandler, err error, respFromServer *http.Response, origin http.ResponseWriter,
-	wholeBody bool) {
-	var errorLogger = logging.Error(tr1.log)
-
-	ForwardHeadersByPrefix("X", origin, respFromServer)
+func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
+	var errorLogger = logging.Error(tr1)
+	var debugLogger = logging.Debug(tr1)
 
 	if err != nil {
-		ReportError(err, origin)
+		ReportError(err, tr1Resp)
 		errorLogger.Log(logging.ErrorKey(), err)
 		return
 	}
 
-	if respFromServer.StatusCode != http.StatusOK {
-		var bodyResp []byte
-		if responseBody, err := ioutil.ReadAll(respFromServer.Body); err == nil {
-			bodyResp = responseBody
-		}
-
-		origin.WriteHeader(respFromServer.StatusCode)
-		origin.Write(bodyResp)
-		errorLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
+	if respFromServer.StatusCode != http.StatusOK || wholeBody {
+		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
+		tr1Resp.Code = respFromServer.StatusCode
+		ReportError(tr1Resp.err, tr1Resp)
+		debugLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
 
-	if wholeBody { // Do not attempt extracting payload, forward whole body
-		err = forwardInput(origin, respFromServer.Body)
-		ReportError(err, origin)
-		return
-	}
-
-	if RDKResponse, err := ch.encodingHelper.ExtractPayload(respFromServer.Body, wrp.JSON); err == nil {
-		if RDKRespCode, err := GetStatusCodeFromRDKResponse(RDKResponse); err == nil && RDKRespCode != http.StatusInternalServerError {
-			origin.WriteHeader(RDKRespCode)
+	if RDKResponse, encodingErr := tr1.ExtractPayload(respFromServer.Body, wrp.JSON); encodingErr == nil {
+		if RDKRespCode, RDKErr := GetStatusCodeFromRDKResponse(RDKResponse); RDKErr == nil && RDKRespCode != http.StatusInternalServerError {
+			tr1Resp.Code = RDKRespCode
 		}
-		origin.Write(RDKResponse)
+		tr1Resp.Body = RDKResponse
 	} else {
-		ReportError(err, origin)
+		ReportError(encodingErr, tr1Resp)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
+
+	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)
+	return
 }
 
 //GetRespTimeout returns the duration the sender should use while waiting
 //for a response from a server
 func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
-	return tr1.respTimeout
+	return tr1.RespTimeout
 }
 
 //Requester has the main functionality of taking a request, performing such request based on some internal client and
@@ -162,16 +175,4 @@ func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *h
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-}
-
-//forwardInput reads the given input into bytes and writes it to a given response writer
-func forwardInput(origin http.ResponseWriter, input io.Reader) (err error) {
-	if origin != nil && input != nil {
-		if body, readErr := ioutil.ReadAll(input); readErr == nil {
-			origin.Write(body)
-		} else {
-			err = readErr
-		}
-	}
-	return
 }

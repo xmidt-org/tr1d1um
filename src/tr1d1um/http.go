@@ -18,32 +18,38 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
 type ConversionHandler struct {
-	logger         log.Logger
-	targetURL      string
-	serverVersion  string
-	wdmpConvert    ConversionTool
-	sender         SendAndHandle
-	encodingHelper EncodingTool
-	Requester
+	TargetURL      string
+	WRPRequestURL  string
+	WdmpConvert    ConversionTool
+	Sender         SendAndHandle
+	EncodingHelper EncodingTool
 	RequestValidator
+	RetryStrategy
+	log.Logger
 }
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
-	logging.Debug(ch.logger).Log(logging.MessageKey(), "ServeHTTP called")
+	var (
+		debugLogger = logging.Debug(ch)
+		errorLogger = logging.Error(ch)
+	)
+
+	debugLogger.Log(logging.MessageKey(), "ServeHTTP called")
 
 	var (
 		err     error
@@ -57,72 +63,95 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	switch req.Method {
 	case http.MethodGet:
-		wdmp, err = ch.wdmpConvert.GetFlavorFormat(req, urlVars, "attributes", "names", ",")
+		wdmp, err = ch.WdmpConvert.GetFlavorFormat(req, urlVars, "attributes", "names", ",")
 		break
 
 	case http.MethodPatch:
-		wdmp, err = ch.wdmpConvert.SetFlavorFormat(req)
+		wdmp, err = ch.WdmpConvert.SetFlavorFormat(req)
 		break
 
 	case http.MethodDelete:
-		wdmp, err = ch.wdmpConvert.DeleteFlavorFormat(urlVars, "parameter")
+		wdmp, err = ch.WdmpConvert.DeleteFlavorFormat(urlVars, "parameter")
 		break
 
 	case http.MethodPut:
-		wdmp, err = ch.wdmpConvert.ReplaceFlavorFormat(req.Body, urlVars, "parameter")
+		wdmp, err = ch.WdmpConvert.ReplaceFlavorFormat(req.Body, urlVars, "parameter")
 		break
 
 	case http.MethodPost:
-		wdmp, err = ch.wdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
+		wdmp, err = ch.WdmpConvert.AddFlavorFormat(req.Body, urlVars, "parameter")
 		break
 	}
 
 	if err != nil {
-		writeResponse(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
-		logging.Error(ch.logger).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
+		WriteResponseWriter(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
+		logging.Error(ch).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
 
-	wdmpPayload, err := ch.encodingHelper.EncodeJSON(wdmp)
+	wdmpPayload, err := ch.EncodingHelper.EncodeJSON(wdmp)
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
-		logging.Error(ch.logger).Log(logging.ErrorKey(), err.Error())
+		logging.Error(ch).Log(logging.ErrorKey(), err.Error())
 		return
 	}
 
-	//set timeout for response waiting
-	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	defer cancel()
+	wrpMsg := ch.WdmpConvert.GetConfiguredWRP(wdmpPayload, urlVars, req.Header)
 
-	response, err := ch.sender.Send(ch, origin, wdmpPayload, req.WithContext(ctx))
-	ch.sender.HandleResponse(ch, err, response, origin, false)
+	//Forward transaction id being used in Request
+	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
+
+	var wrpPayloadBuffer bytes.Buffer
+	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.JSON).Encode(wrpMsg)
+
+	if err != nil {
+		origin.WriteHeader(http.StatusInternalServerError)
+		logging.Error(ch).Log(logging.ErrorKey(), err)
+		return
+	}
+
+	tr1Request := Tr1d1umRequest{
+		ancestorCtx: req.Context(),
+		method:      http.MethodPost,
+		URL:         ch.WRPRequestURL,
+		headers:     http.Header{},
+		body:        wrpPayloadBuffer.Bytes(),
+	}
+	//
+	tr1Request.headers.Set("Content-Type", wrp.JSON.ContentType())
+	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
+
+	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
+
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
+	}
+
+	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
 //HandleStat handles the differentiated STAT command
 func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Request) {
-	logging.Debug(ch.logger).Log(logging.MessageKey(), "HandleStat called")
-	var errorLogger = logging.Error(ch.logger)
+	logging.Debug(ch).Log(logging.MessageKey(), "HandleStat called")
+	var errorLogger = logging.Error(ch)
 
-	ctx, cancel := context.WithTimeout(req.Context(), ch.sender.GetRespTimeout())
-	defer cancel()
-
-	fullPath := ch.targetURL + req.URL.RequestURI()
-	requestToServer, err := http.NewRequest(http.MethodGet, fullPath, nil)
-
-	if err != nil {
-		origin.WriteHeader(http.StatusInternalServerError)
-		errorLogger.Log(logging.ErrorKey(), err)
-		return
+	tr1Request := Tr1d1umRequest{
+		ancestorCtx: req.Context(),
+		method:      http.MethodGet,
+		URL:         ch.TargetURL + req.URL.RequestURI(),
+		headers:     http.Header{},
 	}
 
-	requestToServer.Header.Set("Authorization", req.Header.Get("Authorization"))
-	requestWithContext := requestToServer.WithContext(ctx)
+	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
-	response, err := ch.PerformRequest(requestWithContext)
+	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
 
-	origin.Header().Set("Content-Type", "application/json")
-	ch.sender.HandleResponse(ch, err, response, origin, true)
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
+	}
+
+	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
 type RequestValidator interface {
@@ -142,14 +171,14 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 	//check request contains a valid service
 	if _, isValid = validator.supportedServices[URLVars["service"]]; !isValid {
-		writeResponse(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Unsupported Service: %s", URLVars["service"]), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), "unsupported service", "service", URLVars["service"])
 		return
 	}
 
 	//check device id
 	if _, err := device.ParseID(URLVars["deviceid"]); err != nil {
-		writeResponse(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), err.Error(), logging.MessageKey(), "Invalid deviceID")
 		return false
 	}
@@ -161,16 +190,44 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 //ForwardHeadersByPrefix forwards header values whose keys start with the given prefix from some response
 //into an responseWriter
-func ForwardHeadersByPrefix(prefix string, origin http.ResponseWriter, resp *http.Response) {
-	if resp == nil || resp.Header == nil {
+func ForwardHeadersByPrefix(prefix string, from *http.Response, to *Tr1d1umResponse) {
+	if from == nil || from.Header == nil || to == nil || to.Headers == nil {
 		return
 	}
-
-	for headerKey, headerValues := range resp.Header {
+	for headerKey, headerValues := range from.Header {
 		if strings.HasPrefix(headerKey, prefix) {
 			for _, headerValue := range headerValues {
-				origin.Header().Add(headerKey, headerValue)
+				to.Headers.Add(headerKey, headerValue)
 			}
 		}
 	}
+}
+
+//Helper function which determines whether or not to retry sending making another request
+func ShouldRetryOnResponse(tr1Resp interface{}, _ error) (retry bool) {
+	tr1Response := tr1Resp.(*Tr1d1umResponse)
+	retry = tr1Response.Code == Tr1StatusTimeout
+	return
+}
+
+func OnRetryInternalFailure() (result interface{}) {
+	tr1Resp := Tr1d1umResponse{}.New()
+	tr1Resp.Code = http.StatusInternalServerError
+	return tr1Resp
+}
+
+func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
+	// Headers
+	for headerKey, headerValues := range from.Headers {
+		for _, headerValue := range headerValues {
+			to.Header().Add(headerKey, headerValue)
+		}
+	}
+
+	// Code
+	to.WriteHeader(from.Code)
+
+	// Body
+	to.Write(from.Body)
+
 }
