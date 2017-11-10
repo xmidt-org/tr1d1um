@@ -18,17 +18,16 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
-	"tr1d1um/src/tr1d1um/retryUtilities"
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"bytes"
 )
 
 //ConversionHandler wraps the main WDMP -> WRP conversion method
@@ -39,7 +38,7 @@ type ConversionHandler struct {
 	Sender         SendAndHandle
 	EncodingHelper EncodingTool
 	RequestValidator
-	retryUtilities.RetryStrategy
+	RetryStrategy
 	log.Logger
 }
 

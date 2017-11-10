@@ -157,7 +157,7 @@ func TestConversionHandler(t *testing.T) {
 		mockRequestValidator.On("isValidRequest", mock.Anything, mock.Anything).Return(true).Once()
 		mockEncoding.On("EncodeJSON", wdmpDel).Return(payload, nil).Once()
 		mockConversion.On("GetConfiguredWRP", payload, mock.Anything, commonRequest.Header).Return(wrpMsg).Once()
-		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(resp, errors.New("some internal " +
+		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(resp, errors.New("some internal "+
 			"error")).Once()
 
 		ch.ServeHTTP(recorder, commonRequest)
@@ -240,7 +240,7 @@ func TestHandleStat(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://ThisMachineURL.com", nil)
 		tr1Resp := Tr1d1umResponse{}.New()
 
-		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, errors.New("internal" +
+		mockRetryStrategy.On("Execute", mock.Anything, mock.Anything).Return(tr1Resp, errors.New("internal"+
 			" error")).Once()
 
 		ch.HandleStat(recorder, req)

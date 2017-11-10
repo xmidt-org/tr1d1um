@@ -25,7 +25,6 @@ import (
 	"net/url"
 	"os"
 	"time"
-	"tr1d1um/src/tr1d1um/retryUtilities"
 
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
@@ -196,7 +195,7 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
 			Logger:            logger,
 		},
-		RetryStrategy: retryUtilities.RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
+		RetryStrategy: RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
 			ShouldRetryOnResponse, OnRetryInternalFailure),
 		WRPRequestURL: fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
 		TargetURL:     v.GetString(targetURLKey),

@@ -19,11 +19,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-
-	"errors"
-
 	"strings"
 
 	"github.com/Comcast/webpa-common/wrp"

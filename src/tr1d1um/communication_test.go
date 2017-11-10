@@ -17,150 +17,111 @@
 
 package main
 
-//"bytes"
-//"context"
-//"errors"
-//"io"
-//"io/ioutil"
-//"net/http"
-//"net/http/httptest"
-//"sync"
-//"testing"
-//"time"
-//
-//"github.com/Comcast/webpa-common/wrp"
-//"github.com/gorilla/mux"
-//"github.com/stretchr/testify/assert"
-//"github.com/stretchr/testify/mock"
-//"gopkg.in/h2non/gock.v1"
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
 
-/*
-func TestSend(t *testing.T) {
-	assert := assert.New(t)
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"gopkg.in/h2non/gock.v1"
+)
 
-	data := []byte("data")
-	tid := "someTID"
-	WRPMsg := &wrp.Message{TransactionUUID: tid}
+var (
+	mockRequester = &MockRequester{}
+)
 
-	WRPPayload := []byte("payload")
+func TestMakeRequest(t *testing.T) {
 	validURL := "http://someValidURL.com"
 
-	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion, targetURL: validURL,
-		Requester: mockRequester, serverVersion: "v2"}
+	t.Run("BadNewRequest", func(t *testing.T) {
+		assert := assert.New(t)
+		tr1Req := Tr1d1umRequest{
+			ancestorCtx: context.TODO(),
+			method:      "字", //make http.NewRequest fail with this awesome Chinese character.
+			URL:         validURL,
+			headers:     http.Header{},
+			body:        []byte("d"),
+		}
 
-	t.Run("SendEncodeErr", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
-		var URLVars Vars = mux.Vars(req)
-		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, errors.New(errMsg)).Once()
-
-		origin := httptest.NewRecorder()
 		tr1 := NewTR1()
-		_, err := tr1.Send(ch, origin, data, req)
+
+		resp, err := tr1.MakeRequest(tr1Req)
+		assert.NotNil(resp)
+
+		tr1Resp := resp.(*Tr1d1umResponse)
 
 		assert.NotNil(err)
-		assert.EqualValues(http.StatusInternalServerError, origin.Code)
-		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
-		mockConversion.AssertExpectations(t)
-		mockEncoding.AssertExpectations(t)
+		assert.EqualValues(http.StatusInternalServerError, tr1Resp.Code)
 	})
 
-	t.Run("SendNewRequestErr", func(t *testing.T) {
-		tr1 := NewTR1()
-		tr1.NewHTTPRequest = NewHTTPRequestFail
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
-
-		var URLVars Vars = mux.Vars(req)
-		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-
-		origin := httptest.NewRecorder()
-		_, err := tr1.Send(ch, origin, data, req)
-
-		assert.NotNil(err)
-		assert.EqualValues(http.StatusInternalServerError, origin.Code)
-		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
-		mockConversion.AssertExpectations(t)
-		mockEncoding.AssertExpectations(t)
-
-	})
-
-	t.Run("SendIdeal", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
-
-		var URLVars Vars = mux.Vars(req)
-		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-		mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			StatusCode: http.StatusOK}, nil).Once()
+	t.Run("InternalError", func(t *testing.T) {
+		assert := assert.New(t)
+		tr1Req := Tr1d1umRequest{
+			ancestorCtx: context.TODO(),
+			method:      "GET",
+			URL:         validURL,
+			headers:     http.Header{"key": []string{"value"}},
+		}
 
 		tr1 := NewTR1()
-		origin := httptest.NewRecorder()
-		resp, err := tr1.Send(ch, origin, data, req)
 
-		assert.Nil(err)
-		assert.EqualValues(http.StatusOK, resp.StatusCode)
-		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
-		mockConversion.AssertExpectations(t)
-		mockEncoding.AssertExpectations(t)
-		mockRequester.AssertExpectations(t)
-	})
+		someErr := errors.New("something went wrong")
+		mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(&http.Response{},
+			someErr).Once()
 
-	t.Run("SendTimeout", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, validURL, nil)
+		resp, err := tr1.MakeRequest(tr1Req)
+		assert.NotNil(resp)
 
-		var URLVars Vars = mux.Vars(req)
-		mockConversion.On("GetConfiguredWRP", data, URLVars, req.Header).Return(WRPMsg).Once()
-		mockEncoding.On("GenericEncode", WRPMsg, wrp.JSON).Return(WRPPayload, nil).Once()
-		mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, context.DeadlineExceeded).Once()
+		tr1Resp := resp.(*Tr1d1umResponse)
 
-		tr1 := NewTR1()
-		origin := httptest.NewRecorder()
-		_, err := tr1.Send(ch, origin, data, req)
+		assert.EqualValues(someErr, err)
+		assert.EqualValues(http.StatusInternalServerError, tr1Resp.Code)
 
-		assert.EqualValues(context.DeadlineExceeded, err)
-		assert.EqualValues(tid, origin.Header().Get(HeaderWPATID))
-		mockConversion.AssertExpectations(t)
-		mockEncoding.AssertExpectations(t)
 		mockRequester.AssertExpectations(t)
 	})
 }
 
 func TestHandleResponse(t *testing.T) {
 	assert := assert.New(t)
-	tr1 := &Tr1SendAndHandle{log: &LightFakeLogger{}}
-	tr1.NewHTTPRequest = http.NewRequest
-
-	ch := &ConversionHandler{encodingHelper: mockEncoding, wdmpConvert: mockConversion}
+	tr1 := NewTR1()
 
 	t.Run("IncomingTimeoutErr", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(nil, context.DeadlineExceeded, nil, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(context.DeadlineExceeded, nil, recorder, false)
 		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
 	})
 
 	t.Run("IncomingErr", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(nil, errors.New(errMsg), nil, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(errors.New(errMsg), nil, recorder, false)
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 	})
 
 	t.Run("StatusNotOK", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
+		recorder := Tr1d1umResponse{}.New()
 		var mockBody bytes.Buffer
 		mockBody.WriteString("expectMe")
 		fakeResponse := &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(&mockBody)}
-		tr1.HandleResponse(nil, nil, fakeResponse, recorder, false, true)
+
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
-		assert.EqualValues("expectMe", recorder.Body.String())
+		assert.EqualValues("expectMe", string(recorder.Body))
 	})
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
 			errors.New(errMsg)).Once()
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 		mockEncoding.AssertExpectations(t)
@@ -170,8 +131,8 @@ func TestHandleResponse(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
 			context.Canceled).Once()
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
 		mockEncoding.AssertExpectations(t)
@@ -184,11 +145,11 @@ func TestHandleResponse(t *testing.T) {
 
 		fakeResponse := &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(&fakeBody)}
 
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, true, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(nil, fakeResponse, recorder, true)
 
 		assert.EqualValues(http.StatusOK, recorder.Code)
-		assert.EqualValues(bodyString, recorder.Body.String())
+		assert.EqualValues(bodyString, string(recorder.Body))
 		mockEncoding.AssertNotCalled(t, "ExtractPayload", fakeResponse.Body, wrp.JSON)
 	})
 
@@ -197,11 +158,11 @@ func TestHandleResponse(t *testing.T) {
 		extractedData := []byte(`{"statusCode": 202}`)
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(202, recorder.Code)
-		assert.EqualValues(extractedData, recorder.Body.Bytes())
+		assert.EqualValues(extractedData, string(recorder.Body))
 		mockEncoding.AssertExpectations(t)
 	})
 
@@ -210,11 +171,11 @@ func TestHandleResponse(t *testing.T) {
 		extractedData := []byte(`{"statusCode": 500}`)
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
-		recorder := httptest.NewRecorder()
-		tr1.HandleResponse(ch, nil, fakeResponse, recorder, false, true)
+		recorder := Tr1d1umResponse{}.New()
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(http.StatusOK, recorder.Code) // reflect transaction instead of device status
-		assert.EqualValues(extractedData, recorder.Body.Bytes())
+		assert.EqualValues(extractedData, string(recorder.Body))
 		mockEncoding.AssertExpectations(t)
 	})
 
@@ -275,44 +236,12 @@ func TestPerformRequest(t *testing.T) {
 	})
 }
 
-func TestForwardInput(t *testing.T) {
-
-	t.Run("NilCases", func(t *testing.T) {
-		assert := assert.New(t)
-		recorder := httptest.NewRecorder()
-
-		forwardInput(recorder, nil)
-		assert.Empty(recorder.Body.Bytes())
-
-		forwardInput(nil, nil)
-		assert.Empty(recorder.Body.Bytes())
-	})
-
-	t.Run("NormalInput", func(t *testing.T) {
-		assert := assert.New(t)
-
-		var buf bytes.Buffer
-		buf.WriteString("{")
-
-		recorder := httptest.NewRecorder()
-
-		forwardInput(recorder, &buf)
-		assert.EqualValues([]byte("{"), recorder.Body.Bytes())
-	})
-}
-
-func TestGetRespTimeout(t *testing.T) {
-	assert := assert.New(t)
-	tr1 := &Tr1SendAndHandle{respTimeout: time.Second * 3}
-	assert.EqualValues(time.Second*3, tr1.GetRespTimeout())
-}
-func NewHTTPRequestFail(_, _ string, _ io.Reader) (*http.Request, error) {
-	return nil, errors.New(errMsg)
-}
-
 func NewTR1() (tr1 *Tr1SendAndHandle) {
-	tr1 = &Tr1SendAndHandle{log: &LightFakeLogger{}}
-	tr1.NewHTTPRequest = http.NewRequest
+	tr1 = &Tr1SendAndHandle{
+		Logger:       logging.DefaultLogger(),
+		Requester:    mockRequester,
+		EncodingTool: mockEncoding,
+		RespTimeout:  time.Minute,
+	}
 	return tr1
 }
-*/

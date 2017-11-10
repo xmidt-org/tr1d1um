@@ -43,7 +43,6 @@ func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string
 	logger log.Logger) SendAndHandle {
 	return &Tr1SendAndHandle{
 		RespTimeout:  respTimeout,
-		WrpURL:       wrpURL,
 		Requester:    requester,
 		EncodingTool: encoding,
 		Logger:       logger,
@@ -53,7 +52,6 @@ func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string
 //Tr1SendAndHandle implements the behaviors of SendAndHandle
 type Tr1SendAndHandle struct {
 	RespTimeout time.Duration
-	WrpURL      string
 	Requester
 	EncodingTool
 	log.Logger
@@ -79,16 +77,14 @@ func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 	return
 }
 
-func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error) {
+func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{}, error) {
 	tr1Request := requestArgs[0].(Tr1d1umRequest)
 	newRequest, newRequestErr := http.NewRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
-
 	tr1Response := Tr1d1umResponse{}.New()
 
 	if newRequestErr != nil {
 		tr1Response.Code = http.StatusInternalServerError
-		err = newRequestErr
-		return
+		return tr1Response, newRequestErr
 	}
 
 	//transfer headers to request
@@ -103,10 +99,9 @@ func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (tr1Resp in
 
 	newRequest = newRequest.WithContext(ctx)
 
-	httpResp, err := tr1.PerformRequest(newRequest)
-	tr1.HandleResponse(err, httpResp, tr1Response, tr1Request.method == http.MethodGet)
-	tr1Resp = tr1Response
-	return
+	httpResp, responseErr := tr1.PerformRequest(newRequest)
+	tr1.HandleResponse(responseErr, httpResp, tr1Response, tr1Request.method == http.MethodGet)
+	return tr1Response, responseErr
 }
 
 //HandleResponse contains the instructions of what to write back to the original requester (origin)
@@ -135,7 +130,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		}
 		tr1Resp.Body = RDKResponse
 	} else {
-		ReportError(err, tr1Resp)
+		ReportError(encodingErr, tr1Resp)
 		errorLogger.Log(logging.ErrorKey(), err)
 	}
 

@@ -15,7 +15,7 @@
  *
  */
 
-package retryUtilities
+package main
 
 import (
 	"errors"
@@ -64,18 +64,18 @@ func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments 
 		debugLogger = logging.Debug(r.Logger)
 	)
 
-	if op == nil {
-		result, err = r.OnInternalFail(), undefinedRetryOp
-		return
-	}
-
 	if err = r.checkDependencies(); err != nil {
 		result = r.OnInternalFail()
 		return
 	}
 
+	if op == nil {
+		result, err = r.OnInternalFail(), undefinedRetryOp
+		return
+	}
+
 	for attempt := 0; attempt < r.MaxRetries; attempt++ {
-		debugLogger.Log(logging.MessageKey(), "Attempting request", "attempt", attempt)
+		debugLogger.Log(logging.MessageKey(), "Attempting operation", "attempt", attempt)
 
 		result, err = op(arguments...)
 		if !r.ShouldRetry(result, err) {
