@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,14 +47,20 @@ const (
 	applicationName = "tr1d1um"
 	baseURI         = "/api"
 
-	DefaultKeyID           = "current"
-	defaultClientTimeout   = "30s"
-	defaultRespWaitTimeout = "40s"
-	defaultRetryInterval   = "2s"
-	defaultMaxRetries      = 2
+	DefaultKeyID            = "current"
+	defaultClientTimeout    = "30s"
+	defaultRespWaitTimeout  = "40s"
+	defaultNetDialerTimeout = "5s"
+	defaultRetryInterval    = "2s"
+	defaultMaxRetries       = 2
 
 	supportedServicesKey = "supportedServices"
 	targetURLKey         = "targetURL"
+	netDialerTimeoutKey  = "netDialerTimeout"
+	clientTimeoutKey     = "clientTimeout"
+	reqRetryIntervalKey  = "requestRetryInterval"
+	reqMaxRetriesKey     = "requestMaxRetries"
+	respWaitTimeoutKey   = "respWaitTimeout"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -64,10 +71,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
 	// set config file value defaults
-	v.SetDefault("clientTimeout", defaultClientTimeout)
-	v.SetDefault("respWaitTimeout", defaultRespWaitTimeout)
-	v.SetDefault("requestRetryInterval", defaultRetryInterval)
-	v.SetDefault("requestMaxRetries", defaultMaxRetries)
+	v.SetDefault(clientTimeoutKey, defaultClientTimeout)
+	v.SetDefault(respWaitTimeoutKey, defaultRespWaitTimeout)
+	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
+	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
+	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
@@ -177,19 +185,23 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 
 //SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
 func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
-	clientTimeout, _ := time.ParseDuration(v.GetString("clientTimeout"))
-	respTimeout, _ := time.ParseDuration(v.GetString("respWaitTimeout"))
-	retryInterval, _ := time.ParseDuration(v.GetString("requestRetryInterval"))
-	maxRetries := v.GetInt("requestMaxRetries")
+	clientTimeout, _ := time.ParseDuration(v.GetString(clientTimeoutKey))
+	respTimeout, _ := time.ParseDuration(v.GetString(respWaitTimeoutKey))
+	retryInterval, _ := time.ParseDuration(v.GetString(reqRetryIntervalKey))
+	dialerTimeout, _ := time.ParseDuration(v.GetString(netDialerTimeoutKey))
+	maxRetries := v.GetInt(reqMaxRetriesKey)
 
 	cHandler = &ConversionHandler{
 		WdmpConvert: &ConversionWDMP{
 			encodingHelper: &EncodingHelper{},
 			WRPSource:      v.GetString("WRPSource")},
 		Sender: SendAndHandleFactory{}.New(respTimeout,
-			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
-			&EncodingHelper{},
-			logger),
+			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout,
+				Transport: &http.Transport{
+					Dial: (&net.Dialer{
+						Timeout: dialerTimeout,
+					}).Dial}},
+			}, &EncodingHelper{}, logger),
 		EncodingHelper: &EncodingHelper{},
 		Logger:         logger,
 		RequestValidator: &TR1RequestValidator{
