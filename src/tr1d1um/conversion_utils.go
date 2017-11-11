@@ -35,7 +35,7 @@ import (
 //Vars shortens frequently used type returned by mux.Vars()
 type Vars map[string]string
 
-var emptyNamesErr = errors.New("names parameter is required to be valid")
+var errEmptyNames = errors.New("names parameter is required to be valid")
 
 //ConversionTool lays out the definition of methods to build WDMP from content in an http request
 type ConversionTool interface {
@@ -77,7 +77,7 @@ func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, pathVars Vars, attr
 		wdmp.Command = CommandGet
 		wdmp.Names = strings.Split(nameGroup, sep)
 	} else {
-		err = emptyNamesErr
+		err = errEmptyNames
 		return
 	}
 

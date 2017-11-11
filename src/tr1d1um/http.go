@@ -30,7 +30,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//ConversionHandler wraps the main WDMP -> WRP conversion method
+//ConversionHandler is the main arm of the operations supported by this server
 type ConversionHandler struct {
 	TargetURL      string
 	WRPRequestURL  string
@@ -154,19 +154,21 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
+//RequestValidator verifies a request based the provided named URL variables
 type RequestValidator interface {
 	isValidRequest(map[string]string, http.ResponseWriter) bool
 }
 
+//TR1RequestValidator verifies the basic validity of incoming requests to XMIDT/WebPA
 type TR1RequestValidator struct {
 	supportedServices map[string]struct{}
 	log.Logger
 }
 
-//isValid returns true if and only if service is a supported one
+//isValid returns true if and only if both service and deviceID provided in the request are supported and valid respectively
 func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, origin http.ResponseWriter) (isValid bool) {
-	if URLVars == nil {
-		return false
+	if isValid = URLVars != nil; !isValid {
+		return
 	}
 
 	//check request contains a valid service
@@ -203,19 +205,24 @@ func ForwardHeadersByPrefix(prefix string, from *http.Response, to *Tr1d1umRespo
 	}
 }
 
-//Helper function which determines whether or not to retry sending making another request
+//ShouldRetryOnResponse determines whether or not to retry making another request
 func ShouldRetryOnResponse(tr1Resp interface{}, _ error) (retry bool) {
 	tr1Response := tr1Resp.(*Tr1d1umResponse)
 	retry = tr1Response.Code == Tr1StatusTimeout
 	return
 }
 
+//OnRetryInternalFailure defines the result values in case these cannot be generated due to
+//some internal retry error
 func OnRetryInternalFailure() (result interface{}) {
 	tr1Resp := Tr1d1umResponse{}.New()
 	tr1Resp.Code = http.StatusInternalServerError
 	return tr1Resp
 }
 
+//TransferResponse simply dumps data from a Tr1d1umResponse to its http equivalent (ResponseWriter)
+//This is needed due to the nature of retries. You can write multiple times to a tr1d1umResponse but
+//only once to a ResponseWriter
 func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 	// Headers
 	for headerKey, headerValues := range from.Headers {

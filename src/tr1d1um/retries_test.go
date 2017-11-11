@@ -41,7 +41,7 @@ func TestRetryExecute(t *testing.T) {
 
 		callCount := 0
 		countOp := func(_ ...interface{}) (_ interface{}, _ error) {
-			callCount += 1
+			callCount++
 			return
 		}
 		resp, err := retry.Execute(countOp, 0)
@@ -68,7 +68,7 @@ func TestRetryExecute(t *testing.T) {
 
 		callCount := 0
 		countOp := func(_ ...interface{}) (resp interface{}, _ error) {
-			callCount += 1
+			callCount++
 			resp = callCount
 			return
 		}
@@ -93,7 +93,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 
 		result, err := retry.Execute(nil, "")
 		assert.EqualValues(-1, result)
-		assert.EqualValues(undefinedShouldRetryErr, err)
+		assert.EqualValues(errUndefinedShouldRetry, err)
 	})
 
 	t.Run("InvalidMaxRetries", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 
 		result, err := retry.Execute(nil, "")
 		assert.EqualValues(-1, result)
-		assert.EqualValues(invalidMaxRetriesValErr, err)
+		assert.EqualValues(errInvalidMaxRetriesVal, err)
 	})
 
 	t.Run("undefinedLogger", func(t *testing.T) {
@@ -126,6 +126,23 @@ func TestRetryCheckDependencies(t *testing.T) {
 
 		result, err := retry.Execute(nil, "")
 		assert.EqualValues(-1, result)
-		assert.EqualValues(undefinedLogger, err)
+		assert.EqualValues(errUndefinedLogger, err)
+	})
+
+	t.Run("undefinedOperation", func(t *testing.T) {
+		assert := assert.New(t)
+		retry := Retry{
+			Interval:    time.Second,
+			MaxRetries:  1,
+			Logger: logging.DefaultLogger(),
+			ShouldRetry: func(_ interface{}, _ error) bool { return true },
+			OnInternalFail: func() interface{} {
+				return -1
+			},
+		}
+
+		result, err := retry.Execute(nil, "")
+		assert.EqualValues(-1, result)
+		assert.EqualValues(errUndefinedRetryOp, err)
 	})
 }
