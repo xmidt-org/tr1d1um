@@ -187,8 +187,9 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 			encodingHelper: &EncodingHelper{},
 			WRPSource:      v.GetString("WRPSource")},
 		Sender: SendAndHandleFactory{}.New(respTimeout,
-			fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
-			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}}, &EncodingHelper{}, logger),
+			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout}},
+			&EncodingHelper{},
+			logger),
 		EncodingHelper: &EncodingHelper{},
 		Logger:         logger,
 		RequestValidator: &TR1RequestValidator{

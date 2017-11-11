@@ -37,9 +37,11 @@ type SendAndHandle interface {
 	GetRespTimeout() time.Duration
 }
 
+//SendAndHandleFactory serves as a fool-proof (you must provide all needed values for struct) initializer for SendAndHandle
 type SendAndHandleFactory struct{}
 
-func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string, requester Requester, encoding EncodingTool,
+//New does the initialization of a SendAndHandle (of actual type Tr1SendAndHandle)
+func (factory SendAndHandleFactory) New(respTimeout time.Duration, requester Requester, encoding EncodingTool,
 	logger log.Logger) SendAndHandle {
 	return &Tr1SendAndHandle{
 		RespTimeout:  respTimeout,
@@ -49,7 +51,7 @@ func (factory SendAndHandleFactory) New(respTimeout time.Duration, wrpURL string
 	}
 }
 
-//Tr1SendAndHandle implements the behaviors of SendAndHandle
+//Tr1SendAndHandle provides one implementation of SendAndHandle
 type Tr1SendAndHandle struct {
 	RespTimeout time.Duration
 	Requester
@@ -62,6 +64,8 @@ type clientResponse struct {
 	err  error
 }
 
+//Tr1d1umRequest provides a clean way to store information needed to make some request (in our case, it is http but it is not
+// limited to that).
 type Tr1d1umRequest struct {
 	ancestorCtx context.Context
 	method      string
@@ -70,6 +74,7 @@ type Tr1d1umRequest struct {
 	headers     http.Header
 }
 
+//GetBody is a handy function to provide the payload (body) of Tr1d1umRequest as a fresh reader
 func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 	if tr1Req != nil && tr1Req.body != nil {
 		body = bytes.NewBuffer(tr1Req.body)
@@ -77,6 +82,8 @@ func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 	return
 }
 
+//MakeRequest contains all the logic that actually performs an http request
+//It is tightly coupled with HandleResponse
 func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{}, error) {
 	tr1Request := requestArgs[0].(Tr1d1umRequest)
 	newRequest, newRequestErr := http.NewRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
@@ -104,8 +111,7 @@ func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{
 	return tr1Response, responseErr
 }
 
-//HandleResponse contains the instructions of what to write back to the original requester (origin)
-//based on the responses of a server we have contacted through Send
+//HandleResponse contains the logic to generate a tr1d1umResponse based on some given error information and an http response
 func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
 	var errorLogger = logging.Error(tr1)
 	var debugLogger = logging.Debug(tr1)

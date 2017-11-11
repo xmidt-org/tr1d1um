@@ -26,16 +26,19 @@ import (
 )
 
 var (
-	invalidMaxRetriesValErr = errors.New("retry: MaxRetries should be >= 1")
-	undefinedShouldRetryErr = errors.New("retry: ShouldRetry function is required")
-	undefinedLogger         = errors.New("retry: logger is undefined")
-	undefinedRetryOp        = errors.New("retry: operation to retry is undefined")
+	errInvalidMaxRetriesVal = errors.New("retry: MaxRetries should be >= 1")
+	errUndefinedShouldRetry = errors.New("retry: ShouldRetry function is required")
+	errUndefinedLogger         = errors.New("retry: logger is undefined")
+	errUndefinedRetryOp        = errors.New("retry: operation to retry is undefined")
 )
 
+//RetryStrategy defines
 type RetryStrategy interface {
 	Execute(func(...interface{}) (interface{}, error), ...interface{}) (interface{}, error)
 }
 
+
+//Retry is the realization of RetryStrategy. It
 type Retry struct {
 	log.Logger
 	Interval       time.Duration                 // time we wait between retries
@@ -44,7 +47,7 @@ type Retry struct {
 	OnInternalFail func() interface{}            // provided function to define some result in the case of failure
 }
 
-//RetryFactory is the fool-proof method to get a retry strategy struct initialized
+//RetryFactory is the fool-proof method to get a RetryStrategy struct initialized
 type RetryStrategyFactory struct{}
 
 func (r RetryStrategyFactory) NewRetryStrategy(logger log.Logger, interval time.Duration, maxRetries int,
@@ -70,7 +73,7 @@ func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments 
 	}
 
 	if op == nil {
-		result, err = r.OnInternalFail(), undefinedRetryOp
+		result, err = r.OnInternalFail(), errUndefinedRetryOp
 		return
 	}
 
@@ -88,17 +91,17 @@ func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments 
 
 func (r *Retry) checkDependencies() (err error) {
 	if r.ShouldRetry == nil {
-		err = undefinedShouldRetryErr
+		err = errUndefinedShouldRetry
 		return
 	}
 
 	if r.MaxRetries < 1 {
-		err = invalidMaxRetriesValErr
+		err = errInvalidMaxRetriesVal
 		return
 	}
 
 	if r.Logger == nil {
-		err = undefinedLogger
+		err = errUndefinedLogger
 		return
 	}
 
