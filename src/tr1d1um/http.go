@@ -103,7 +103,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
 
 	var wrpPayloadBuffer bytes.Buffer
-	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.JSON).Encode(wrpMsg)
+	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.Msgpack).Encode(wrpMsg)
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
@@ -119,7 +119,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		body:        wrpPayloadBuffer.Bytes(),
 	}
 	//
-	tr1Request.headers.Set("Content-Type", wrp.JSON.ContentType())
+	tr1Request.headers.Set("Content-Type", wrp.Msgpack.ContentType())
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
 	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
