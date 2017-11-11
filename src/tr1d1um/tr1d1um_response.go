@@ -32,7 +32,7 @@ const (
 	Tr1StatusTimeout = 503
 )
 
-var unexpectedRKDResponse = errors.New("unexpectedRDKResponse")
+var errUnexpectedRKDResponse = errors.New("unexpectedRDKResponse")
 
 //RDKResponse will serve as the struct to read in
 //results coming from some RDK device
@@ -40,6 +40,9 @@ type RDKResponse struct {
 	StatusCode int `json:"statusCode"`
 }
 
+//Tr1d1umResponse serves as a container for http responses to Tr1d1um
+//Due to the nature of retries, only the final container's data gets
+//transferred to an http.ResponseWriter
 type Tr1d1umResponse struct {
 	Body    []byte
 	Code    int
@@ -47,6 +50,8 @@ type Tr1d1umResponse struct {
 	err     error
 }
 
+//New helps initialize values that avoid nil exceptions and keeps
+//consistent status code standard with an http.ResponseWriter
 func (tr1Resp Tr1d1umResponse) New() *Tr1d1umResponse {
 	tr1Resp.Headers, tr1Resp.Body, tr1Resp.Code = http.Header{}, []byte{}, http.StatusOK
 	return &tr1Resp
@@ -60,13 +65,16 @@ func WriteResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
 	tr1Resp.Body = []byte(fmt.Sprintf(`{"message":"%s"}`, message))
 }
 
+
+//WriteResponseWriter is a tiny helper function that passes responses (In Json format only for now)
+//to a caller through a ResponseWriter
 func WriteResponseWriter(message string, statusCode int, origin http.ResponseWriter) {
 	origin.Header().Set("Content-Type", wrp.JSON.ContentType())
 	origin.WriteHeader(statusCode)
 	origin.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, message)))
 }
 
-//ReportError, given that the given error is not nil, checks if the error is related to a timeout. If it is, it marks it as so.
+//ReportError checks (given that the given error is not nil) if the error is related to a timeout. If it is, it marks it as so.
 //Else, it defaults to an InternalError
 func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 	if err == nil {
@@ -92,7 +100,7 @@ func GetStatusCodeFromRDKResponse(RDKPayload []byte) (statusCode int, err error)
 		if RDKResp.StatusCode != 0 { // some statusCode was actually provided
 			statusCode = RDKResp.StatusCode
 		} else {
-			err = unexpectedRKDResponse
+			err = errUnexpectedRKDResponse
 		}
 	}
 	return

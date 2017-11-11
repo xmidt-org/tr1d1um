@@ -47,9 +47,10 @@ type Retry struct {
 	OnInternalFail func() interface{}            // provided function to define some result in the case of failure
 }
 
-//RetryFactory is the fool-proof method to get a RetryStrategy struct initialized
+//RetryStrategyFactory is the fool-proof method to get a RetryStrategy struct initialized
 type RetryStrategyFactory struct{}
 
+//NewRetryStrategy provides a RetryStrategy (of type Retry)
 func (r RetryStrategyFactory) NewRetryStrategy(logger log.Logger, interval time.Duration, maxRetries int,
 	shouldRetry func(interface{}, error) bool, onInternalFailure func() interface{}) RetryStrategy {
 	retry := &Retry{
@@ -62,6 +63,8 @@ func (r RetryStrategyFactory) NewRetryStrategy(logger log.Logger, interval time.
 	return retry
 }
 
+//Execute is the core method of the RetryStrategy. It runs a given operation on provided inputs based on
+// pre-defined configurations
 func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments ...interface{}) (result interface{}, err error) {
 	var (
 		debugLogger = logging.Debug(r.Logger)
