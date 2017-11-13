@@ -107,7 +107,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	AddRoutes(baseRouter, preHandler, conversionHandler)
 
-	if exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
+	var snsFactory *webhook.Factory
+
+	if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
 		return
 	}
 
@@ -115,6 +117,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
 		signals          = make(chan os.Signal, 1)
 	)
+
+	go snsFactory.PrepareAndStart()
 
 	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
 		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
@@ -127,12 +131,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 //ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
 //baseRouter is pre-configured with the api/v2 prefix path
 //root is the original router used by webHookFactory.Initialize()
-func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) int {
+func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) (*webhook.Factory, int) {
 	webHookFactory, err := webhook.NewFactory(v)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err)
-		return 1
+		return nil, 1
 	}
 
 	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler()
@@ -147,9 +151,7 @@ func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *ali
 	}
 
 	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, nil)
-	webHookFactory.PrepareAndStart()
-
-	return 0
+	return webHookFactory, 0
 }
 
 //AddRoutes configures the paths and connection rules to TR1D1UM
