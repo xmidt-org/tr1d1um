@@ -134,7 +134,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 		retry := Retry{
 			Interval:    time.Second,
 			MaxRetries:  1,
-			Logger: logging.DefaultLogger(),
+			Logger:      logging.DefaultLogger(),
 			ShouldRetry: func(_ interface{}, _ error) bool { return true },
 			OnInternalFail: func() interface{} {
 				return -1

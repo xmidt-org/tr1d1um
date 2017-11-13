@@ -28,15 +28,14 @@ import (
 var (
 	errInvalidMaxRetriesVal = errors.New("retry: MaxRetries should be >= 1")
 	errUndefinedShouldRetry = errors.New("retry: ShouldRetry function is required")
-	errUndefinedLogger         = errors.New("retry: logger is undefined")
-	errUndefinedRetryOp        = errors.New("retry: operation to retry is undefined")
+	errUndefinedLogger      = errors.New("retry: logger is undefined")
+	errUndefinedRetryOp     = errors.New("retry: operation to retry is undefined")
 )
 
 //RetryStrategy defines
 type RetryStrategy interface {
 	Execute(func(...interface{}) (interface{}, error), ...interface{}) (interface{}, error)
 }
-
 
 //Retry is the realization of RetryStrategy. It
 type Retry struct {

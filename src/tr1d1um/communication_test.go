@@ -118,7 +118,7 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
 			errors.New(errMsg)).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
@@ -129,7 +129,7 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("ExtractPayloadTimeout", func(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return([]byte(""),
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
 			context.Canceled).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
@@ -150,14 +150,14 @@ func TestHandleResponse(t *testing.T) {
 
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues(bodyString, string(recorder.Body))
-		mockEncoding.AssertNotCalled(t, "ExtractPayload", fakeResponse.Body, wrp.JSON)
+		mockEncoding.AssertNotCalled(t, "ExtractPayload", fakeResponse.Body, wrp.Msgpack)
 	})
 
 	t.Run("GoodRDKResponse", func(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
 		extractedData := []byte(`{"statusCode": 202}`)
 
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
@@ -170,7 +170,7 @@ func TestHandleResponse(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
 		extractedData := []byte(`{"statusCode": 500}`)
 
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.JSON).Return(extractedData, nil).Once()
+		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 

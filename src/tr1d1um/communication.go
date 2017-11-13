@@ -130,14 +130,14 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		return
 	}
 
-	if RDKResponse, encodingErr := tr1.ExtractPayload(respFromServer.Body, wrp.JSON); encodingErr == nil {
+	if RDKResponse, encodingErr := tr1.ExtractPayload(respFromServer.Body, wrp.Msgpack); encodingErr == nil {
 		if RDKRespCode, RDKErr := GetStatusCodeFromRDKResponse(RDKResponse); RDKErr == nil && RDKRespCode != http.StatusInternalServerError {
 			tr1Resp.Code = RDKRespCode
 		}
 		tr1Resp.Body = RDKResponse
 	} else {
 		ReportError(encodingErr, tr1Resp)
-		errorLogger.Log(logging.ErrorKey(), err)
+		errorLogger.Log(logging.MessageKey(), "could not extract payload from wrp body", logging.ErrorKey(), encodingErr)
 	}
 
 	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)

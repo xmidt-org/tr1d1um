@@ -65,7 +65,6 @@ func WriteResponse(message string, statusCode int, tr1Resp *Tr1d1umResponse) {
 	tr1Resp.Body = []byte(fmt.Sprintf(`{"message":"%s"}`, message))
 }
 
-
 //WriteResponseWriter is a tiny helper function that passes responses (In Json format only for now)
 //to a caller through a ResponseWriter
 func WriteResponseWriter(message string, statusCode int, origin http.ResponseWriter) {
