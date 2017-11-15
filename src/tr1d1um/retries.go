@@ -37,7 +37,7 @@ type RetryStrategy interface {
 	Execute(func(...interface{}) (interface{}, error), ...interface{}) (interface{}, error)
 }
 
-//Retry is the realization of RetryStrategy. It
+//Retry is the realization of RetryStrategy.
 type Retry struct {
 	log.Logger
 	Interval       time.Duration                 // time we wait between retries
