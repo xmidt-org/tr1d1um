@@ -116,7 +116,6 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues("expectMe", string(recorder.Body))
 	})
 
-
 	t.Run("503Into504", func(t *testing.T) {
 		recorder := Tr1d1umResponse{}.New()
 		var mockBody bytes.Buffer
