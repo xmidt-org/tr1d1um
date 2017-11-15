@@ -116,6 +116,18 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues("expectMe", string(recorder.Body))
 	})
 
+
+	t.Run("503Into504", func(t *testing.T) {
+		recorder := Tr1d1umResponse{}.New()
+		var mockBody bytes.Buffer
+		mockBody.WriteString("expectMe")
+		fakeResponse := &http.Response{StatusCode: http.StatusServiceUnavailable, Body: ioutil.NopCloser(&mockBody)}
+
+		tr1.HandleResponse(nil, fakeResponse, recorder, false)
+		assert.EqualValues(http.StatusGatewayTimeout, recorder.Code)
+		assert.EqualValues("expectMe", string(recorder.Body))
+	})
+
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
 		fakeResponse := &http.Response{StatusCode: http.StatusOK}
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
