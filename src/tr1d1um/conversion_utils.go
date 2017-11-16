@@ -129,7 +129,7 @@ func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableNa
 
 	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Row); err == nil {
 		err = validation.Validate(wdmp.Row, validation.Required)
-	}
+}
 
 	return
 }
@@ -152,9 +152,7 @@ func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tab
 	return
 }
 
-//ValidateAndDeduceSET attempts at defaulting to the SET command given all command property requirements are satisfied
-// (name, value, dataType). Then, if the new_cid is provided, it is deduced that the command should be TEST_SET
-//If the SET command properties are not satisfied, we attempt at validating the input for the SET_ATTRS command
+//ValidateAndDeduceSET deduces the command for a given wdmp object and validates it for such
 func (cw *ConversionWDMP) ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
 	newCID, oldCID, syncCMC := header.Get(HeaderWPASyncNewCID), header.Get(HeaderWPASyncOldCID), header.Get(HeaderWPASyncCMC)
 

@@ -151,6 +151,112 @@ func TestSetFlavorFormat(t *testing.T) {
 	})
 }
 
+func TestGetCommandForParam(t *testing.T){
+	t.Run("EmptyParams", func(t *testing.T) {
+		assert := assert.New(t)
+		assert.EqualValues(CommandSet, getCommandForParam(nil))
+		assert.EqualValues(CommandSet, getCommandForParam([]SetParam{}))
+	})
+
+	//Attributes and Name are required properties for SET_ATTRS
+	t.Run("SetCommandUndefinedAttributes", func(t *testing.T) {
+		assert := assert.New(t)
+		name := "setParam"
+		setCommandParam := SetParam{Name: &name}
+		assert.EqualValues(CommandSet, getCommandForParam([]SetParam{setCommandParam}))
+	})
+
+	//DataType and Value must be null for SET_ATTRS
+	t.Run("SetAttrsCommand", func(t *testing.T) {
+		assert := assert.New(t)
+		name := "setAttrsParam"
+		setCommandParam := SetParam{
+			Name: &name,
+			Attributes:Attr{"zero": 0},
+		}
+		assert.EqualValues(CommandSetAttrs, getCommandForParam([]SetParam{setCommandParam}))
+	})
+}
+
+func TestIsValidSetWDMP(t *testing.T) {
+	t.Run("TestSetEmptyParams", func(t *testing.T) {
+		assert := assert.New(t)
+
+		wdmp := &SetWDMP{Command:CommandTestSet}
+		assert.True(isValidSetWDMP(wdmp))
+	})
+
+	t.Run("NilNameInParam", func(t *testing.T) {
+		assert := assert.New(t)
+
+		value, dataType := "validate", int8(1)
+		nilNameParam := SetParam{
+			Value: value,
+			DataType: &dataType,
+			}
+		params := []SetParam{nilNameParam}
+		wdmp := &SetWDMP{Command: CommandSet, Parameters:params}
+		assert.False(isValidSetWDMP(wdmp))
+	})
+
+	t.Run("NilDataTypeNonNilValue", func(t *testing.T) {
+		assert := assert.New(t)
+
+		name := "validate"
+		param := SetParam{
+			Name: &name,
+			Value: 3,
+		}
+		params := []SetParam{param}
+		wdmp := &SetWDMP{Command: CommandSet, Parameters:params}
+		assert.False(isValidSetWDMP(wdmp))
+	})
+
+	t.Run("SetAttrsParamNilAttr", func(t *testing.T) {
+		assert := assert.New(t)
+
+		name := "victory"
+		param := SetParam{
+			Name: &name,
+		}
+		params := []SetParam{param}
+		wdmp := &SetWDMP{Command: CommandSetAttrs, Parameters:params}
+		assert.False(isValidSetWDMP(wdmp))
+	})
+
+	t.Run("MixedParams", func(t *testing.T) {
+		assert := assert.New(t)
+
+		name, dataType := "victorious", int8(1)
+		setAttrParam := SetParam{
+			Name: &name,
+			Attributes:map[string]interface{}{"j": 3},
+		}
+		setParam := SetParam{
+			Name: &name,
+			Attributes:map[string]interface{}{"j": 3},
+			Value: 3,
+			DataType: &dataType,
+		}
+		params := []SetParam{setAttrParam, setParam}
+		wdmp := &SetWDMP{Command: CommandSetAttrs, Parameters:params}
+		assert.False(isValidSetWDMP(wdmp))
+	})
+
+	t.Run("IdealSet", func(t *testing.T) {
+		assert := assert.New(t)
+
+		name := "victorious"
+		setAttrParam := SetParam{
+			Name: &name,
+			Attributes:map[string]interface{}{"j": 3},
+		}
+		params := []SetParam{setAttrParam}
+		wdmp := &SetWDMP{Command: CommandSetAttrs, Parameters:params}
+		assert.True(isValidSetWDMP(wdmp))
+	})
+}
+
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
@@ -302,7 +408,6 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 	t.Run("NilParams", func(t *testing.T) {
 		err := c.ValidateAndDeduceSET(http.Header{}, wdmp)
 		assert.NotNil(err)
-		assert.True(strings.Contains(err.Error(), "cannot be blank"))
 		assert.EqualValues("", wdmp.Command)
 	})
 
@@ -400,23 +505,6 @@ func TestExtractPayloadFromWrp(t *testing.T) {
 		assert.NotNil(err)
 	})
 }
-
-/*
-This test is testing code that's already tested in webpa-common.
-there are too many layers of abstraction here.  Remove conversion_utils, and just use webpa-common
-
-func TestGenericEncode(t *testing.T) {
-	assert := assert.New(t)
-	e := EncodingHelper{}
-	wrpMsg := wrp.Message{Type: wrp.SimpleRequestResponseMessageType, Destination: "someDestination"}
-	expectedEncoding := []byte(`{"msg_type":3,"dest":"someDestination"}`)
-
-	actualEncoding, err := e.GenericEncode(&wrpMsg, wrp.JSON)
-
-	assert.Nil(err)
-	assert.EqualValues(expectedEncoding, actualEncoding)
-}
-*/
 
 func TestGetConfiguredWRP(t *testing.T) {
 	assert := assert.New(t)
