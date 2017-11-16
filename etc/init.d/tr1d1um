@@ -83,7 +83,7 @@ case "$1" in
 	[ -f /var/lock/subsys/tr1d1um ] && restart
 	;;
   status)
-	status supervisord
+	status tr1d1um
 	RETVAL=$?
 	;;
   *)
