@@ -59,7 +59,9 @@ start() {
 
 stop() {
 	echo -n $"Stopping tr1d1um: "
-	killproc supervisord
+	kill $(cat /var/run/tr1d1um.pid)
+	RETVAL=$?
+	rm -f /var/run/tr1d1um.pid
 	echo
 	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/tr1d1um
 }
