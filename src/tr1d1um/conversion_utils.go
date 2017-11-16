@@ -36,9 +36,13 @@ import (
 type Vars map[string]string
 
 var (
+	//SET errors
 	errEmptyNames     = errors.New("names parameter is required to be valid")
-	errInvalidWDMP    = errors.New("invalid WDMP request")
-	errNewCIDRequired = errors.New("header NewCID is required for TEST_AND_SET")
+	errInvalidSetWDMP = errors.New("invalid XPC SET message")
+	errNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
+
+	//PUT errors
+	errTableNameRequired = errors.New("could not get parameter var from http.Request")
 )
 
 //ConversionTool lays out the definition of methods to build WDMP from content in an http request
@@ -123,13 +127,13 @@ func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableNa
 	if table, exists := cw.GetFromURLPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
-		err = errors.New("tableName is required for this method")
+		err = errTableNameRequired
 		return
 	}
 
 	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Row); err == nil {
-		err = validation.Validate(wdmp.Row, validation.Required)
-}
+		err = validation.Validate(wdmp.Row, validation.NotNil)
+	}
 
 	return
 }
@@ -141,12 +145,12 @@ func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tab
 	if table, exists := cw.GetFromURLPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
-		err = errors.New("tableName is required for this method")
+		err = errTableNameRequired
 		return
 	}
 
 	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Rows); err == nil {
-		err = validation.Validate(wdmp.Rows, validation.Required)
+		err = validation.Validate(wdmp.Rows, validation.NotNil)
 	}
 
 	return
@@ -169,7 +173,7 @@ func (cw *ConversionWDMP) ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP
 	}
 
 	if !isValidSetWDMP(wdmp) {
-		err = errInvalidWDMP
+		err = errInvalidSetWDMP
 	}
 
 	return
@@ -264,9 +268,10 @@ func (cw *ConversionWDMP) GetWRPSource() string {
 /*   Encoding Helper methods below */
 
 //DecodeJSON decodes data from the input into v. It uses json.Unmarshall to perform actual decoding
+//Note: if nothing is read from input, Unmarshalling is not attempted.
 func (helper *EncodingHelper) DecodeJSON(input io.Reader, v interface{}) (err error) {
 	var payload []byte
-	if payload, err = ioutil.ReadAll(input); err == nil {
+	if payload, err = ioutil.ReadAll(input); err == nil && len(payload) > 0 {
 		err = json.Unmarshal(payload, v)
 	}
 	return

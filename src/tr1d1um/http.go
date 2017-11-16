@@ -30,6 +30,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var contentTypeKey = "Content-Type"
+
 //ConversionHandler is the main arm of the operations supported by this server
 type ConversionHandler struct {
 	TargetURL      string
@@ -84,7 +86,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	}
 
 	if err != nil {
-		WriteResponseWriter(fmt.Sprintf("Error found during data parse: %s", err.Error()), http.StatusBadRequest, origin)
+		WriteResponseWriter(err.Error(), http.StatusBadRequest, origin)
 		logging.Error(ch).Log(logging.MessageKey(), ErrUnsuccessfulDataParse, logging.ErrorKey(), err.Error())
 		return
 	}
@@ -101,6 +103,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	//Forward transaction id being used in Request
 	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
+	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 
 	var wrpPayloadBuffer bytes.Buffer
 	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.Msgpack).Encode(wrpMsg)
@@ -118,8 +121,8 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		headers:     http.Header{},
 		body:        wrpPayloadBuffer.Bytes(),
 	}
-	//
-	tr1Request.headers.Set("Content-Type", wrp.Msgpack.ContentType())
+
+	tr1Request.headers.Set(contentTypeKey, wrp.Msgpack.ContentType())
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
 	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
@@ -150,6 +153,9 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	if err != nil {
 		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
 	}
+
+	// we expect content to be of json format
+	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 
 	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
