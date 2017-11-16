@@ -17,12 +17,6 @@
 
 package main
 
-import (
-	"errors"
-
-	"github.com/go-ozzo/ozzo-validation"
-)
-
 //All the supported commands, WebPA Headers and misc
 const (
 	CommandGet         = "GET"
@@ -90,26 +84,4 @@ type IndexRow map[string]map[string]string
 type DeleteRowWDMP struct {
 	Command string `json:"command"`
 	Row     string `json:"row"`
-}
-
-//Validate defines the validation rules applicable to SetParam in the context of the SET and TEST_SET commands
-func (sp SetParam) Validate() error {
-	return validation.ValidateStruct(&sp,
-		validation.Field(&sp.Name, validation.NotNil),
-		validation.Field(&sp.DataType, validation.NotNil),
-		validation.Field(&sp.Value, validation.Required))
-}
-
-//ValidateSETAttrParams validates an entire list of parameters. Applicable to SET commands
-func ValidateSETAttrParams(params []SetParam) (err error) {
-	if params == nil || len(params) == 0 {
-		err = errors.New("invalid list of params")
-		return
-	}
-	for _, param := range params {
-		if err = validation.Validate(param.Attributes, validation.Required.Error("invalid attr")); err != nil {
-			return
-		}
-	}
-	return
 }
