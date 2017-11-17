@@ -81,7 +81,7 @@ func TestRouteConfigurations(t *testing.T) {
 		//3: case method patch body is nil
 		httptest.NewRequest(http.MethodPatch, "http://server.com/api/v2/device/mac:11223344/serv1", nil),
 
-		//4: case method (put | post) body is nil
+		//4: case method where body is nil
 		httptest.NewRequest(http.MethodPost, "http://server.com/api/v2/device/mac:11223344/serv1/param1", nil),
 
 		//5: No parameter. Applicable to methods delete, put and post
@@ -93,7 +93,7 @@ func TestRouteConfigurations(t *testing.T) {
 	}
 
 	expectedResults := map[int]bool{ //a map for reading ease with respect to ^
-		0: false, 1: false, 2: true, 3: false, 4: false, 5: false, 6: true,
+		0: false, 1: false, 2: true, 3: true, 4: false, 5: false, 6: true,
 	}
 
 	testsCases := make([]RouteTestBundle, len(requests))

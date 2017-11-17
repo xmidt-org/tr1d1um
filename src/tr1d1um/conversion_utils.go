@@ -35,7 +35,15 @@ import (
 //Vars shortens frequently used type returned by mux.Vars()
 type Vars map[string]string
 
-var errEmptyNames = errors.New("names parameter is required to be valid")
+var (
+	//SET errors
+	errEmptyNames     = errors.New("names parameter is required to be valid")
+	errInvalidSetWDMP = errors.New("invalid XPC SET message")
+	errNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
+
+	//PUT errors
+	errTableNameRequired = errors.New("could not get parameter var from http.Request")
+)
 
 //ConversionTool lays out the definition of methods to build WDMP from content in an http request
 type ConversionTool interface {
@@ -119,12 +127,12 @@ func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableNa
 	if table, exists := cw.GetFromURLPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
-		err = errors.New("tableName is required for this method")
+		err = errTableNameRequired
 		return
 	}
 
 	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Row); err == nil {
-		err = validation.Validate(wdmp.Row, validation.Required)
+		err = validation.Validate(wdmp.Row, validation.NotNil)
 	}
 
 	return
@@ -137,40 +145,93 @@ func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tab
 	if table, exists := cw.GetFromURLPath(tableName, urlVars); exists {
 		wdmp.Table = table
 	} else {
-		err = errors.New("tableName is required for this method")
+		err = errTableNameRequired
 		return
 	}
 
 	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Rows); err == nil {
-		err = validation.Validate(wdmp.Rows, validation.Required)
+		err = validation.Validate(wdmp.Rows, validation.NotNil)
 	}
 
 	return
 }
 
-//ValidateAndDeduceSET attempts at defaulting to the SET command given all command property requirements are satisfied
-// (name, value, dataType). Then, if the new_cid is provided, it is deduced that the command should be TEST_SET
-//If the SET command properties are not satisfied, we attempt at validating the input for the SET_ATTRS command
+//ValidateAndDeduceSET deduces the command for a given wdmp object and validates it for such
 func (cw *ConversionWDMP) ValidateAndDeduceSET(header http.Header, wdmp *SetWDMP) (err error) {
-	if err = validation.Validate(wdmp.Parameters, validation.Required); err == nil {
-		wdmp.Command = CommandSet
-		if newCid := header.Get(HeaderWPASyncNewCID); newCid != "" {
-			wdmp.OldCid, wdmp.NewCid = header.Get(HeaderWPASyncOldCID), newCid
+	newCID, oldCID, syncCMC := header.Get(HeaderWPASyncNewCID), header.Get(HeaderWPASyncOldCID), header.Get(HeaderWPASyncCMC)
 
-			if syncCmc := header.Get(HeaderWPASyncCMC); syncCmc != "" {
-				wdmp.SyncCmc = syncCmc
-			}
-			wdmp.Command = CommandTestSet
-		}
+	if newCID == "" && oldCID != "" {
+		err = errNewCIDRequired
+		return
+	} else if newCID == "" && oldCID == "" && syncCMC == "" {
+		wdmp.Command = getCommandForParam(wdmp.Parameters)
 	} else {
-		errMsg := err.Error()
-		if !(errMsg == "cannot be blank" || strings.Contains(errMsg, "name")) {
-			if err = ValidateSETAttrParams(wdmp.Parameters); err == nil {
-				wdmp.Command = CommandSetAttrs
-			}
-		}
+		wdmp.Command = CommandTestSet
+		wdmp.NewCid = newCID
+		wdmp.OldCid = oldCID
+		wdmp.SyncCmc = syncCMC
+	}
+
+	if !isValidSetWDMP(wdmp) {
+		err = errInvalidSetWDMP
+	}
+
+	return
+}
+
+//getCommandForParams decides whether the command for some request is a 'SET' or 'SET_ATTRS' based on a given list of parameters
+func getCommandForParam(params []SetParam) (command string) {
+	command = CommandSet
+	if params == nil || len(params) < 1 {
+		return
+	}
+	if wdmp := params[0]; wdmp.Attributes != nil &&
+		wdmp.Name != nil &&
+		wdmp.DataType == nil &&
+		wdmp.Value == nil {
+		command = CommandSetAttrs
 	}
 	return
+}
+
+//validate servers as a helper function to determine whether the given Set WDMP object is valid for its context
+func isValidSetWDMP(wdmp *SetWDMP) (isValid bool) {
+	if emptyParams := wdmp.Parameters == nil || len(wdmp.Parameters) == 0; emptyParams {
+		return wdmp.Command == CommandTestSet //TEST_AND_SET can have empty parameters
+	}
+
+	cmdSetAttr := 0
+	cmdSet := 0
+
+	//validate parameters if it exists, even for TEST_SET
+	for _, param := range wdmp.Parameters {
+		if param.Name == nil || *param.Name == "" {
+			return
+		}
+
+		if param.Value != nil && (param.DataType == nil || *param.DataType < 0) {
+			return
+		}
+
+		if wdmp.Command == CommandSetAttrs && param.Attributes == nil {
+			return
+		}
+
+		if param.Attributes != nil &&
+			param.DataType == nil &&
+			param.Value == nil {
+
+			cmdSetAttr++
+		} else {
+			cmdSet++
+		}
+
+		// verify that all parameters are correct for either doing a command SET_ATTRIBUTE or SET
+		if cmdSetAttr > 0 && cmdSet > 0 {
+			return
+		}
+	}
+	return true
 }
 
 //GetFromURLPath Same as invoking urlVars[key] directly but urlVars can be nil in which case key does not exist in it
@@ -207,9 +268,10 @@ func (cw *ConversionWDMP) GetWRPSource() string {
 /*   Encoding Helper methods below */
 
 //DecodeJSON decodes data from the input into v. It uses json.Unmarshall to perform actual decoding
+//Note: if nothing is read from input, Unmarshalling is not attempted.
 func (helper *EncodingHelper) DecodeJSON(input io.Reader, v interface{}) (err error) {
 	var payload []byte
-	if payload, err = ioutil.ReadAll(input); err == nil {
+	if payload, err = ioutil.ReadAll(input); err == nil && len(payload) > 0 {
 		err = json.Unmarshal(payload, v)
 	}
 	return

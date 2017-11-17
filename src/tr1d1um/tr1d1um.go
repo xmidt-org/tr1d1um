@@ -176,7 +176,7 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 		Methods(http.MethodGet)
 
 	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodPatch).MatcherFunc(BodyNonEmpty)
+		Methods(http.MethodPatch)
 
 	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodDelete)
