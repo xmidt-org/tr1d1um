@@ -107,18 +107,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	AddRoutes(baseRouter, preHandler, conversionHandler)
 
-	//var snsFactory *webhook.Factory
-	//
-	//if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
-	//	return
-	//}
+	var snsFactory *webhook.Factory
+
+	if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
+		return
+	}
 
 	var (
 		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
 		signals          = make(chan os.Signal, 1)
 	)
 
-	//go snsFactory.PrepareAndStart()
+	go snsFactory.PrepareAndStart()
 
 	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
 		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
