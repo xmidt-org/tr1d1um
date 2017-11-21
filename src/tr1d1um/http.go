@@ -30,7 +30,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var contentTypeKey = "Content-Type"
+const contentTypeKey = "Content-Type"
 
 //ConversionHandler is the main arm of the operations supported by this server
 type ConversionHandler struct {
@@ -105,6 +105,8 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
 	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 
+	forwardServerHeaderInfo(origin)
+
 	var wrpPayloadBuffer bytes.Buffer
 	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.Msgpack).Encode(wrpMsg)
 
@@ -145,6 +147,8 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 		URL:         ch.TargetURL + req.URL.RequestURI(),
 		headers:     http.Header{},
 	}
+
+	forwardServerHeaderInfo(origin)
 
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
@@ -242,5 +246,12 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 
 	// Body
 	to.Write(from.Body)
+}
 
+//forwardServerInfo forwards the tr1d1um:
+// - release version
+// - VM OS hostname
+func forwardServerHeaderInfo(origin http.ResponseWriter) {
+	origin.Header().Set(releaseKey, release)
+	origin.Header().Set("hostname", hostname)
 }
