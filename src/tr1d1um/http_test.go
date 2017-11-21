@@ -331,7 +331,7 @@ func TestForwardServerInfo(t *testing.T) {
 	release = "1.0.1"
 	hostname = "tr1d1umRocks"
 
-	forwardServerInfo(origin)
+	forwardServerHeaderInfo(origin)
 	assert.EqualValues(2, len(origin.HeaderMap))
 	assert.EqualValues("1.0.1", origin.Header().Get(releaseKey))
 	assert.EqualValues("tr1d1umRocks", origin.Header().Get("hostname"))
