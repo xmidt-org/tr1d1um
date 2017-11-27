@@ -320,6 +320,24 @@ func TestTransferResponse(t *testing.T) {
 	assert.EqualValues(to.Header().Get("k2"), "v2")
 }
 
+func TestForwardServerInfo(t *testing.T) {
+	assert := assert.New(t)
+	origin := httptest.NewRecorder()
+	defer func() {
+		release = "-"
+		hostname = "-"
+	}()
+
+	release = "1.0.1"
+	hostname = "tr1d1umRocks"
+
+	forwardServerHeaderInfo(origin)
+	assert.EqualValues(2, len(origin.HeaderMap))
+	assert.EqualValues("1.0.1", origin.Header().Get(releaseKey))
+	assert.EqualValues("tr1d1umRocks", origin.Header().Get("hostname"))
+
+}
+
 // Test Helpers //
 func SetUpTest(encodeArg interface{}, req *http.Request) {
 	recorder := httptest.NewRecorder()

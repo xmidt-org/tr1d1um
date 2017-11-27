@@ -61,6 +61,13 @@ const (
 	reqRetryIntervalKey  = "requestRetryInterval"
 	reqMaxRetriesKey     = "requestMaxRetries"
 	respWaitTimeoutKey   = "respWaitTimeout"
+
+	releaseKey = "release"
+)
+
+var (
+	release  = "-"
+	hostname = "-"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -76,6 +83,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
 	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
 	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
+
+	//release and internal OS info set up
+	if releaseVal := v.GetString(releaseKey); releaseVal != "" {
+		release = releaseVal
+	}
+
+	if hostnameVal, hostnameErr := os.Hostname(); hostnameErr == nil {
+		hostname = hostnameVal
+	}
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
