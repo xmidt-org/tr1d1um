@@ -55,6 +55,7 @@ const (
 	defaultNetDialerTimeout = "5s"
 	defaultRetryInterval    = "2s"
 	defaultMaxRetries       = 2
+	defaultMetricsAddress   = ":8080"
 
 	supportedServicesKey = "supportedServices"
 	targetURLKey         = "targetURL"
@@ -63,6 +64,7 @@ const (
 	reqRetryIntervalKey  = "requestRetryInterval"
 	reqMaxRetriesKey     = "requestMaxRetries"
 	respWaitTimeoutKey   = "respWaitTimeout"
+	metricsAddressKey    = "metricsAddress"
 
 	releaseKey = "release"
 )
@@ -89,6 +91,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
 	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
 	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
+	v.SetDefault(metricsAddressKey, defaultMetricsAddress)
 
 	//release and internal OS info set up
 	if releaseVal := v.GetString(releaseKey); releaseVal != "" {
@@ -144,9 +147,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 	go snsFactory.PrepareAndStart()
 
 	// prometheus metrics set up
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", preHandler.Then(promhttp.Handler()))
 	go func() {
-		if prometheusEndpointErr := http.ListenAndServe(":8080", nil); prometheusEndpointErr != nil {
+		if prometheusEndpointErr := http.ListenAndServe(v.GetString(metricsAddressKey), nil); prometheusEndpointErr != nil {
 			errorLogger.Log(logging.MessageKey(), "error with prometheus endpoint", logging.ErrorKey(), prometheusEndpointErr)
 		}
 	}()
