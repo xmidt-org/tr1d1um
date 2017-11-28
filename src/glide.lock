@@ -1,5 +1,5 @@
-hash: baf3fd61b03d957f2b25f1957efa9d707d025dc0b6c14adc4316a81e8afddafc
-updated: 2017-11-06T12:05:59.48168555-08:00
+hash: 97d10c9b7ffd3449444ef44e59aca3fb256830ae622d7a4e8ffc228af05e62fa
+updated: 2017-11-27T16:02:02.929126358-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -104,6 +104,10 @@ imports:
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
+- name: github.com/prometheus/client_golang
+  version: 967789050ba94deca04a5e84cce8ad472ce313c1
+  subpackages:
+  - prometheus
 - name: github.com/SermoDigital/jose
   version: f6df55f235c24f236d11dbcf665249a59ac2021f
   subpackages:

@@ -40,6 +40,8 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/prometheus/client_golang/prometheus"
+	"client_golang/prometheus/promhttp"
 )
 
 //convenient global values
@@ -68,6 +70,10 @@ const (
 var (
 	release  = "-"
 	hostname = "-"
+	requestsReceived = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "requests_received",
+		Help: "Number of requests (that hit correct endpoints) received by tr1d1um.",
+	})
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -100,6 +106,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
 		infoLogger = logging.Info(logger)
+		errorLogger = logging.Error(logger)
 	)
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
@@ -135,6 +142,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 	)
 
 	go snsFactory.PrepareAndStart()
+
+
+	http.Handle("/metrics", promhttp.Handler())
+	if prometheusEndpointErr := http.ListenAndServe(":8080",nil); prometheusEndpointErr != nil {
+		errorLogger.Log(logging.MessageKey(), "error with prometheus endpoint", logging.ErrorKey(), prometheusEndpointErr)
+	}
 
 	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
 		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
@@ -314,4 +327,9 @@ func getSupportedServicesMap(supportedServices []string) (supportedServicesMap m
 
 func main() {
 	os.Exit(tr1d1um(os.Args))
+}
+
+func init() {
+	// Metrics have to be registered to be exposed:
+	prometheus.MustRegister(requestsReceived)
 }
