@@ -38,10 +38,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/prometheus/client_golang/prometheus"
-	"client_golang/prometheus/promhttp"
 )
 
 //convenient global values
@@ -68,8 +68,8 @@ const (
 )
 
 var (
-	release  = "-"
-	hostname = "-"
+	release          = "-"
+	hostname         = "-"
 	requestsReceived = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "requests_received",
 		Help: "Number of requests (that hit correct endpoints) received by tr1d1um.",
@@ -105,7 +105,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	var (
-		infoLogger = logging.Info(logger)
+		infoLogger  = logging.Info(logger)
 		errorLogger = logging.Error(logger)
 	)
 
@@ -143,9 +143,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	go snsFactory.PrepareAndStart()
 
-
 	http.Handle("/metrics", promhttp.Handler())
-	if prometheusEndpointErr := http.ListenAndServe(":8080",nil); prometheusEndpointErr != nil {
+	if prometheusEndpointErr := http.ListenAndServe(":8080", nil); prometheusEndpointErr != nil {
 		errorLogger.Log(logging.MessageKey(), "error with prometheus endpoint", logging.ErrorKey(), prometheusEndpointErr)
 	}
 
