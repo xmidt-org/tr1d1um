@@ -7,7 +7,3 @@ import:
   version: v3.3
 - package: gopkg.in/h2non/gock.v1
   version: v1.0.6
-- package: github.com/prometheus/client_golang
-  version: v0.9.0-pre1
-  subpackages:
-  - prometheus
