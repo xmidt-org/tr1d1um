@@ -38,8 +38,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -55,7 +53,6 @@ const (
 	defaultNetDialerTimeout = "5s"
 	defaultRetryInterval    = "2s"
 	defaultMaxRetries       = 2
-	defaultMetricsAddress   = ":8080"
 
 	supportedServicesKey = "supportedServices"
 	targetURLKey         = "targetURL"
@@ -64,18 +61,13 @@ const (
 	reqRetryIntervalKey  = "requestRetryInterval"
 	reqMaxRetriesKey     = "requestMaxRetries"
 	respWaitTimeoutKey   = "respWaitTimeout"
-	metricsAddressKey    = "metricsAddress"
 
 	releaseKey = "release"
 )
 
 var (
-	release          = "-"
-	hostname         = "-"
-	requestsReceived = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "requests_received",
-		Help: "Number of requests (that hit correct endpoints) received by tr1d1um.",
-	})
+	release  = "-"
+	hostname = "-"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -91,7 +83,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
 	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
 	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
-	v.SetDefault(metricsAddressKey, defaultMetricsAddress)
 
 	//release and internal OS info set up
 	if releaseVal := v.GetString(releaseKey); releaseVal != "" {
@@ -108,8 +99,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	var (
-		infoLogger  = logging.Info(logger)
-		errorLogger = logging.Error(logger)
+		infoLogger = logging.Info(logger)
 	)
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
@@ -145,14 +135,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 	)
 
 	go snsFactory.PrepareAndStart()
-
-	// prometheus metrics set up
-	http.Handle("/metrics", preHandler.Then(promhttp.Handler()))
-	go func() {
-		if prometheusEndpointErr := http.ListenAndServe(v.GetString(metricsAddressKey), nil); prometheusEndpointErr != nil {
-			errorLogger.Log(logging.MessageKey(), "error with prometheus endpoint", logging.ErrorKey(), prometheusEndpointErr)
-		}
-	}()
 
 	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
 		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
@@ -332,9 +314,4 @@ func getSupportedServicesMap(supportedServices []string) (supportedServicesMap m
 
 func main() {
 	os.Exit(tr1d1um(os.Args))
-}
-
-func init() {
-	// Metrics values must be registered to be exposed:
-	prometheus.MustRegister(requestsReceived)
 }
