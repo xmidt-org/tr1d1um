@@ -1,12 +1,48 @@
 {
-	"port": 8080,
-	"hcport": 8888,
-	"pprofport": 9999,
-	                   
-	"log" : {
-		"file"      : "tr1d1umLog.log",
+	"fqdn": "fake-fqdn",
+	
+	"primary": {
+		"address": ":443",
+	},
+
+	"alternate": {
+		"address": ":8090",
+	},
+
+	"health": {
+		"address": ":80",
+		"logInterval": "60s",
+		"options": [
+			"PayloadsOverZero",
+			"PayloadsOverHundred",
+			"PayloadsOverThousand",
+			"PayloadsOverTenThousand"
+		]
+	},
+
+	"pprof": {
+		"address": ":9999"
+	},
+	
+	"log": {
+		"file"      : "/var/log/tr1d1um/tr1d1um.log",
 		"level"     : "DEBUG",
-		"maxSize"   : 5242880,
-		"maxBackup" : 3
-	}
+		"maxSize"   : 52428800,
+		"maxBackup" : 10,
+		"json"      : true
+	},
+
+	"aws": {
+		"accessKey": "fake-accessKey",
+		"secretKey": "fake-secretKey",
+		"env": "fake-env",
+		"sns": {
+			"region": "fake region",
+			"topicArn": "fake-sns-topic",
+			"urlPath" : "/api/v2/aws/sns"
+		}
+	},
+
+	"targetURL": "localhost:6000",
+	"supportedServices": ["config"]
 }
