@@ -36,6 +36,8 @@ import (
 	"github.com/Comcast/webpa-common/webhook"
 	"github.com/SermoDigital/jose/jwt"
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/metrics"
+	"github.com/go-kit/kit/metrics/provider"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
@@ -66,8 +68,9 @@ const (
 )
 
 var (
-	release  = "-"
-	hostname = "-"
+	release                 = "-"
+	hostname                = "-"
+	requestsReceivedCounter metrics.Counter
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -133,6 +136,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
 		signals          = make(chan os.Signal, 1)
 	)
+
+	//todo: just example usage for now of new webpa server metrics
+	//initialize the metrics provider
+	webPA.GoKitMetricsProvider = provider.NewPrometheusProvider(applicationName, "todo") //todo: what's the approapiate subsystem?
+
+	//create a counter
+	requestsReceivedCounter = webPA.GoKitMetricsProvider.NewCounter("requests_received")
 
 	go snsFactory.PrepareAndStart()
 

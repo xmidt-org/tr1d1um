@@ -1,5 +1,5 @@
-hash: baf3fd61b03d957f2b25f1957efa9d707d025dc0b6c14adc4316a81e8afddafc
-updated: 2017-11-06T12:05:59.48168555-08:00
+hash: 26317278b7258c31da54bbc725a83d309175f7f62b335d11117fdaa7bedf4cf8
+updated: 2017-12-01T18:57:10.675268-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -29,14 +29,20 @@ imports:
   - service/sns
   - service/sns/snsiface
   - service/sts
+- name: github.com/beorn7/perks
+  version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
+  subpackages:
+  - quantile
 - name: github.com/c9s/goprocinfo
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
   subpackages:
   - linux
 - name: github.com/Comcast/webpa-common
-  version: 48c0a25ca44cfd9de9a053832b4decf4d36082e1
+  version: 6e6cd5fad81e2ee9b8fae59371465d99c5ca56ca
   subpackages:
   - concurrent
+  - convey
+  - convey/conveyhttp
   - device
   - health
   - httperror
@@ -63,12 +69,29 @@ imports:
   subpackages:
   - log
   - log/level
+  - metrics
+  - metrics/discard
+  - metrics/dogstatsd
+  - metrics/expvar
+  - metrics/generic
+  - metrics/graphite
+  - metrics/influx
+  - metrics/internal/lv
+  - metrics/internal/ratemap
+  - metrics/prometheus
+  - metrics/provider
+  - metrics/statsd
+  - util/conn
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-ozzo/ozzo-validation
   version: 85dcd8368eba387e65a03488b003e233994e87e9
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
+- name: github.com/golang/protobuf
+  version: 130e6b02ab059e7b717a096f397c5b60111cae74
+  subpackages:
+  - proto
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
@@ -86,6 +109,12 @@ imports:
   - json/parser
   - json/scanner
   - json/token
+- name: github.com/influxdata/influxdb
+  version: fd11e200c8b2e4d23c31945e330b2768b83d46f5
+  subpackages:
+  - client/v2
+  - models
+  - pkg/escape
 - name: github.com/jmespath/go-jmespath
   version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
 - name: github.com/jtacoma/uritemplates
@@ -96,6 +125,10 @@ imports:
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/magiconair/properties
   version: 8d7837e64d3c1ee4e54a880c5a920ab4316fc90a
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: c12348ce28de40eed0136aa2b644d0ee0650e56c
+  subpackages:
+  - pbutil
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/pelletier/go-toml
@@ -104,6 +137,25 @@ imports:
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
+- name: github.com/prometheus/client_golang
+  version: 967789050ba94deca04a5e84cce8ad472ce313c1
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- name: github.com/prometheus/client_model
+  version: 99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: 2e54d0b93cba2fd133edc32211dcc32c06ef72ca
+  subpackages:
+  - expfmt
+  - internal/bitbucket.org/ww/goautoneg
+  - model
+- name: github.com/prometheus/procfs
+  version: a6e9df898b1336106c743392c48ee0b71f5c4efa
+  subpackages:
+  - xfs
 - name: github.com/SermoDigital/jose
   version: f6df55f235c24f236d11dbcf665249a59ac2021f
   subpackages:
@@ -132,9 +184,11 @@ imports:
   - mock
   - require
 - name: github.com/ugorji/go
-  version: d23841a297e5489e787e72fceffabf9d2994b52a
+  version: 00a57e09e383d445aeef6c6cd642969dc4360231
   subpackages:
   - codec
+- name: github.com/VividCortex/gohistogram
+  version: 51564d9861991fb0ad0f531c99ef602d0f9866e6
 - name: golang.org/x/sys
   version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
   subpackages:
