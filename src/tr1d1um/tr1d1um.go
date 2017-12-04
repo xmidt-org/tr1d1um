@@ -68,9 +68,9 @@ const (
 )
 
 var (
-	release                = "-"
-	hostname               = "-"
-	requetsReceivedCounter metrics.Counter
+	release                 = "-"
+	hostname                = "-"
+	requestsReceivedCounter metrics.Counter
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -142,7 +142,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	webPA.GoKitMetricsProvider = provider.NewPrometheusProvider(applicationName, "todo") //todo: what's the approapiate subsystem?
 
 	//create a counter
-	requetsReceivedCounter = webPA.GoKitMetricsProvider.NewCounter("requests_received")
+	requestsReceivedCounter = webPA.GoKitMetricsProvider.NewCounter("requests_received")
 
 	go snsFactory.PrepareAndStart()
 
