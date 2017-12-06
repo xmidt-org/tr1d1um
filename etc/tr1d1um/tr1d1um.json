@@ -1,16 +1,12 @@
 {
-	"fqdn": "fake-fqdn",
+	"fqdn": "localhost",
 	
 	"primary": {
-		"address": ":443",
-	},
-
-	"alternate": {
-		"address": ":8090",
+		"address": ":6003",
 	},
 
 	"health": {
-		"address": ":80",
+		"address": ":6004",
 		"logInterval": "60s",
 		"options": [
 			"PayloadsOverZero",
@@ -21,11 +17,11 @@
 	},
 
 	"pprof": {
-		"address": ":9999"
+		"address": ":6005"
 	},
 	
 	"metrics": {
-		"address": ":8080"
+		"address": ":8082"
 	},
 	
 	"log": {
