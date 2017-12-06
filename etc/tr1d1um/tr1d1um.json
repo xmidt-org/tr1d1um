@@ -2,7 +2,7 @@
 	"fqdn": "localhost",
 	
 	"primary": {
-		"address": ":6003",
+		"address": ":6003"
 	},
 
 	"health": {
