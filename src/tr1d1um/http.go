@@ -46,10 +46,6 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
-	if requestsReceivedCounter != nil {
-		requestsReceivedCounter.Add(1)
-	}
-
 	var (
 		debugLogger = logging.Debug(ch)
 		errorLogger = logging.Error(ch)
@@ -142,10 +138,6 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 //HandleStat handles the differentiated STAT command
 func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Request) {
-	if requestsReceivedCounter != nil {
-		requestsReceivedCounter.Add(1)
-	}
-
 	logging.Debug(ch).Log(logging.MessageKey(), "HandleStat called")
 	var errorLogger = logging.Error(ch)
 
