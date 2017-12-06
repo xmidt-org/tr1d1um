@@ -24,6 +24,10 @@
 		"address": ":9999"
 	},
 	
+	"metrics": {
+		"address": ":8080"
+	},
+	
 	"log": {
 		"file"      : "/var/log/tr1d1um/tr1d1um.log",
 		"level"     : "DEBUG",
