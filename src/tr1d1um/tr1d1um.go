@@ -254,18 +254,13 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 	return
 }
 
-//GetValidator returns a validator for JWT tokens
+//GetValidator returns a validator for JWT/Basic tokens
+//It reads in tokens from a config file. Zero or more tokens
+//can be read.
 func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
-	defaultValidators := make(secure.Validators, 0, 0)
 	var jwtVals []JWTValidator
 
 	v.UnmarshalKey("jwtValidators", &jwtVals)
-
-	// make sure there is at least one jwtValidator supplied
-	if len(jwtVals) < 1 {
-		validator = defaultValidators
-		return
-	}
 
 	// if a JWTKeys section was supplied, configure a JWS validator
 	// and append it to the chain of validators
