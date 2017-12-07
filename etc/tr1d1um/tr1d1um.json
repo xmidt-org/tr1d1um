@@ -44,5 +44,6 @@
 	},
 
 	"targetURL": "localhost:6000",
-	"supportedServices": ["config"]
+	"supportedServices": ["config"],
+	"version", "v2"
 }
