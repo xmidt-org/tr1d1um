@@ -5,5 +5,3 @@ import:
   version: 83d899053e41996424c18cb1559c97b87a5084f6 
 - package: github.com/go-ozzo/ozzo-validation
   version: v3.3
-- package: gopkg.in/h2non/gock.v1
-  version: v1.0.6
