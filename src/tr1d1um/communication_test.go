@@ -23,6 +23,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gopkg.in/h2non/gock.v1"
 )
 
 var (
@@ -200,13 +200,16 @@ func TestPerformRequest(t *testing.T) {
 		defer testWaitGroup.Done()
 		assert := assert.New(t)
 
-		validURL := "http://someValidURL.com"
-		req, _ := http.NewRequest(http.MethodGet, validURL, nil)
+		slowTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(time.Minute) // time out will for sure be triggered
+		}))
+
+		defer slowTS.Close()
+
+		req, _ := http.NewRequest(http.MethodGet, slowTS.URL, nil)
 		ctx, cancel := context.WithCancel(req.Context())
 
 		requester := &ContextTimeoutRequester{&http.Client{}}
-
-		gock.New(validURL).Reply(http.StatusOK).Delay(time.Minute) // on purpose delaying response.
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -219,7 +222,7 @@ func TestPerformRequest(t *testing.T) {
 			errChan <- err
 		}()
 
-		wg.Wait() //Wait until we know PerformRequest() is running
+		wg.Wait() //Wait until we have high chance that PerformRequest() has begun running to call cancel()
 		cancel()
 
 		assert.NotNil(<-errChan)
@@ -227,17 +230,18 @@ func TestPerformRequest(t *testing.T) {
 
 	t.Run("RequestNoTimeout", func(t *testing.T) {
 		testWaitGroup.Wait()
-		gock.OffAll()
 
 		assert := assert.New(t)
 
 		requester := &ContextTimeoutRequester{&http.Client{}}
 
-		someURL := "http://123.com"
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusAccepted) // write a status code we can assert on
+		}))
 
-		req, _ := http.NewRequest(http.MethodGet, someURL, nil)
+		defer ts.Close()
 
-		gock.New(someURL).Reply(http.StatusAccepted)
+		req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
 
 		resp, err := requester.PerformRequest(req)
 

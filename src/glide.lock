@@ -1,5 +1,5 @@
-hash: aac40af9394d91f51b8f5c58aee8964246102f59cc4fb5d51f83b362bdbf5e8d
-updated: 2017-12-06T10:08:21.510547-08:00
+hash: bc11a244aec0ca9962a116f9b3521347df3791cdd2d78fc1ffb657c308552920
+updated: 2017-12-08T13:37:12.517019-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -198,8 +198,6 @@ imports:
   subpackages:
   - transform
   - unicode/norm
-- name: gopkg.in/h2non/gock.v1
-  version: 84d599244901620fb3eb96473eb9e50619f69b47
 - name: gopkg.in/natefinch/lumberjack.v2
   version: a96e63847dc3c67d17befa69c303767e2f84e54f
 - name: gopkg.in/yaml.v2
