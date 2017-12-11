@@ -73,9 +73,9 @@ var (
 func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
-		f                  = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-		v                  = viper.New()
-		logger, webPA, err = server.Initialize(applicationName, arguments, f, v)
+		f                                   = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
+		v                                   = viper.New()
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v)
 	)
 	// set config file value defaults
 	v.SetDefault(clientTimeoutKey, defaultClientTimeout)
@@ -130,7 +130,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	var (
-		_, tr1d1umServer = webPA.Prepare(logger, nil, r)
+		_, tr1d1umServer = webPA.Prepare(logger, nil, metricsRegistry, r)
 		signals          = make(chan os.Signal, 1)
 	)
 
