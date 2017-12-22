@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -107,65 +107,62 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := Tr1d1umResponse{}.New()
-		var mockBody bytes.Buffer
-		mockBody.WriteString("expectMe")
-		fakeResponse := &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(&mockBody)}
+		fakeResponse := newTestingHTTPResponse(http.StatusBadRequest, "expectMe")
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
+		assert.True(bodyIsClosed(fakeResponse))
 	})
 
 	t.Run("503Into504", func(t *testing.T) {
 		recorder := Tr1d1umResponse{}.New()
-		var mockBody bytes.Buffer
-		mockBody.WriteString("expectMe")
-		fakeResponse := &http.Response{StatusCode: http.StatusServiceUnavailable, Body: ioutil.NopCloser(&mockBody)}
+		fakeResponse := newTestingHTTPResponse(http.StatusServiceUnavailable, "expectMe")
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 		assert.EqualValues(http.StatusGatewayTimeout, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
+		assert.True(bodyIsClosed(fakeResponse))
 	})
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
-		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "")
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
 			errors.New(errMsg)).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
+		assert.True(bodyIsClosed(fakeResponse))
 		mockEncoding.AssertExpectations(t)
 	})
 
 	t.Run("ExtractPayloadTimeout", func(t *testing.T) {
-		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "")
+
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
 			context.Canceled).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
+		assert.True(bodyIsClosed(fakeResponse))
 		mockEncoding.AssertExpectations(t)
 	})
 
 	t.Run("IdealReadEntireBody", func(t *testing.T) {
-		var fakeBody bytes.Buffer
-		bodyString := "bodyString"
-		fakeBody.WriteString(bodyString)
-
-		fakeResponse := &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(&fakeBody)}
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "read all of this")
 
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, true)
 
 		assert.EqualValues(http.StatusOK, recorder.Code)
-		assert.EqualValues(bodyString, string(recorder.Body))
-		mockEncoding.AssertNotCalled(t, "ExtractPayload", fakeResponse.Body, wrp.Msgpack)
+		assert.EqualValues("read all of this", string(recorder.Body))
+		assert.True(bodyIsClosed(fakeResponse))
 	})
 
 	t.Run("GoodRDKResponse", func(t *testing.T) {
-		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "") //these arguments are irrelevant as we mock RDK response below
 		extractedData := []byte(`{"statusCode": 202}`)
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
@@ -174,11 +171,12 @@ func TestHandleResponse(t *testing.T) {
 
 		assert.EqualValues(202, recorder.Code)
 		assert.EqualValues(extractedData, string(recorder.Body))
+		assert.True(bodyIsClosed(fakeResponse))
 		mockEncoding.AssertExpectations(t)
 	})
 
 	t.Run("BadRDKResponse", func(t *testing.T) {
-		fakeResponse := &http.Response{StatusCode: http.StatusOK}
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "") //these arguments are irrelevant as we mock RDK response below
 		extractedData := []byte(`{"statusCode": 500}`)
 
 		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
@@ -187,9 +185,9 @@ func TestHandleResponse(t *testing.T) {
 
 		assert.EqualValues(http.StatusOK, recorder.Code) // reflect transaction instead of device status
 		assert.EqualValues(extractedData, string(recorder.Body))
+		assert.True(bodyIsClosed(fakeResponse))
 		mockEncoding.AssertExpectations(t)
 	})
-
 }
 
 func TestPerformRequest(t *testing.T) {
@@ -259,4 +257,30 @@ func NewTR1() (tr1 *Tr1SendAndHandle) {
 		RespTimeout:  time.Minute,
 	}
 	return tr1
+}
+
+//bodyCloseVerifier is a helper struct that helps track of whether or not some client called
+//http.Response.Body.Close() after reading it.
+type bodyCloseVerifier struct {
+	io.Reader
+	bodyClosed bool
+}
+
+func (b *bodyCloseVerifier) Close() (err error) {
+	b.bodyClosed = true
+	return
+}
+
+func newTestingHTTPResponse(code int, body string) (resp *http.Response) {
+	resp = &http.Response{StatusCode: code, Body: &bodyCloseVerifier{bytes.NewBufferString(body), false}}
+	return
+}
+
+//bodyIsClosed is a simple helper that returns true if http.Response.Body.Close() was called.
+//Note that correct results are only guaranteed if the body is an underlying bodyCloseVerifier
+func bodyIsClosed(resp *http.Response) (isClosed bool) {
+	if verifier, ofCorrectType := resp.Body.(*bodyCloseVerifier); ofCorrectType {
+		isClosed = verifier.bodyClosed
+	}
+	return
 }
