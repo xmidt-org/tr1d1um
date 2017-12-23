@@ -122,6 +122,9 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		return
 	}
 
+	//as a client, we are responsible to close the body after it gets read below
+	defer respFromServer.Body.Close()
+
 	if respFromServer.StatusCode != http.StatusOK || wholeBody {
 		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
 		tr1Resp.Code = respFromServer.StatusCode
