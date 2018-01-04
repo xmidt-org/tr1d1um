@@ -59,9 +59,8 @@ start() {
 
 stop() {
 	echo -n $"Stopping tr1d1um: "
-	kill $(cat /var/run/tr1d1um.pid)
+	supervisorctl -c /etc/tr1d1um/supervisord.conf shutdown > /dev/null
 	RETVAL=$?
-	rm -f /var/run/tr1d1um.pid
 	echo
 	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/tr1d1um
 }
@@ -85,7 +84,7 @@ case "$1" in
 	[ -f /var/lock/subsys/tr1d1um ] && restart
 	;;
   status)
-	status tr1d1um
+	supervisorctl -c /etc/tr1d1um/supervisord.conf status
 	RETVAL=$?
 	;;
   *)
