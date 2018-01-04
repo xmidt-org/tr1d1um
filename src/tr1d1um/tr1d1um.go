@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/Comcast/webpa-common/concurrent"
@@ -133,6 +134,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		_, tr1d1umServer = webPA.Prepare(logger, nil, metricsRegistry, r)
 		signals          = make(chan os.Signal, 1)
 	)
+
+	signal.Notify(signals, os.Interrupt, os.Kill)
 
 	go snsFactory.PrepareAndStart()
 
