@@ -105,8 +105,6 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
 	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 
-	forwardServerHeaderInfo(origin)
-
 	var wrpPayloadBuffer bytes.Buffer
 	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.Msgpack).Encode(wrpMsg)
 
@@ -147,8 +145,6 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 		URL:         ch.TargetURL + req.URL.RequestURI(),
 		headers:     http.Header{},
 	}
-
-	forwardServerHeaderInfo(origin)
 
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
