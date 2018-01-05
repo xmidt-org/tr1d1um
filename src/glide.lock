@@ -1,5 +1,5 @@
-hash: b9751521812929046bfd68323a925a44946c944577f83c3e53706a0a443f109c
-updated: 2017-12-11T11:07:05.224498056-08:00
+hash: 60f7cc237c177a00e988ca32901ef0321d5cb6ddd2d5c1473f7d43b547ec2d5c
+updated: 2018-01-04T16:36:53.621426-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -38,14 +38,13 @@ imports:
   subpackages:
   - linux
 - name: github.com/Comcast/webpa-common
-  version: e630982de53ef5a555610825c4dbca78c097549d
+  version: 49d31397e019541d27795f8543e634ab0846ed82
   subpackages:
   - concurrent
   - convey
   - convey/conveyhttp
   - device
   - health
-  - httperror
   - logging
   - resource
   - secure
@@ -56,6 +55,7 @@ imports:
   - webhook
   - webhook/aws
   - wrp
+  - xhttp
   - xmetrics
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
@@ -121,7 +121,7 @@ imports:
 - name: github.com/jtacoma/uritemplates
   version: 307ae868f90f4ee1b73ebe4596e0394237dacce8
 - name: github.com/justinas/alice
-  version: 1051eaf52fcafdd87ead59d28b065f1fcb8274ec
+  version: 03f45bd4b7dad4734bc4620e46a35789349abb20
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/magiconair/properties

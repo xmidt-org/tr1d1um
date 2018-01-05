@@ -62,13 +62,6 @@ const (
 	reqRetryIntervalKey  = "requestRetryInterval"
 	reqMaxRetriesKey     = "requestMaxRetries"
 	respWaitTimeoutKey   = "respWaitTimeout"
-
-	releaseKey = "release"
-)
-
-var (
-	release  = "-"
-	hostname = "-"
 )
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -85,22 +78,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
 	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
 
-	//release and internal OS info set up
-	if releaseVal := v.GetString(releaseKey); releaseVal != "" {
-		release = releaseVal
-	}
-
-	if hostnameVal, hostnameErr := os.Hostname(); hostnameErr == nil {
-		hostname = hostnameVal
-	}
-
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
 		return 1
 	}
 
 	var (
-		infoLogger = logging.Info(logger)
+		infoLogger  = logging.Info(logger)
+		errorLogger = logging.Error(logger)
 	)
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
@@ -135,14 +120,23 @@ func tr1d1um(arguments []string) (exitCode int) {
 		signals          = make(chan os.Signal, 1)
 	)
 
-	signal.Notify(signals, os.Interrupt, os.Kill)
-
 	go snsFactory.PrepareAndStart()
 
-	if err := concurrent.Await(tr1d1umServer, signals); err != nil {
-		fmt.Fprintf(os.Stderr, "Error when starting %s: %s", applicationName, err)
+	//
+	// Execute the runnable, which runs all the servers, and wait for a signal
+	//
+	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
+
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
 		return 4
 	}
+
+	signal.Notify(signals)
+	s := server.SignalWait(infoLogger, signals, os.Kill, os.Interrupt)
+	errorLogger.Log(logging.MessageKey(), "exiting due to signal", "signal", s)
+	close(shutdown)
+	waitGroup.Wait()
 
 	return 0
 }
