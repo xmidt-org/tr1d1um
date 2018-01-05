@@ -247,11 +247,3 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 	// Body
 	to.Write(from.Body)
 }
-
-//forwardServerHeaderInfo forwards the tr1d1um:
-// - release version
-// - VM OS hostname
-func forwardServerHeaderInfo(origin http.ResponseWriter) {
-	origin.Header().Set(releaseKey, release)
-	origin.Header().Set("hostname", hostname)
-}
