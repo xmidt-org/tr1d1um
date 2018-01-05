@@ -54,6 +54,7 @@ const (
 	defaultNetDialerTimeout = "5s"
 	defaultRetryInterval    = "2s"
 	defaultMaxRetries       = 2
+	defaultVersion          = "v2"
 
 	supportedServicesKey = "supportedServices"
 	targetURLKey         = "targetURL"
@@ -62,6 +63,7 @@ const (
 	reqRetryIntervalKey  = "requestRetryInterval"
 	reqMaxRetriesKey     = "requestMaxRetries"
 	respWaitTimeoutKey   = "respWaitTimeout"
+	versionKey           = "version"
 
 	releaseKey = "release"
 )
@@ -84,6 +86,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
 	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
 	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
+	v.SetDefault(versionKey, defaultVersion)
 
 	//release and internal OS info set up
 	if releaseVal := v.GetString(releaseKey); releaseVal != "" {
@@ -120,7 +123,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	conversionHandler := SetUpHandler(v, logger)
 
 	r := mux.NewRouter()
-	baseRouter := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString("version"))).Subrouter()
+	baseRouter := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString(versionKey))).Subrouter()
 
 	AddRoutes(baseRouter, preHandler, conversionHandler)
 
@@ -231,7 +234,7 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 		},
 		RetryStrategy: RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
 			ShouldRetryOnResponse, OnRetryInternalFailure),
-		WRPRequestURL: fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
+		WRPRequestURL: fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString(versionKey)),
 		TargetURL:     v.GetString(targetURLKey),
 	}
 
