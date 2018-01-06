@@ -20,7 +20,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"net/http"
 	"strings"
 
@@ -132,16 +131,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
 	}
 
-	//temporary debugging log for weird 403 cases
-	tr1Response := tr1Resp.(*Tr1d1umResponse)
-	if tr1Response.Code == http.StatusForbidden {
-		authVal := req.Header.Get("Authorization")
-		n, perc := float64(len(authVal)), float64(0.9)
-		desiredLength := int(math.Floor(n * perc))
-		debugLogger.Log(logging.MessageKey(), "first 90% of auth value", "authValLength", n, "90PPrefix", authVal[:desiredLength])
-	}
-
-	TransferResponse(tr1Response, origin)
+	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
 }
 
 //HandleStat handles the differentiated STAT command

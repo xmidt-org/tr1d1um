@@ -1,5 +1,8 @@
 {
-	"fqdn": "localhost",
+	"server": "localhost",
+	"version": "-",
+	"region": "-",
+	"flavor": "", 
 	
 	"primary": {
 		"address": ":6003"
@@ -44,6 +47,5 @@
 	},
 
 	"targetURL": "localhost:6000",
-	"supportedServices": ["config"],
-	"version", "v2"
+	"supportedServices": ["config"]
 }
