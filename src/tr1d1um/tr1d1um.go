@@ -45,8 +45,7 @@ import (
 
 //convenient global values
 const (
-	applicationName = "tr1d1um"
-	baseURI         = "/api"
+	applicationName, apiBase = "tr1d1um", "/api/v2"
 
 	DefaultKeyID            = "current"
 	defaultClientTimeout    = "30s"
@@ -105,7 +104,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	conversionHandler := SetUpHandler(v, logger)
 
 	r := mux.NewRouter()
-	baseRouter := r.PathPrefix(fmt.Sprintf("%s/%s", baseURI, v.GetString("version"))).Subrouter()
+	baseRouter := r.PathPrefix(apiBase).Subrouter()
 
 	AddRoutes(baseRouter, preHandler, conversionHandler)
 
@@ -160,7 +159,7 @@ func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *ali
 
 	selfURL := &url.URL{
 		Scheme: "https",
-		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
+		Host:   v.GetString("server") + v.GetString("primary.address"),
 	}
 
 	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, nil)
@@ -225,7 +224,7 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 		},
 		RetryStrategy: RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
 			ShouldRetryOnResponse, OnRetryInternalFailure),
-		WRPRequestURL: fmt.Sprintf("%s%s/%s/device", v.GetString(targetURLKey), baseURI, v.GetString("version")),
+		WRPRequestURL: fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
 		TargetURL:     v.GetString(targetURLKey),
 	}
 
