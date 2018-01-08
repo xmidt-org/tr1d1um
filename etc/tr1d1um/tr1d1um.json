@@ -1,4 +1,6 @@
 {
+	"fqdn": "localhost",
+
 	"server": "localhost",
 	"version": "-",
 	"region": "-",
