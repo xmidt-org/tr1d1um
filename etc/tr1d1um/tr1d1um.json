@@ -30,7 +30,7 @@
 	},
 	
 	"log": {
-		"file"      : "/var/log/tr1d1um/tr1d1um.log",
+		"file"      : "tr1d1um.log",
 		"level"     : "DEBUG",
 		"maxSize"   : 52428800,
 		"maxBackup" : 10,
@@ -48,6 +48,7 @@
 		}
 	},
 
-	"targetURL": "localhost:6000",
-	"supportedServices": ["config"]
+	"targetURL": "http://localhost:6000",
+	"supportedServices": ["config"],
+	"authHeader": "test-basic"
 }

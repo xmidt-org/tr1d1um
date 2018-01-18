@@ -110,8 +110,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var snsFactory *webhook.Factory
 
-	if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
-		return
+	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
+		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
+			return
+		}
 	}
 
 	var (
@@ -119,7 +121,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		signals          = make(chan os.Signal, 1)
 	)
 
-	go snsFactory.PrepareAndStart()
+	if snsFactory != nil {
+		go snsFactory.PrepareAndStart()
+	}
 
 	//
 	// Execute the runnable, which runs all the servers, and wait for a signal
