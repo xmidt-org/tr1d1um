@@ -30,7 +30,7 @@
 	},
 	
 	"log": {
-		"file"      : "/var/log/tr1d1um/tr1d1um.log",
+		"file"      : "tr1d1um.log",
 		"level"     : "DEBUG",
 		"maxSize"   : 52428800,
 		"maxBackup" : 10,
