@@ -1,5 +1,5 @@
 {
-	"fqdn": "localhost",
+	"fqdn": "127.0.0.1",
 
 	"server": "localhost",
 	"version": "-",
@@ -48,6 +48,7 @@
 		}
 	},
 
-	"targetURL": "localhost:6000",
-	"supportedServices": ["config"]
+	"targetURL": "http://localhost:6000",
+	"supportedServices": ["config"],
+	"authHeader": "test-basic"
 }
