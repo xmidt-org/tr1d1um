@@ -111,7 +111,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 	var snsFactory *webhook.Factory
 
 	if v.GetString("aws.accessKey") != "" {
-		fmt.Printf("'%v'\n", v.GetString("aws.accessKey"))
 		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
 			return
 		}
