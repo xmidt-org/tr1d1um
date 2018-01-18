@@ -110,7 +110,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var snsFactory *webhook.Factory
 
-	if v.GetString("aws.accessKey") != "" {
+	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
 		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
 			return
 		}
