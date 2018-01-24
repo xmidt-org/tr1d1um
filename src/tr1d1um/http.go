@@ -46,10 +46,7 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
-	var (
-		debugLogger = logging.Debug(ch)
-		errorLogger = logging.Error(ch)
-	)
+	var debugLogger, errorLogger = logging.Debug(ch), logging.Error(ch)
 
 	debugLogger.Log(logging.MessageKey(), "ServeHTTP called")
 
@@ -131,7 +128,10 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
 	}
 
-	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
+	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
+
+	bookkeepingLog(ch, tr1d1umResp, req)
+	TransferResponse(tr1d1umResp, origin)
 }
 
 //HandleStat handles the differentiated STAT command
@@ -156,8 +156,11 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 
 	// we expect content to be of json format
 	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
+	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
 
-	TransferResponse(tr1Resp.(*Tr1d1umResponse), origin)
+	bookkeepingLog(ch, tr1d1umResp, req)
+
+	TransferResponse(tr1d1umResp, origin)
 }
 
 //RequestValidator verifies a request based the provided named URL variables
@@ -242,4 +245,15 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 
 	// Body
 	to.Write(from.Body)
+}
+
+//helper function that logs desired HTTP request/response info
+func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request) {
+	logging.Info(logger).Log(
+		logging.MessageKey(), "Bookkeeping response",
+		"requestOrigin", req.RemoteAddr,
+		"requestMethod", req.Method,
+		"responseHeaders", tr1Resp.Headers,
+		"responseStatusCode", tr1Resp.Code,
+		"responseError", tr1Resp.err)
 }
