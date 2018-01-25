@@ -36,6 +36,9 @@ import (
 	"github.com/Comcast/webpa-common/secure/key"
 	"github.com/Comcast/webpa-common/server"
 	"github.com/Comcast/webpa-common/webhook"
+	"github.com/Comcast/webpa-common/webhook/aws"
+
+	"github.com/Comcast/webpa-common/xmetrics"
 	"github.com/SermoDigital/jose/jwt"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
@@ -69,8 +72,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 	var (
 		f                                   = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 		v                                   = viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v)
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, secure.Metrics)
 	)
+
 	// set config file value defaults
 	v.SetDefault(clientTimeoutKey, defaultClientTimeout)
 	v.SetDefault(respWaitTimeoutKey, defaultRespWaitTimeout)
@@ -95,7 +99,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	preHandler, err := SetUpPreHandler(v, logger)
+	valMetrics := secure.NewJWTValidationMeasures(metricsRegistry)
+	preHandler, err := SetUpPreHandler(v, logger, valMetrics)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error setting up prehandler: %s\n", err.Error())
@@ -112,7 +117,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	var snsFactory *webhook.Factory
 
 	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
-		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger); exitCode != 0 {
+		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger, metricsRegistry); exitCode != 0 {
 			return
 		}
 	}
@@ -148,15 +153,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 //ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
 //baseRouter is pre-configured with the api/v2 prefix path
 //root is the original router used by webHookFactory.Initialize()
-func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger) (*webhook.Factory, int) {
-	webHookFactory, err := webhook.NewFactory(v)
+func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*webhook.Factory, int) {
+	webHookFactory, err := webhook.NewFactory(v, &registry)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err)
 		return nil, 1
 	}
 
-	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler()
+	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler(registry)
 
 	// register webHook end points for api
 	baseRouter.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
@@ -167,7 +172,7 @@ func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *ali
 		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
 	}
 
-	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, nil)
+	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, registry, nil)
 	return webHookFactory, 0
 }
 
@@ -237,8 +242,8 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 }
 
 //SetUpPreHandler configures the authorization requirements for requests to reach the main handler
-func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain, err error) {
-	validator, err := GetValidator(v)
+func SetUpPreHandler(v *viper.Viper, logger log.Logger, m *secure.JWTValidationMeasures) (preHandler *alice.Chain, err error) {
+	validator, err := GetValidator(v, m)
 	if err != nil {
 		return
 	}
@@ -250,6 +255,8 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 		Logger:              logger,
 	}
 
+	authHandler.DefineMeasures(m)
+
 	newPreHandler := alice.New(authHandler.Decorate)
 	preHandler = &newPreHandler
 	return
@@ -258,7 +265,7 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger) (preHandler *alice.Chain
 //GetValidator returns a validator for JWT/Basic tokens
 //It reads in tokens from a config file. Zero or more tokens
 //can be read.
-func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
+func GetValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator secure.Validator, err error) {
 	var jwtVals []JWTValidator
 
 	v.UnmarshalKey("jwtValidators", &jwtVals)
@@ -274,6 +281,8 @@ func GetValidator(v *viper.Viper) (validator secure.Validator, err error) {
 			validator = validators
 			return
 		}
+
+		validatorDescriptor.Custom.DefineMeasures(m)
 
 		validators = append(
 			validators,
