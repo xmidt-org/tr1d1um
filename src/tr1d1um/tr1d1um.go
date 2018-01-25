@@ -154,7 +154,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 //baseRouter is pre-configured with the api/v2 prefix path
 //root is the original router used by webHookFactory.Initialize()
 func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*webhook.Factory, int) {
-	webHookFactory, err := webhook.NewFactory(v, &registry)
+	webHookFactory, err := webhook.NewFactory(v)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err)
