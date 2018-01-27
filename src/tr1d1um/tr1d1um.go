@@ -99,8 +99,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	valMetrics := secure.NewJWTValidationMeasures(metricsRegistry)
-	preHandler, err := SetUpPreHandler(v, logger, valMetrics)
+	preHandler, err := SetUpPreHandler(v, logger, metricsRegistry)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error setting up prehandler: %s\n", err.Error())
@@ -242,30 +241,30 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 }
 
 //SetUpPreHandler configures the authorization requirements for requests to reach the main handler
-func SetUpPreHandler(v *viper.Viper, logger log.Logger, m *secure.JWTValidationMeasures) (preHandler *alice.Chain, err error) {
-	validator, err := GetValidator(v, m)
-	if err != nil {
-		return
+func SetUpPreHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (preHandler *alice.Chain, err error) {
+	m := secure.NewJWTValidationMeasures(registry)
+	var validator secure.Validator
+	if validator, err = getValidator(v, m); err == nil {
+
+		authHandler := handler.AuthorizationHandler{
+			HeaderName:          "Authorization",
+			ForbiddenStatusCode: 403,
+			Validator:           validator,
+			Logger:              logger,
+		}
+
+		authHandler.DefineMeasures(m)
+
+		newPreHandler := alice.New(authHandler.Decorate)
+		preHandler = &newPreHandler
 	}
-
-	authHandler := handler.AuthorizationHandler{
-		HeaderName:          "Authorization",
-		ForbiddenStatusCode: 403,
-		Validator:           validator,
-		Logger:              logger,
-	}
-
-	authHandler.DefineMeasures(m)
-
-	newPreHandler := alice.New(authHandler.Decorate)
-	preHandler = &newPreHandler
 	return
 }
 
-//GetValidator returns a validator for JWT/Basic tokens
+//getValidator returns a validator for JWT/Basic tokens
 //It reads in tokens from a config file. Zero or more tokens
 //can be read.
-func GetValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator secure.Validator, err error) {
+func getValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator secure.Validator, err error) {
 	var jwtVals []JWTValidator
 
 	v.UnmarshalKey("jwtValidators", &jwtVals)
