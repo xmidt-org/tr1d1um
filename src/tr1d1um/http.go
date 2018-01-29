@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
@@ -46,6 +47,7 @@ type ConversionHandler struct {
 
 //ConversionHandler handles the different incoming tr1 requests
 func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Request) {
+	requestArrivalTime := time.Now()
 	var debugLogger, errorLogger = logging.Debug(ch), logging.Error(ch)
 
 	debugLogger.Log(logging.MessageKey(), "ServeHTTP called")
@@ -130,12 +132,13 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
 
-	bookkeepingLog(ch, tr1d1umResp, req)
+	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime).Seconds())
 	TransferResponse(tr1d1umResp, origin)
 }
 
 //HandleStat handles the differentiated STAT command
 func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Request) {
+	requestArrivalTime := time.Now()
 	logging.Debug(ch).Log(logging.MessageKey(), "HandleStat called")
 	var errorLogger = logging.Error(ch)
 
@@ -158,7 +161,7 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
 
-	bookkeepingLog(ch, tr1d1umResp, req)
+	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime).Seconds())
 
 	TransferResponse(tr1d1umResp, origin)
 }
@@ -248,12 +251,14 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 }
 
 //helper function that logs desired HTTP request/response info
-func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request) {
+func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request, latency float64) {
 	logging.Info(logger).Log(
 		logging.MessageKey(), "Bookkeeping response",
-		"requestOrigin", req.RemoteAddr,
+		"requestAddress", req.RemoteAddr,
+		"requestURLPath", req.URL.Path,
 		"requestMethod", req.Method,
 		"responseHeaders", tr1Resp.Headers,
-		"responseStatusCode", tr1Resp.Code,
-		"responseError", tr1Resp.err)
+		"responseCode", tr1Resp.Code,
+		"responseError", tr1Resp.err,
+		"latencySeconds", latency)
 }
