@@ -132,7 +132,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 
 	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
 
-	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime).Seconds(), wrpMsg.TransactionUUID)
+	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime), wrpMsg.TransactionUUID)
 	TransferResponse(tr1d1umResp, origin)
 }
 
@@ -161,7 +161,7 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
 	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
 
-	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime).Seconds(), GetOrGenTID(req.Header))
+	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime), GetOrGenTID(req.Header))
 
 	TransferResponse(tr1d1umResp, origin)
 }
@@ -251,7 +251,7 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 }
 
 //helper function that logs desired HTTP request/response info
-func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request, latencySeconds float64, TID string) {
+func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request, latency time.Duration, TID string) {
 	logging.Info(logger).Log(
 		logging.MessageKey(), "Bookkeeping response",
 		"requestAddress", req.RemoteAddr,
@@ -260,6 +260,6 @@ func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Reque
 		"responseHeaders", tr1Resp.Headers,
 		"responseCode", tr1Resp.Code,
 		"responseError", tr1Resp.err,
-		"latency", fmt.Sprintf("%fms", latencySeconds*1000),
+		"latency", latency,
 		"tid", TID)
 }
