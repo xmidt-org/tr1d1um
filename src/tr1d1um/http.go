@@ -260,6 +260,6 @@ func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Reque
 		"responseHeaders", tr1Resp.Headers,
 		"responseCode", tr1Resp.Code,
 		"responseError", tr1Resp.err,
-		"latency", fmt.Sprintf("%fms", latencySeconds/1000),
+		"latency", fmt.Sprintf("%fms", latencySeconds*1000),
 		"tid", TID)
 }
