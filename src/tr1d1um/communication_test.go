@@ -115,12 +115,12 @@ func TestHandleResponse(t *testing.T) {
 		assert.True(bodyIsClosed(fakeResponse))
 	})
 
-	t.Run("503Into504", func(t *testing.T) {
+	t.Run("Scytale503s", func(t *testing.T) {
 		recorder := Tr1d1umResponse{}.New()
 		fakeResponse := newTestingHTTPResponse(http.StatusServiceUnavailable, "expectMe")
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
-		assert.EqualValues(http.StatusGatewayTimeout, recorder.Code)
+		assert.EqualValues(http.StatusServiceUnavailable, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
 	})
