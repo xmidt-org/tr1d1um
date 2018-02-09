@@ -120,7 +120,7 @@ func TestHandleResponse(t *testing.T) {
 		fakeResponse := newTestingHTTPResponse(http.StatusServiceUnavailable, "expectMe")
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
-		assert.EqualValues(http.StatusGatewayTimeout, recorder.Code)
+		assert.EqualValues(http.StatusServiceUnavailable, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
 	})

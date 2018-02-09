@@ -128,9 +128,7 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 	if respFromServer.StatusCode != http.StatusOK || wholeBody {
 		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
 		tr1Resp.Code = respFromServer.StatusCode
-		if respFromServer.StatusCode == http.StatusServiceUnavailable {
-			tr1Resp.Code = http.StatusGatewayTimeout
-		}
+
 		ReportError(tr1Resp.err, tr1Resp)
 		debugLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
