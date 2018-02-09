@@ -14,10 +14,15 @@ src/vendor
 -src/tr1d1um/tr1d1um.json
 +src/tr1d1um/tr1d1um.json
 +keys/*.private
+*.xml
+*.bk
+*.log
+*.iml
 
 src/tr1d1um/tr1d1um
 src/tr1d1um/debug
 src/tr1d1um/output
+
 
 # config
 src/tr1d1um/tr1d1um.json
