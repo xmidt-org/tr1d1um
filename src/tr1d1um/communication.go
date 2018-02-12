@@ -169,11 +169,10 @@ type ContextTimeoutRequester struct {
 //PerformRequest makes its client execute the request asynchronously and guarantees that the cancellations or
 // timeouts of the request's context is respected
 func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *http.Response, err error) {
-	responseReady := make(chan clientResponse)
+	responseReady := make(chan clientResponse, 1) // capacity of 1 helps avoid goroutine blocking in timeout situations
 	ctx := request.Context()
 
 	go func() {
-		defer close(responseReady)
 		respObj, respErr := c.client.Do(request)
 		responseReady <- clientResponse{respObj, respErr}
 	}()
