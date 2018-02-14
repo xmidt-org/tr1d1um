@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"time"
@@ -72,39 +73,14 @@ func (m *MockConversionTool) GetConfiguredWRP(wdmp []byte, pathVars Vars, header
 	return args.Get(0).(*wrp.Message)
 }
 
-/*  Mocks for EncodingTool  */
-type MockEncodingTool struct {
-	mock.Mock
-}
-
-func (m *MockEncodingTool) GenericEncode(v interface{}, f wrp.Format) ([]byte, error) {
-	args := m.Called(v, f)
-	return args.Get(0).([]byte), args.Error(1)
-}
-
-func (m *MockEncodingTool) DecodeJSON(input io.Reader, v interface{}) error {
-	args := m.Called(input, v)
-	return args.Error(0)
-}
-
-func (m *MockEncodingTool) EncodeJSON(v interface{}) ([]byte, error) {
-	args := m.Called(v)
-	return args.Get(0).([]byte), args.Error(1)
-}
-
-func (m *MockEncodingTool) ExtractPayload(input io.Reader, format wrp.Format) ([]byte, error) {
-	args := m.Called(input, format)
-	return args.Get(0).([]byte), args.Error(1)
-}
-
 /* Mocks for SendAndHandle */
 
 type MockSendAndHandle struct {
 	mock.Mock
 }
 
-func (m *MockSendAndHandle) MakeRequest(request ...interface{}) (interface{}, error) {
-	args := m.Called(request...)
+func (m *MockSendAndHandle) MakeRequest(ctx context.Context, request ...interface{}) (interface{}, error) {
+	args := m.Called(ctx, request)
 	return args.Get(0), args.Error(1)
 }
 func (m *MockSendAndHandle) HandleResponse(err error, resp *http.Response, tr1Resp *Tr1d1umResponse, wholeBody bool) {
@@ -114,16 +90,6 @@ func (m *MockSendAndHandle) HandleResponse(err error, resp *http.Response, tr1Re
 func (m *MockSendAndHandle) GetRespTimeout() time.Duration {
 	args := m.Called()
 	return args.Get(0).(time.Duration)
-}
-
-/* Mock functions for Requester */
-type MockRequester struct {
-	mock.Mock
-}
-
-func (m *MockRequester) PerformRequest(req *http.Request) (*http.Response, error) {
-	args := m.Called(req)
-	return args.Get(0).(*http.Response), args.Error(1)
 }
 
 /* Mocks for RequestValidator */
@@ -149,7 +115,7 @@ type MockRetry struct {
 	mock.Mock
 }
 
-func (m *MockRetry) Execute(op func(...interface{}) (interface{}, error), opArgs ...interface{}) (interface{}, error) {
-	args := m.Called(op, opArgs)
+func (m *MockRetry) Execute(ctx context.Context, op func(context.Context, ...interface{}) (interface{}, error), opArgs ...interface{}) (interface{}, error) {
+	args := m.Called(ctx, op, opArgs)
 	return args.Get(0), args.Error(1)
 }

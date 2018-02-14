@@ -216,25 +216,29 @@ func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandle
 
 	cHandler = &ConversionHandler{
 		WdmpConvert: &ConversionWDMP{
-			encodingHelper: &EncodingHelper{},
-			WRPSource:      v.GetString("WRPSource")},
-		Sender: SendAndHandleFactory{}.New(respTimeout,
-			&ContextTimeoutRequester{&http.Client{Timeout: clientTimeout,
+			WRPSource: v.GetString("WRPSource")},
+
+		Sender: &Tr1SendAndHandle{
+			RespTimeout: respTimeout,
+			Logger:      logger,
+			client: &http.Client{Timeout: clientTimeout,
 				Transport: &http.Transport{
 					Dial: (&net.Dialer{
 						Timeout: dialerTimeout,
-					}).Dial}},
-			}, &EncodingHelper{}, logger),
-		EncodingHelper: &EncodingHelper{},
-		Logger:         logger,
+					}).Dial}}},
+
+		Logger: logger,
+
 		RequestValidator: &TR1RequestValidator{
 			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
 			Logger:            logger,
 		},
+
 		RetryStrategy: RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
 			ShouldRetryOnResponse, OnRetryInternalFailure),
 		WRPRequestURL: fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
-		TargetURL:     v.GetString(targetURLKey),
+
+		TargetURL: v.GetString(targetURLKey),
 	}
 
 	return

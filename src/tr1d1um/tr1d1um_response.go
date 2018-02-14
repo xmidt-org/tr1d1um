@@ -17,7 +17,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,8 +79,10 @@ func ReportError(err error, tr1Resp *Tr1d1umResponse) {
 		return
 	}
 	message, statusCode := "", http.StatusInternalServerError
-	if err == context.Canceled || err == context.DeadlineExceeded ||
-		strings.Contains(err.Error(), "Client.Timeout exceeded") {
+
+	if errMsg := err.Error(); strings.HasSuffix(errMsg, "context canceled") ||
+		strings.HasSuffix(errMsg, "deadline exceeded") ||
+		strings.Contains(errMsg, "Client.Timeout exceeded") {
 		message, statusCode = "Error Timeout", Tr1StatusTimeout
 	}
 

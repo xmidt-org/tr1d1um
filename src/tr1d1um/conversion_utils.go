@@ -58,20 +58,12 @@ type ConversionTool interface {
 	GetConfiguredWRP([]byte, Vars, http.Header) *wrp.Message
 }
 
-//EncodingTool lays out the definition of methods used for encoding/decoding between WDMP and WRP
-type EncodingTool interface {
-	DecodeJSON(io.Reader, interface{}) error
-	EncodeJSON(interface{}) ([]byte, error)
-	ExtractPayload(io.Reader, wrp.Format) ([]byte, error)
-}
-
 //EncodingHelper implements the definitions defined in EncodingTool
 type EncodingHelper struct{}
 
 //ConversionWDMP implements the definitions defined in ConversionTool
 type ConversionWDMP struct {
-	encodingHelper EncodingTool
-	WRPSource      string
+	WRPSource string
 }
 
 //The following functions with names of the form {command}FlavorFormat serve as the low level builders of WDMP objects
@@ -101,9 +93,13 @@ func (cw *ConversionWDMP) GetFlavorFormat(req *http.Request, pathVars Vars, attr
 func (cw *ConversionWDMP) SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err error) {
 	wdmp = new(SetWDMP)
 
-	if err = cw.encodingHelper.DecodeJSON(req.Body, wdmp); err == nil {
-		err = cw.ValidateAndDeduceSET(req.Header, wdmp)
+	var payload []byte
+	if payload, err = ioutil.ReadAll(req.Body); err == nil && len(payload) > 0 {
+		if err = json.Unmarshal(payload, wdmp); err == nil {
+			err = cw.ValidateAndDeduceSET(req.Header, wdmp)
+		}
 	}
+
 	return
 }
 
@@ -131,10 +127,12 @@ func (cw *ConversionWDMP) AddFlavorFormat(input io.Reader, urlVars Vars, tableNa
 		return
 	}
 
-	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Row); err == nil {
-		err = validation.Validate(wdmp.Row, validation.NotNil)
+	var payload []byte
+	if payload, err = ioutil.ReadAll(input); err == nil && len(payload) > 0 {
+		if err = json.Unmarshal(payload, &wdmp.Row); err == nil {
+			err = validation.Validate(wdmp.Row, validation.NotNil)
+		}
 	}
-
 	return
 }
 
@@ -149,8 +147,11 @@ func (cw *ConversionWDMP) ReplaceFlavorFormat(input io.Reader, urlVars Vars, tab
 		return
 	}
 
-	if err = cw.encodingHelper.DecodeJSON(input, &wdmp.Rows); err == nil {
-		err = validation.Validate(wdmp.Rows, validation.NotNil)
+	var payload []byte
+	if payload, err = ioutil.ReadAll(input); err == nil && len(payload) > 0 {
+		if err = json.Unmarshal(payload, &wdmp.Rows); err == nil {
+			err = validation.Validate(wdmp.Rows, validation.NotNil)
+		}
 	}
 
 	return
@@ -263,35 +264,6 @@ func (cw *ConversionWDMP) GetConfiguredWRP(wdmp []byte, pathVars Vars, header ht
 // WRP transaction message
 func (cw *ConversionWDMP) GetWRPSource() string {
 	return cw.WRPSource
-}
-
-/*   Encoding Helper methods below */
-
-//DecodeJSON decodes data from the input into v. It uses json.Unmarshall to perform actual decoding
-//Note: if nothing is read from input, Unmarshalling is not attempted.
-func (helper *EncodingHelper) DecodeJSON(input io.Reader, v interface{}) (err error) {
-	var payload []byte
-	if payload, err = ioutil.ReadAll(input); err == nil && len(payload) > 0 {
-		err = json.Unmarshal(payload, v)
-	}
-	return
-}
-
-//EncodeJSON wraps the json.Marshall method
-func (helper *EncodingHelper) EncodeJSON(v interface{}) (data []byte, err error) {
-	data, err = json.Marshal(v)
-	return
-}
-
-//ExtractPayload decodes an encoded wrp message and returns its payload
-func (helper *EncodingHelper) ExtractPayload(input io.Reader, format wrp.Format) (payload []byte, err error) {
-	wrpResponse := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
-
-	if err = wrp.NewDecoder(input, format).Decode(wrpResponse); err == nil {
-		payload = wrpResponse.Payload
-	}
-
-	return
 }
 
 //GetOrGenTID returns a Transaction ID for a given request.
