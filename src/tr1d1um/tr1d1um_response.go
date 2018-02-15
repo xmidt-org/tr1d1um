@@ -26,10 +26,8 @@ import (
 	"github.com/Comcast/webpa-common/wrp"
 )
 
-//Custom TR1 HTTP Status codes
-const (
-	Tr1StatusTimeout = 503
-)
+//Tr1StatusTimeout is a custom status representing multiple webpa-specific timeout cases (context, http.client, service unavailable)
+const Tr1StatusTimeout = 503
 
 var errUnexpectedRKDResponse = errors.New("unexpectedRDKResponse")
 

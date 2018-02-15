@@ -37,9 +37,6 @@ type SendAndHandle interface {
 	GetRespTimeout() time.Duration
 }
 
-//SendAndHandleFactory serves as a fool-proof (you must provide all needed values for struct) initializer for SendAndHandle
-type SendAndHandleFactory struct{}
-
 //Tr1SendAndHandle provides one implementation of SendAndHandle
 type Tr1SendAndHandle struct {
 	RespTimeout time.Duration
