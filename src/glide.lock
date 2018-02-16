@@ -1,5 +1,5 @@
-hash: 7d3763ce58287e1ec25cc6e0a9d55c89ba8ffa885f899c8a4034722f88822936
-updated: 2018-02-15T11:23:20.832854409-08:00
+hash: fe64274b3986d2cff665f0172e90ebedaff96ccc1c79abaed36eb14d3a525dc4
+updated: 2018-02-15T17:52:14.754691983-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -38,7 +38,7 @@ imports:
   subpackages:
   - linux
 - name: github.com/Comcast/webpa-common
-  version: 22ab2a2a2faf9a1f46a3c2a983a776a28af72203
+  version: 75d21caa5da8a1fb952c1c507f8250b0c1eb57a6
   subpackages:
   - concurrent
   - convey
