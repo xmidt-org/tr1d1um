@@ -1,8 +1,5 @@
 sudo: required
 
-env:
-    - DEP_VERSION="0.4.1"
-
 services:
     - docker
 
@@ -25,13 +22,7 @@ before_install:
     - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build bash -c "pushd tr1d1um; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
     - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
 
-    - docker exec build yum install curl -y
-
-    # Download the binary to bin folder in $GOPATH
-    - docker exec build curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
-
-    # Make the binary executable
-    - docker exec build chmod +x $GOPATH/bin/dep
+    - go get -u github.com/golang/dep/cmd/dep
 
 
 install:
