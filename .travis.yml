@@ -14,7 +14,7 @@ before_install:
     - docker exec build rpm -q golang
     - docker exec build go version
     - docker exec build git clone https://github.com/Comcast/tr1d1um.git
-    - docker exec build git clone https://github.com/Comcast/tr1d1um.git codecovio_build
+    - docker exec build git clone https://github.com/Comcast/tr1d1um.git codecovio_build/src/tr1d1um
 
     - docker exec build go get -u github.com/golang/dep/cmd/dep
 
@@ -27,7 +27,7 @@ before_install:
 
 
 install:
-    - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && dep ensure && cd tr1d1um && go build tr1d1um && go test -race -coverprofile=coverage.txt && popd"
+    - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src/tr1d1um/src && dep ensure && cd tr1d1um && go build tr1d1um && go test -race -coverprofile=coverage.txt && popd"
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
 
 after_success:
