@@ -11,7 +11,6 @@ before_install:
     - docker pull schmidtw/webpa.builder.centos6:latest
     - docker run -it -e BUILD_NUMBER=$TRAVIS_BUILD_NUMBER -d --name build schmidtw/webpa.builder.centos6 bash
     - env
-    - docker exec build export DEP_VERSION="0.4.1" 
     - docker exec build rpm -q golang
     - docker exec build go version
     - docker exec build git clone https://github.com/Comcast/tr1d1um.git
@@ -25,8 +24,9 @@ before_install:
 
     - docker exec build yum install curl -y
 
+    - docker exec build echo $GOPATH
     # Download the binary to bin folder in $GOPATH
-    - docker exec build curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
+    - docker exec build curl -L -s https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 -o $GOPATH/bin/dep
  
     # Make the binary executable
     - docker exec build chmod +x $GOPATH/bin/dep
