@@ -26,7 +26,7 @@ before_install:
 
 
 
-install:
+script:
     - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src/tr1d1um/src && dep ensure && cd tr1d1um && go build -o tr1d1um && go test -race -coverprofile=coverage.txt && popd"
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
 
