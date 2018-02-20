@@ -36,6 +36,7 @@ keys/*.private
 _obj
 _test
 coverage*
+_vendor
 
 # Architecture specific extensions/prefixes
 *.[568vq]
