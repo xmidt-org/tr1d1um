@@ -26,36 +26,12 @@
 
 
 [[constraint]]
-  branch = "master"
   name = "github.com/Comcast/webpa-common"
-
-[[constraint]]
-  name = "github.com/SermoDigital/jose"
-  version = "1.1.0"
-
-[[constraint]]
-  name = "github.com/go-kit/kit"
-  version = "0.5.0"
+  revision = "a53513b20447d2c0aabcf4868fa8d43459c79d3e"
 
 [[constraint]]
   name = "github.com/go-ozzo/ozzo-validation"
   version = "3.3.0"
-
-[[constraint]]
-  name = "github.com/gorilla/mux"
-  version = "1.6.1"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/justinas/alice"
-
-[[constraint]]
-  name = "github.com/spf13/pflag"
-  version = "1.0.0"
-
-[[constraint]]
-  name = "github.com/spf13/viper"
-  version = "1.0.0"
 
 [prune]
   go-tests = true
