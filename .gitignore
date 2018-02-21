@@ -1,7 +1,6 @@
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 bin
 pkg
-src/vendor
 *.o
 *.out
 *.a
@@ -36,8 +35,8 @@ keys/*.private
 # Folders
 _obj
 _test
-vendor
 coverage*
+vendor
 
 # Architecture specific extensions/prefixes
 *.[568vq]
