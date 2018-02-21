@@ -7,42 +7,53 @@ Summary:    The Xmidt router agent.
 
 Group:      System Environment/Daemons
 License:    ASL 2.0
-URL:        https://github.com/Comcast/tr1d1um
-Source0:    %{name}-%{_fullver}.tar.gz
+URL:        https://github.com/Comcast/%{name}
+Source0:    %{name}-%{version}-%{_releaseno}.tar.gz
 
 BuildRequires:  golang >= 1.8
 Requires:       supervisor
+
+Provides:       %{name}
 
 %description
 The Xmidt router agent.
 
 %prep
-%setup -c go_dep_needs_this/src -q
+%setup -c -n %{name}-%{version}/src -a 0
+mv %{name}-%{version} %{name}
 
 
 %build
-export GOPATH=$(pwd)/../..
-pushd src
+# All this cobbled up directory structure is to allow `dep` to work.
+# It needs a path of ~/whatever/src/project/src/project
+export GOPATH=%{_builddir}/%{name}-%{version}
+pushd %{name}
+cd src
+pwd
 dep ensure
-cd tr1d1um
+cd %{name}
+pwd
 go build -o %{name}
 popd
 
 %install
 
 # Install Binary
-%{__install} -d %{buildroot}%{_bindir}
-%{__install} -p src/tr1d1um/%{name} %{buildroot}%{_bindir}
+# The extra %{name}/ that prefixes the source is due to `dep` needs.
+mkdir -p %{buildroot}%{_bindir}
+%{__install} -p %{name}/src/%{name}/%{name} %{buildroot}%{_bindir}
 
 # Install Service
-%{__install} -d %{buildroot}%{_initddir}
-%{__install} -p etc/init.d/%{name} %{buildroot}%{_initddir}
+# The extra %{name}/ that prefixes the source is due to `dep` needs.
+mkdir -p %{buildroot}%{_initddir}
+%{__install} -p %{name}/etc/init.d/%{name} %{buildroot}%{_initddir}
 
 # Install Configuration
+# The extra %{name}/ that prefixes the source is due to `dep` needs.
 %{__install} -d %{buildroot}%{_sysconfdir}/%{name}
-%{__install} -p etc/%{name}/%{name}.env.example %{buildroot}%{_sysconfdir}/%{name}/%{name}.env.example
-%{__install} -p etc/%{name}/%{name}.json %{buildroot}%{_sysconfdir}/%{name}/%{name}.json
-%{__install} -p etc/%{name}/supervisord.conf %{buildroot}%{_sysconfdir}/%{name}/supervisord.conf
+%{__install} -p %{name}/etc/%{name}/%{name}.env.example %{buildroot}%{_sysconfdir}/%{name}/%{name}.env.example
+%{__install} -p %{name}/etc/%{name}/%{name}.json %{buildroot}%{_sysconfdir}/%{name}/%{name}.json
+%{__install} -p %{name}/etc/%{name}/supervisord.conf %{buildroot}%{_sysconfdir}/%{name}/supervisord.conf
 
 # Create Logging Location
 %{__install} -d %{buildroot}%{_localstatedir}/log/%{name}
@@ -51,20 +62,19 @@ popd
 %{__install} -d %{buildroot}%{_localstatedir}/run/%{name}
 
 %files
-%defattr(644, tr1d1um, tr1d1um, 755)
+%defattr(644, %{name}, %{name}, 755)
 
 # Binary
-%dir %{_bindir}
-%attr(755, tr1d1um, tr1d1um) %{_bindir}/%{name} 
+%attr(755, %{name}, %{name}) %{_bindir}/%{name} 
 
 # Init.d
-%attr(755, tr1d1um, tr1d1um) %{_initddir}/%{name}
+%attr(755, %{name}, %{name}) %{_initddir}/%{name}
 
 # Configuration
 %dir %{_sysconfdir}/%{name}
-%config %attr(644, tr1d1um, tr1d1um) %{_sysconfdir}/%{name}/%{name}.env.example
-%config %attr(644, tr1d1um, tr1d1um) %{_sysconfdir}/%{name}/%{name}.json
-%config %attr(644, tr1d1um, tr1d1um) %{_sysconfdir}/%{name}/supervisord.conf
+%config %attr(644, %{name}, %{name}) %{_sysconfdir}/%{name}/%{name}.env.example
+%config %attr(644, %{name}, %{name}) %{_sysconfdir}/%{name}/%{name}.json
+%config %attr(644, %{name}, %{name}) %{_sysconfdir}/%{name}/supervisord.conf
 
 # Logging Location
 %dir %{_localstatedir}/log/%{name}
