@@ -17,15 +17,15 @@ Requires:       supervisor
 The Xmidt router agent.
 
 %prep
-%setup -q
+%setup -c go_dep_needs_this/src -q
 
 
 %build
-export GOPATH=$(pwd)
+export GOPATH=$(pwd)/../..
 pushd src
-glide install --strip-vendor
+dep ensure
 cd tr1d1um
-go build %{name}
+go build -o %{name}
 popd
 
 %install
