@@ -55,7 +55,6 @@ func TestSetUpHandler(t *testing.T) {
 		AssertCommon(actualHandler, assert)
 	})
 }
-
 func TestRouteConfigurations(t *testing.T) {
 	r := mux.NewRouter()
 	fakePreHandler := new(alice.Chain)
@@ -103,7 +102,6 @@ func TestRouteConfigurations(t *testing.T) {
 	}
 	AssertConfiguredRoutes(r, t, testsCases)
 }
-
 func TestGetSupportedDevices(t *testing.T) {
 	t.Run("TypicalCase", func(t *testing.T) {
 		assert := assert.New(t)
@@ -143,7 +141,6 @@ func AssertCommon(actualHandler *ConversionHandler, assert *assert.Assertions) {
 	assert.NotEmpty(actualHandler.WRPRequestURL)
 	assert.NotNil(actualHandler.WdmpConvert)
 	assert.NotNil(actualHandler.Sender)
-	assert.NotNil(actualHandler.EncodingHelper)
 	assert.NotNil(actualHandler.RequestValidator)
 	assert.NotNil(actualHandler.RetryStrategy)
 	assert.NotNil(actualHandler.Logger)

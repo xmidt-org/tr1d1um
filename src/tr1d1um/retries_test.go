@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -40,11 +41,11 @@ func TestRetryExecute(t *testing.T) {
 		}
 
 		callCount := 0
-		countOp := func(_ ...interface{}) (_ interface{}, _ error) {
+		countOp := func(_ context.Context, _ ...interface{}) (_ interface{}, _ error) {
 			callCount++
 			return
 		}
-		resp, err := retry.Execute(countOp, 0)
+		resp, err := retry.Execute(context.TODO(), countOp, 0)
 		assert.Nil(err)
 		assert.Nil(resp)
 		assert.EqualValues(retry.MaxRetries, callCount)
@@ -67,12 +68,12 @@ func TestRetryExecute(t *testing.T) {
 		}
 
 		callCount := 0
-		countOp := func(_ ...interface{}) (resp interface{}, _ error) {
+		countOp := func(_ context.Context, _ ...interface{}) (resp interface{}, _ error) {
 			callCount++
 			resp = callCount
 			return
 		}
-		resp, err := retry.Execute(countOp, 0)
+		resp, err := retry.Execute(context.TODO(), countOp, 0)
 		assert.Nil(err)
 		assert.EqualValues(1, resp)
 		assert.EqualValues(retry.MaxRetries-1, callCount)
@@ -91,7 +92,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 			},
 		}
 
-		result, err := retry.Execute(nil, "")
+		result, err := retry.Execute(context.TODO(), nil, "")
 		assert.EqualValues(-1, result)
 		assert.EqualValues(errUndefinedShouldRetry, err)
 	})
@@ -108,7 +109,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 			},
 		}
 
-		result, err := retry.Execute(nil, "")
+		result, err := retry.Execute(context.TODO(), nil, "")
 		assert.EqualValues(-1, result)
 		assert.EqualValues(errInvalidMaxRetriesVal, err)
 	})
@@ -124,7 +125,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 			},
 		}
 
-		result, err := retry.Execute(nil, "")
+		result, err := retry.Execute(context.TODO(), nil, "")
 		assert.EqualValues(-1, result)
 		assert.EqualValues(errUndefinedLogger, err)
 	})
@@ -141,7 +142,7 @@ func TestRetryCheckDependencies(t *testing.T) {
 			},
 		}
 
-		result, err := retry.Execute(nil, "")
+		result, err := retry.Execute(context.TODO(), nil, "")
 		assert.EqualValues(-1, result)
 		assert.EqualValues(errUndefinedRetryOp, err)
 	})

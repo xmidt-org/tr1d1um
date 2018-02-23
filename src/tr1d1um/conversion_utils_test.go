@@ -82,7 +82,7 @@ func TestGetFlavorFormat(t *testing.T) {
 }
 
 func TestSetFlavorFormat(t *testing.T) {
-	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{WRPSource: "dns:machineDNS"}
 	commonURL := "http://device/config?k=v"
 	var req *http.Request
 
@@ -290,11 +290,10 @@ func TestIsValidSetWDMP(t *testing.T) {
 		assert.True(isValidSetWDMP(wdmp))
 	})
 }
-
 func TestDeleteFlavorFormat(t *testing.T) {
 	assert := assert.New(t)
 	commonVars := Vars{"param": "rowName", "emptyParam": ""}
-	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{WRPSource: "dns:machineDNS"}
 
 	t.Run("NoRowName", func(t *testing.T) {
 		_, err := c.DeleteFlavorFormat(Vars{}, "param")
@@ -318,7 +317,7 @@ func TestDeleteFlavorFormat(t *testing.T) {
 func TestReplaceFlavorFormat(t *testing.T) {
 	commonVars := Vars{"uThere?": "yes!"}
 	emptyVars := Vars{}
-	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		assert := assert.New(t)
@@ -359,7 +358,7 @@ func TestReplaceFlavorFormat(t *testing.T) {
 func TestAddFlavorFormat(t *testing.T) {
 	emptyVars := Vars{}
 
-	c := ConversionWDMP{encodingHelper: &EncodingHelper{}, WRPSource: "dns:machineDNS"}
+	c := ConversionWDMP{WRPSource: "dns:machineDNS"}
 
 	t.Run("TableNotProvided", func(t *testing.T) {
 		assert := assert.New(t)
@@ -430,72 +429,6 @@ func TestGetFromURLPath(t *testing.T) {
 	})
 }
 
-func TestDecodeJSON(t *testing.T) {
-	assert := assert.New(t)
-	e := EncodingHelper{}
-
-	t.Run("IdealPath", func(t *testing.T) {
-		input := bytes.NewBufferString(`{"0":"zero","1":"one"}`)
-
-		expected := map[string]string{"0": "zero", "1": "one"}
-		actual := make(map[string]string)
-
-		err := e.DecodeJSON(input, &actual)
-
-		assert.Nil(err)
-		assert.EqualValues(expected, actual)
-	})
-
-	t.Run("JsonErr", func(t *testing.T) {
-		actual := make(map[string]string)
-
-		err := e.DecodeJSON(bytes.NewBufferString("{"), &actual)
-		assert.NotNil(err)
-	})
-
-	t.Run("EmptyInput", func(t *testing.T) {
-		actual := make(map[string]string)
-
-		err := e.DecodeJSON(bytes.NewBufferString(""), &actual)
-		assert.Nil(err)
-	})
-}
-
-func TestEncodeJSON(t *testing.T) {
-	e := EncodingHelper{}
-	assert := assert.New(t)
-	expected := []byte(`{"command":"GET","names":["p1","p2"]}`)
-	actual, err := e.EncodeJSON(wdmpGet)
-	assert.Nil(err)
-	assert.EqualValues(expected, actual)
-}
-
-func TestExtractPayloadFromWrp(t *testing.T) {
-	assert := assert.New(t)
-	e := EncodingHelper{}
-
-	t.Run("IdealScenario", func(t *testing.T) {
-		expectedPayload := []byte("expectMe")
-		wrpMsg := wrp.Message{Payload: expectedPayload}
-		var inputBuffer bytes.Buffer
-
-		wrp.NewEncoder(&inputBuffer, wrp.JSON).Encode(wrpMsg)
-
-		payload, err := e.ExtractPayload(&inputBuffer, wrp.JSON)
-
-		assert.Nil(err)
-		assert.EqualValues(expectedPayload, payload)
-	})
-
-	t.Run("DecodingErr", func(t *testing.T) {
-		badInput := bytes.NewBufferString("{")
-
-		_, err := e.ExtractPayload(badInput, wrp.JSON)
-
-		assert.NotNil(err)
-	})
-}
-
 func TestGetConfiguredWRP(t *testing.T) {
 	assert := assert.New(t)
 	deviceID := "mac:112233445566"
@@ -523,7 +456,6 @@ func TestGetConfiguredWRP(t *testing.T) {
 	assert.EqualValues(expectedSource, wrpMsg.Source)
 	assert.EqualValues(tid, wrpMsg.TransactionUUID)
 }
-
 func TestGetOrGenTID(t *testing.T) {
 	assert := assert.New(t)
 	t.Run("UseGivenTID", func(t *testing.T) {

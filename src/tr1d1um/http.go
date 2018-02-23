@@ -19,6 +19,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -35,11 +36,10 @@ const contentTypeKey = "Content-Type"
 
 //ConversionHandler is the main arm of the operations supported by this server
 type ConversionHandler struct {
-	TargetURL      string
-	WRPRequestURL  string
-	WdmpConvert    ConversionTool
-	Sender         SendAndHandle
-	EncodingHelper EncodingTool
+	TargetURL     string
+	WRPRequestURL string
+	WdmpConvert   ConversionTool
+	Sender        SendAndHandle
 	RequestValidator
 	RetryStrategy
 	log.Logger
@@ -90,7 +90,7 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 		return
 	}
 
-	wdmpPayload, err := ch.EncodingHelper.EncodeJSON(wdmp)
+	wdmpPayload, err := json.Marshal(wdmp)
 
 	if err != nil {
 		origin.WriteHeader(http.StatusInternalServerError)
@@ -114,17 +114,16 @@ func (ch *ConversionHandler) ServeHTTP(origin http.ResponseWriter, req *http.Req
 	}
 
 	tr1Request := Tr1d1umRequest{
-		ancestorCtx: req.Context(),
-		method:      http.MethodPost,
-		URL:         ch.WRPRequestURL,
-		headers:     http.Header{},
-		body:        wrpPayloadBuffer.Bytes(),
+		method:  http.MethodPost,
+		URL:     ch.WRPRequestURL,
+		headers: http.Header{},
+		body:    wrpPayloadBuffer.Bytes(),
 	}
 
 	tr1Request.headers.Set(contentTypeKey, wrp.Msgpack.ContentType())
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
-	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
+	tr1Resp, err := ch.Execute(req.Context(), ch.Sender.MakeRequest, tr1Request)
 
 	if err != nil {
 		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
@@ -143,15 +142,14 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 	var errorLogger = logging.Error(ch)
 
 	tr1Request := Tr1d1umRequest{
-		ancestorCtx: req.Context(),
-		method:      http.MethodGet,
-		URL:         ch.TargetURL + req.URL.RequestURI(),
-		headers:     http.Header{},
+		method:  http.MethodGet,
+		URL:     ch.TargetURL + req.URL.RequestURI(),
+		headers: http.Header{},
 	}
 
 	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
 
-	tr1Resp, err := ch.Execute(ch.Sender.MakeRequest, tr1Request)
+	tr1Resp, err := ch.Execute(req.Context(), ch.Sender.MakeRequest, tr1Request)
 
 	if err != nil {
 		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)

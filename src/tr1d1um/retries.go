@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -34,7 +35,7 @@ var (
 
 //RetryStrategy defines
 type RetryStrategy interface {
-	Execute(func(...interface{}) (interface{}, error), ...interface{}) (interface{}, error)
+	Execute(context.Context, func(context.Context, ...interface{}) (interface{}, error), ...interface{}) (interface{}, error)
 }
 
 //Retry is the realization of RetryStrategy.
@@ -64,7 +65,7 @@ func (r RetryStrategyFactory) NewRetryStrategy(logger log.Logger, interval time.
 
 //Execute is the core method of the RetryStrategy. It runs a given operation on provided inputs based on
 // pre-defined configurations
-func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments ...interface{}) (result interface{}, err error) {
+func (r *Retry) Execute(ctx context.Context, op func(context.Context, ...interface{}) (interface{}, error), arguments ...interface{}) (result interface{}, err error) {
 	var (
 		debugLogger = logging.Debug(r.Logger)
 	)
@@ -82,7 +83,7 @@ func (r *Retry) Execute(op func(...interface{}) (interface{}, error), arguments 
 	for attempt := 0; attempt < r.MaxRetries; attempt++ {
 		debugLogger.Log(logging.MessageKey(), "Attempting operation", "attempt", attempt)
 
-		result, err = op(arguments...)
+		result, err = op(ctx, arguments...)
 		if !r.ShouldRetry(result, err) {
 			break
 		}

@@ -24,36 +24,29 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-)
 
-var (
-	mockRequester = &MockRequester{}
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeRequest(t *testing.T) {
-	validURL := "http://someValidURL.com"
-
 	t.Run("BadNewRequest", func(t *testing.T) {
 		assert := assert.New(t)
 		tr1Req := Tr1d1umRequest{
-			ancestorCtx: context.TODO(),
-			method:      "字", //make http.NewRequest fail with this awesome Chinese character.
-			URL:         validURL,
-			headers:     http.Header{},
-			body:        []byte("d"),
+			method:  "字", //make http.NewRequest fail with this awesome Chinese character.
+			URL:     "http://someValidURL.com",
+			headers: http.Header{},
+			body:    []byte("d"),
 		}
 
 		tr1 := NewTR1()
 
-		resp, err := tr1.MakeRequest(tr1Req)
+		resp, err := tr1.MakeRequest(context.TODO(), tr1Req)
 		assert.NotNil(resp)
 
 		tr1Resp := resp.(*Tr1d1umResponse)
@@ -62,42 +55,74 @@ func TestMakeRequest(t *testing.T) {
 		assert.EqualValues(http.StatusInternalServerError, tr1Resp.Code)
 	})
 
-	t.Run("InternalError", func(t *testing.T) {
+	t.Run("RequestContextTimetout", func(t *testing.T) {
 		assert := assert.New(t)
+
+		slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(time.Minute) // time out will for sure be triggered
+		}))
+
 		tr1Req := Tr1d1umRequest{
-			ancestorCtx: context.TODO(),
-			method:      "GET",
-			URL:         validURL,
-			headers:     http.Header{"key": []string{"value"}},
+			method:  http.MethodGet,
+			URL:     slowServer.URL,
+			headers: http.Header{},
+			body:    nil,
 		}
 
 		tr1 := NewTR1()
 
-		someErr := errors.New("something went wrong")
-		mockRequester.On("PerformRequest", mock.AnythingOfType("*http.Request")).Return(&http.Response{},
-			someErr).Once()
+		ctx, cancel := context.WithCancel(context.TODO())
 
-		resp, err := tr1.MakeRequest(tr1Req)
+		go cancel() //fake an a quick timeout
+
+		resp, err := tr1.MakeRequest(ctx, tr1Req)
+
 		assert.NotNil(resp)
+		assert.NotNil(err)
+		assert.True(strings.HasSuffix(err.Error(), "context canceled"))
+
+		tr1Resp := resp.(*Tr1d1umResponse)
+		assert.EqualValues(http.StatusServiceUnavailable, tr1Resp.Code)
+	})
+
+	t.Run("RequestContextNoTimetout", func(t *testing.T) {
+		assert := assert.New(t)
+
+		body := []byte(`aqua`)
+
+		fastServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write(body)
+		}))
+
+		tr1Req := Tr1d1umRequest{
+			method:  http.MethodGet,
+			URL:     fastServer.URL,
+			headers: http.Header{},
+			body:    nil,
+		}
+
+		tr1 := NewTR1()
+
+		ctx, cancel := context.WithCancel(context.TODO())
+
+		defer cancel()
+
+		resp, err := tr1.MakeRequest(ctx, tr1Req)
+
+		assert.NotNil(resp)
+		assert.Nil(err)
 
 		tr1Resp := resp.(*Tr1d1umResponse)
 
-		assert.EqualValues(someErr, err)
-		assert.EqualValues(http.StatusInternalServerError, tr1Resp.Code)
-
-		mockRequester.AssertExpectations(t)
+		assert.EqualValues(body, tr1Resp.Body)
+		assert.EqualValues(http.StatusOK, tr1Resp.Code)
 	})
+
 }
 
 func TestHandleResponse(t *testing.T) {
 	assert := assert.New(t)
 	tr1 := NewTR1()
-
-	t.Run("IncomingTimeoutErr", func(t *testing.T) {
-		recorder := Tr1d1umResponse{}.New()
-		tr1.HandleResponse(context.DeadlineExceeded, nil, recorder, false)
-		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
-	})
 
 	t.Run("IncomingErr", func(t *testing.T) {
 		recorder := Tr1d1umResponse{}.New()
@@ -127,27 +152,11 @@ func TestHandleResponse(t *testing.T) {
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
 		fakeResponse := newTestingHTTPResponse(http.StatusOK, "")
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
-			errors.New(errMsg)).Once()
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 		assert.True(bodyIsClosed(fakeResponse))
-		mockEncoding.AssertExpectations(t)
-	})
-
-	t.Run("ExtractPayloadTimeout", func(t *testing.T) {
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, "")
-
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return([]byte(""),
-			context.Canceled).Once()
-		recorder := Tr1d1umResponse{}.New()
-		tr1.HandleResponse(nil, fakeResponse, recorder, false)
-
-		assert.EqualValues(Tr1StatusTimeout, recorder.Code)
-		assert.True(bodyIsClosed(fakeResponse))
-		mockEncoding.AssertExpectations(t)
 	})
 
 	t.Run("IdealReadEntireBody", func(t *testing.T) {
@@ -162,99 +171,46 @@ func TestHandleResponse(t *testing.T) {
 	})
 
 	t.Run("GoodRDKResponse", func(t *testing.T) {
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, "") //these arguments are irrelevant as we mock RDK response below
-		extractedData := []byte(`{"statusCode": 202}`)
+		RDKResponse := []byte(`{"statusCode": 202}`)
+		wrpMsg := wrp.Message{
+			Type:    wrp.SimpleRequestResponseMessageType,
+			Payload: RDKResponse}
 
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
+		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
+
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(202, recorder.Code)
-		assert.EqualValues(extractedData, string(recorder.Body))
+		assert.EqualValues(RDKResponse, string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
-		mockEncoding.AssertExpectations(t)
 	})
 
-	t.Run("BadRDKResponse", func(t *testing.T) {
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, "") //these arguments are irrelevant as we mock RDK response below
-		extractedData := []byte(`{"statusCode": 500}`)
+	t.Run("IgnoredRDKResponseStatusCode", func(t *testing.T) {
+		RDKResponse := []byte(`{"statusCode": 500}`) //status 500 is ignored to avoid ambiguities (server vs RDK device internal error)
+		wrpMsg := wrp.Message{
+			Type:    wrp.SimpleRequestResponseMessageType,
+			Payload: RDKResponse}
 
-		mockEncoding.On("ExtractPayload", fakeResponse.Body, wrp.Msgpack).Return(extractedData, nil).Once()
+		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
+
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
+
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
-		assert.EqualValues(http.StatusOK, recorder.Code) // reflect transaction instead of device status
-		assert.EqualValues(extractedData, string(recorder.Body))
+		assert.EqualValues(200, recorder.Code)
+		assert.EqualValues(RDKResponse, string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
-		mockEncoding.AssertExpectations(t)
-	})
-}
-
-func TestPerformRequest(t *testing.T) {
-	testWaitGroup := &sync.WaitGroup{}
-	testWaitGroup.Add(1)
-
-	t.Run("RequestTimeout", func(t *testing.T) {
-		defer testWaitGroup.Done()
-		assert := assert.New(t)
-
-		slowTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(time.Minute) // time out will for sure be triggered
-		}))
-
-		defer slowTS.Close()
-
-		req, _ := http.NewRequest(http.MethodGet, slowTS.URL, nil)
-		ctx, cancel := context.WithCancel(req.Context())
-
-		requester := &ContextTimeoutRequester{&http.Client{}}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-
-		errChan := make(chan error)
-
-		go func() {
-			wg.Done()
-			_, err := requester.PerformRequest(req.WithContext(ctx))
-			errChan <- err
-		}()
-
-		wg.Wait() //Wait until we have high chance that PerformRequest() has begun running to call cancel()
-		cancel()
-
-		assert.NotNil(<-errChan)
-	})
-
-	t.Run("RequestNoTimeout", func(t *testing.T) {
-		testWaitGroup.Wait()
-
-		assert := assert.New(t)
-
-		requester := &ContextTimeoutRequester{&http.Client{}}
-
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusAccepted) // write a status code we can assert on
-		}))
-
-		defer ts.Close()
-
-		req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
-
-		resp, err := requester.PerformRequest(req)
-
-		assert.Nil(err)
-		assert.NotNil(resp)
-		assert.EqualValues(http.StatusAccepted, resp.StatusCode)
 	})
 }
 
 func NewTR1() (tr1 *Tr1SendAndHandle) {
 	tr1 = &Tr1SendAndHandle{
-		Logger:       logging.DefaultLogger(),
-		Requester:    mockRequester,
-		EncodingTool: mockEncoding,
-		RespTimeout:  time.Minute,
+		Logger:      logging.DefaultLogger(),
+		RespTimeout: time.Minute,
+		client:      &http.Client{},
 	}
 	return tr1
 }

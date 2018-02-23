@@ -32,46 +32,25 @@ import (
 
 //SendAndHandle wraps the methods to communicate both back to a requester and to a target server
 type SendAndHandle interface {
-	MakeRequest(requestArgs ...interface{}) (tr1Resp interface{}, err error)
+	MakeRequest(context.Context, ...interface{}) (tr1Resp interface{}, err error)
 	HandleResponse(error, *http.Response, *Tr1d1umResponse, bool)
 	GetRespTimeout() time.Duration
-}
-
-//SendAndHandleFactory serves as a fool-proof (you must provide all needed values for struct) initializer for SendAndHandle
-type SendAndHandleFactory struct{}
-
-//New does the initialization of a SendAndHandle (of actual type Tr1SendAndHandle)
-func (factory SendAndHandleFactory) New(respTimeout time.Duration, requester Requester, encoding EncodingTool,
-	logger log.Logger) SendAndHandle {
-	return &Tr1SendAndHandle{
-		RespTimeout:  respTimeout,
-		Requester:    requester,
-		EncodingTool: encoding,
-		Logger:       logger,
-	}
 }
 
 //Tr1SendAndHandle provides one implementation of SendAndHandle
 type Tr1SendAndHandle struct {
 	RespTimeout time.Duration
-	Requester
-	EncodingTool
 	log.Logger
-}
-
-type clientResponse struct {
-	resp *http.Response
-	err  error
+	client *http.Client
 }
 
 //Tr1d1umRequest provides a clean way to store information needed to make some request (in our case, it is http but it is not
 // limited to that).
 type Tr1d1umRequest struct {
-	ancestorCtx context.Context
-	method      string
-	URL         string
-	body        []byte
-	headers     http.Header
+	method  string
+	URL     string
+	body    []byte
+	headers http.Header
 }
 
 //GetBody is a handy function to provide the payload (body) of Tr1d1umRequest as a fresh reader
@@ -84,7 +63,7 @@ func (tr1Req *Tr1d1umRequest) GetBody() (body io.Reader) {
 
 //MakeRequest contains all the logic that actually performs an http request
 //It is tightly coupled with HandleResponse
-func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{}, error) {
+func (tr1 *Tr1SendAndHandle) MakeRequest(ctx context.Context, requestArgs ...interface{}) (interface{}, error) {
 	tr1Request := requestArgs[0].(Tr1d1umRequest)
 	newRequest, newRequestErr := http.NewRequest(tr1Request.method, tr1Request.URL, tr1Request.GetBody())
 	tr1Response := Tr1d1umResponse{}.New()
@@ -101,12 +80,10 @@ func (tr1 *Tr1SendAndHandle) MakeRequest(requestArgs ...interface{}) (interface{
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(tr1Request.ancestorCtx, tr1.GetRespTimeout())
+	timeoutCtx, cancel := context.WithTimeout(ctx, tr1.GetRespTimeout())
 	defer cancel()
 
-	newRequest = newRequest.WithContext(ctx)
-
-	httpResp, responseErr := tr1.PerformRequest(newRequest)
+	httpResp, responseErr := tr1.client.Do(newRequest.WithContext(timeoutCtx))
 	tr1.HandleResponse(responseErr, httpResp, tr1Response, tr1Request.method == http.MethodGet)
 	return tr1Response, responseErr
 }
@@ -118,30 +95,40 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 
 	if err != nil {
 		ReportError(err, tr1Resp)
-		errorLogger.Log(logging.ErrorKey(), err)
+		errorLogger.Log(logging.MessageKey(), "got an error instead of an http.Response", logging.ErrorKey(), err)
 		return
 	}
 
 	//as a client, we are responsible to close the body after it gets read below
 	defer respFromServer.Body.Close()
+	bodyBytes, errReading := ioutil.ReadAll(respFromServer.Body)
+
+	if errReading != nil {
+		ReportError(errReading, tr1Resp)
+		errorLogger.Log(logging.MessageKey(), "error reading http.Response body", logging.ErrorKey(), errReading)
+		return
+	}
 
 	if respFromServer.StatusCode != http.StatusOK || wholeBody {
-		tr1Resp.Body, tr1Resp.err = ioutil.ReadAll(respFromServer.Body)
-		tr1Resp.Code = respFromServer.StatusCode
+		tr1Resp.Body, tr1Resp.Code = bodyBytes, respFromServer.StatusCode
 
-		ReportError(tr1Resp.err, tr1Resp)
 		debugLogger.Log(logging.MessageKey(), "non-200 response from server", logging.ErrorKey(), respFromServer.Status)
 		return
 	}
 
-	if RDKResponse, encodingErr := tr1.ExtractPayload(respFromServer.Body, wrp.Msgpack); encodingErr == nil {
+	ResponseData := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
+
+	if errDecoding := wrp.NewDecoder(bytes.NewBuffer(bodyBytes), wrp.Msgpack).Decode(ResponseData); errDecoding == nil {
+		RDKResponse := ResponseData.Payload
+
 		if RDKRespCode, RDKErr := GetStatusCodeFromRDKResponse(RDKResponse); RDKErr == nil && RDKRespCode != http.StatusInternalServerError {
 			tr1Resp.Code = RDKRespCode
 		}
+
 		tr1Resp.Body = RDKResponse
 	} else {
-		ReportError(encodingErr, tr1Resp)
-		errorLogger.Log(logging.MessageKey(), "could not extract payload from wrp body", logging.ErrorKey(), encodingErr)
+		ReportError(errDecoding, tr1Resp)
+		errorLogger.Log(logging.MessageKey(), "could not extract payload from wrp body", logging.ErrorKey(), errDecoding)
 	}
 
 	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)
@@ -152,36 +139,4 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 //for a response from a server
 func (tr1 *Tr1SendAndHandle) GetRespTimeout() time.Duration {
 	return tr1.RespTimeout
-}
-
-//Requester has the main functionality of taking a request, performing such request based on some internal client and
-// simply returning the response and potential err when applicable
-type Requester interface {
-	PerformRequest(*http.Request) (*http.Response, error)
-}
-
-//ContextTimeoutRequester is a Requester realization that executes an http request respecting any context deadlines (or
-// cancellations)
-type ContextTimeoutRequester struct {
-	client *http.Client
-}
-
-//PerformRequest makes its client execute the request asynchronously and guarantees that the cancellations or
-// timeouts of the request's context is respected
-func (c *ContextTimeoutRequester) PerformRequest(request *http.Request) (resp *http.Response, err error) {
-	responseReady := make(chan clientResponse, 1) // capacity of 1 helps avoid goroutine blocking in timeout situations
-	ctx := request.Context()
-
-	go func() {
-		respObj, respErr := c.client.Do(request)
-		responseReady <- clientResponse{respObj, respErr}
-	}()
-
-	select {
-	case cResponse := <-responseReady:
-		resp, err = cResponse.resp, cResponse.err
-		return
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
 }
