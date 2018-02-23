@@ -176,12 +176,7 @@ func TestHandleResponse(t *testing.T) {
 			Type:    wrp.SimpleRequestResponseMessageType,
 			Payload: RDKResponse}
 
-		var encodedData []byte
-		errEncoding := wrp.NewEncoderBytes(&encodedData, wrp.Msgpack).Encode(wrpMsg)
-		if errEncoding != nil {
-			t.Fatalf("test depency failed: %v\n", errEncoding)
-		}
-
+		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
 		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
 
 		recorder := Tr1d1umResponse{}.New()
@@ -198,11 +193,7 @@ func TestHandleResponse(t *testing.T) {
 			Type:    wrp.SimpleRequestResponseMessageType,
 			Payload: RDKResponse}
 
-		var encodedData []byte
-		errEncoding := wrp.NewEncoderBytes(&encodedData, wrp.Msgpack).Encode(wrpMsg)
-		if errEncoding != nil {
-			t.Fatalf("test depency failed: %v\n", errEncoding)
-		}
+		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
 
 		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
 
