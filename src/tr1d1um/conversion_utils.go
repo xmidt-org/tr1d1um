@@ -94,8 +94,8 @@ func (cw *ConversionWDMP) SetFlavorFormat(req *http.Request) (wdmp *SetWDMP, err
 	wdmp = new(SetWDMP)
 
 	var payload []byte
-	if payload, err = ioutil.ReadAll(req.Body); err == nil && len(payload) > 0 {
-		if err = json.Unmarshal(payload, wdmp); err == nil {
+	if payload, err = ioutil.ReadAll(req.Body); err == nil {
+		if err = json.Unmarshal(payload, wdmp); err == nil || len(payload) == 0 {
 			err = cw.ValidateAndDeduceSET(req.Header, wdmp)
 		}
 	}
