@@ -228,10 +228,13 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 }
 
 func TestIsValidSetWDMP(t *testing.T) {
-	t.Run("TestSetEmptyParams", func(t *testing.T) {
+	t.Run("TestAndSetZeroParams", func(t *testing.T) {
 		assert := assert.New(t)
 
-		wdmp := &SetWDMP{Command: CommandTestSet}
+		wdmp := &SetWDMP{Command: CommandTestSet} //nil parameters
+		assert.True(isValidSetWDMP(wdmp))
+
+		wdmp = &SetWDMP{Command: CommandTestSet, Parameters: []SetParam{}} //empty parameters
 		assert.True(isValidSetWDMP(wdmp))
 	})
 
