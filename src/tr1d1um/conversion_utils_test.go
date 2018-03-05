@@ -152,6 +152,24 @@ func TestSetFlavorFormat(t *testing.T) {
 		assert.EqualValues("sync-val", wdmp.SyncCmc)
 		assert.EqualValues("newCid", wdmp.NewCid)
 	})
+
+	//Allow testSet with empty body and optional cmc header
+	t.Run("EmptyBodyTestSet", func(t *testing.T) {
+		assert := assert.New(t)
+
+		req := httptest.NewRequest(http.MethodPatch, "http://device/config?k=v", nil)
+		req.Header.Set(HeaderWPASyncNewCID, "newCid")
+		req.Header.Set(HeaderWPASyncOldCID, "oldCid")
+
+		wdmp, err := c.SetFlavorFormat(req)
+
+		assert.Nil(err)
+		assert.EqualValues(CommandTestSet, wdmp.Command)
+		assert.Empty(wdmp.Parameters)
+		assert.Empty(wdmp.SyncCmc)
+		assert.EqualValues("oldCid", wdmp.OldCid)
+		assert.EqualValues("newCid", wdmp.NewCid)
+	})
 }
 
 func TestGetCommandForParam(t *testing.T) {
@@ -210,10 +228,13 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 }
 
 func TestIsValidSetWDMP(t *testing.T) {
-	t.Run("TestSetEmptyParams", func(t *testing.T) {
+	t.Run("TestAndSetZeroParams", func(t *testing.T) {
 		assert := assert.New(t)
 
-		wdmp := &SetWDMP{Command: CommandTestSet}
+		wdmp := &SetWDMP{Command: CommandTestSet} //nil parameters
+		assert.True(isValidSetWDMP(wdmp))
+
+		wdmp = &SetWDMP{Command: CommandTestSet, Parameters: []SetParam{}} //empty parameters
 		assert.True(isValidSetWDMP(wdmp))
 	})
 
