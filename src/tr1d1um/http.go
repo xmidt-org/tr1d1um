@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -161,6 +162,71 @@ func (ch *ConversionHandler) HandleStat(origin http.ResponseWriter, req *http.Re
 
 	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime), GetOrGenTID(req.Header))
 
+	TransferResponse(tr1d1umResp, origin)
+}
+
+//HandleIOT handles the /iot endpoint.
+//TODO: this is temporary and should be deleted ASA endpoint is not needed in tr1d1um
+func (ch *ConversionHandler) HandleIOT(origin http.ResponseWriter, req *http.Request) {
+	requestArrivalTime := time.Now()
+	var debugLogger, errorLogger = logging.Debug(ch), logging.Error(ch)
+
+	debugLogger.Log(logging.MessageKey(), "HandleIOT called")
+
+	var (
+		err     error
+		urlVars = mux.Vars(req)
+	)
+
+	if _, err := device.ParseID(urlVars["deviceid"]); err != nil {
+		WriteResponseWriter(fmt.Sprintf("Invalid deviceID: %s", err.Error()), http.StatusBadRequest, origin)
+		errorLogger.Log(logging.ErrorKey(), err.Error(), logging.MessageKey(), "Invalid deviceID")
+		return
+	}
+
+	var payload []byte
+	payload, err = ioutil.ReadAll(req.Body)
+
+	if err != nil {
+		origin.WriteHeader(http.StatusInternalServerError)
+		errorLogger.Log(logging.MessageKey(), "seeing error while reading request body", logging.ErrorKey(), err.Error())
+		return
+	}
+
+	wrpMsg := ch.WdmpConvert.GetConfiguredWRP(payload, urlVars, req.Header)
+
+	//Forward transaction id being used in Request
+	origin.Header().Set(HeaderWPATID, wrpMsg.TransactionUUID)
+	origin.Header().Set(contentTypeKey, wrp.JSON.ContentType())
+
+	var wrpPayloadBuffer bytes.Buffer
+	err = wrp.NewEncoder(&wrpPayloadBuffer, wrp.Msgpack).Encode(wrpMsg)
+
+	if err != nil {
+		origin.WriteHeader(http.StatusInternalServerError)
+		logging.Error(ch).Log(logging.ErrorKey(), err)
+		return
+	}
+
+	tr1Request := Tr1d1umRequest{
+		method:  http.MethodPost,
+		URL:     ch.WRPRequestURL,
+		headers: http.Header{},
+		body:    wrpPayloadBuffer.Bytes(),
+	}
+
+	tr1Request.headers.Set(contentTypeKey, wrp.Msgpack.ContentType())
+	tr1Request.headers.Set("Authorization", req.Header.Get("Authorization"))
+
+	tr1Resp, err := ch.Execute(req.Context(), ch.Sender.MakeRequest, tr1Request)
+
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "error in retry execution", logging.ErrorKey(), err)
+	}
+
+	tr1d1umResp := tr1Resp.(*Tr1d1umResponse)
+
+	bookkeepingLog(ch, tr1d1umResp, req, time.Now().Sub(requestArrivalTime), wrpMsg.TransactionUUID)
 	TransferResponse(tr1d1umResp, origin)
 }
 
