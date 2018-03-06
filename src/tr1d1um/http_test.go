@@ -231,6 +231,35 @@ func TestHandleStat(t *testing.T) {
 	})
 }
 
+func TestHandleIOT(t *testing.T) {
+	ch := &ConversionHandler{
+		Sender:        mockSender,
+		Logger:        logging.DefaultLogger(),
+		TargetURL:     "http://targetURL.com",
+		RetryStrategy: mockRetryStrategy,
+		WRPRequestURL: "http://wrpurl.io",
+		WdmpConvert:   mockConversion,
+	}
+
+	t.Run("CorrectOutgoingRequest", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+
+		b := bytes.NewBufferString(`{}`)
+		req := httptest.NewRequest(http.MethodPost, "http://ThisMachineURL.com/api/v2/device/mac:112233445566/iot", b)
+		tr1Resp := Tr1d1umResponse{}.New()
+
+		urlVars := Vars{"deviceid": "mac:112233445566"}
+		req = mux.SetURLVars(req, urlVars)
+
+		mockConversion.On("GetConfiguredWRP", b.Bytes(), urlVars, req.Header).Return(&wrp.Message{})
+		mockRetryStrategy.On("Execute", req.Context(), mock.Anything, mock.Anything).Return(tr1Resp, nil).Once()
+
+		ch.HandleIOT(recorder, req)
+
+		mockRetryStrategy.AssertExpectations(t)
+		mockConversion.AssertExpectations(t)
+	})
+}
 func TestIsValidRequest(t *testing.T) {
 	t.Run("NilURLVars", func(t *testing.T) {
 		assert := assert.New(t)

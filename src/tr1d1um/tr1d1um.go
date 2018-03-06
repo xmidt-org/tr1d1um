@@ -193,6 +193,9 @@ func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *Conver
 	r.Handle("/device/{deviceid}/stat", preHandler.ThenFunc(conversionHandler.HandleStat)).
 		Methods(http.MethodGet)
 
+	r.Handle("/device/{deviceid}/iot", preHandler.ThenFunc(conversionHandler.HandleIOT)).
+		Methods(http.MethodPost) //TODO: path is temporary. Should be deleted once endpoint is not needed in tr1d1um
+
 	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
 		Methods(http.MethodGet)
 
