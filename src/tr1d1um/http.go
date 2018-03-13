@@ -320,6 +320,7 @@ func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Reque
 		logging.MessageKey(), "Bookkeeping response",
 		"requestAddress", req.RemoteAddr,
 		"requestURLPath", req.URL.Path,
+		"requestURLQuery", req.URL.RawQuery,
 		"requestMethod", req.Method,
 		"responseHeaders", tr1Resp.Headers,
 		"responseCode", tr1Resp.Code,
