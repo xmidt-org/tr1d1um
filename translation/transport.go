@@ -138,6 +138,8 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			}
 		}
 	}
+
+	forwardHeadersByPrefix("X", resp, w)
 	return
 }
 
@@ -153,13 +155,30 @@ func contains(i string, elements []string) bool {
 //encode errors from business logic
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json")
+
 	switch err {
+	case ErrInvalidService:
+		w.WriteHeader(http.StatusBadRequest)
+	case context.DeadlineExceeded:
+		w.WriteHeader(http.StatusServiceUnavailable)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": err.Error(),
+		"message": err.Error(),
 	})
 
+}
+
+func forwardHeadersByPrefix(prefix string, resp *http.Response, w http.ResponseWriter) {
+	if resp != nil {
+		for headerKey, headerValues := range resp.Header {
+			if strings.HasPrefix(headerKey, prefix) {
+				for _, headerValue := range headerValues {
+					w.Header().Add(headerKey, headerValue)
+				}
+			}
+		}
+	}
 }
