@@ -110,6 +110,8 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	defer resp.Body.Close()
 	var body []byte
 
+	forwardHeadersByPrefix("X", resp, w)
+
 	if body, err = ioutil.ReadAll(resp.Body); err == nil {
 
 		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
@@ -139,7 +141,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		}
 	}
 
-	forwardHeadersByPrefix("X", resp, w)
 	return
 }
 

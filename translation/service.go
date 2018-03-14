@@ -48,6 +48,9 @@ func (w *WRPService) SendWRP(wrpMsg *wrp.Message, authValue, xmidtService string
 			defer cancel()
 
 			resp, err = w.RetryDo(req.WithContext(ctx))
+
+			//place TID in response
+			resp.Header.Set(http.CanonicalHeaderKey(HeaderWPATID), wrpMsg.TransactionUUID)
 		}
 	}
 	return
