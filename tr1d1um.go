@@ -102,7 +102,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	service := prepareWRPService(v)
 
-	translation.ConfigHandler(service, baseRouter, authenticate, logger)
+	translation.ConfigHandler(&translation.TranslationOptions{
+		S:             service,
+		R:             baseRouter,
+		Authenticate:  authenticate,
+		Log:           logger,
+		ValidServices: []string{"config"}, //TODO: read from config
+	})
 
 	var (
 		_, tr1d1umServer = webPA.Prepare(logger, nil, metricsRegistry, r)
