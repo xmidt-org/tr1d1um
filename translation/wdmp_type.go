@@ -15,7 +15,7 @@
  *
  */
 
-package main
+package translation
 
 //All the supported commands, WebPA Headers and misc
 const (
@@ -35,13 +35,6 @@ const (
 
 	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
 )
-
-//GetWDMP serves as container for data used for the GET-flavored commands
-type GetWDMP struct {
-	Command   string   `json:"command"`
-	Names     []string `json:"names,omitempty"`
-	Attribute string   `json:"attributes,omitempty"`
-}
 
 //SetParam defines the structure for Parameters read from json data. Applicable to the SET-flavored commands
 type SetParam struct {
