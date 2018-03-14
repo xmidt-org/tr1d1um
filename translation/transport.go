@@ -45,7 +45,7 @@ func ConfigHandler(t *TranslationOptions) {
 	}
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(t.S),
-		decodeValidServiceRequests(t.ValidServices),
+		decodeGetRequest(t.ValidServices),
 		encodeResponse,
 		opts...,
 	)
@@ -54,7 +54,7 @@ func ConfigHandler(t *TranslationOptions) {
 	return
 }
 
-func decodeValidServiceRequests(services []string) kithttp.DecodeRequestFunc {
+func decodeGetRequest(services []string) kithttp.DecodeRequestFunc {
 	return func(_ context.Context, r *http.Request) (getRequest interface{}, err error) {
 
 		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
