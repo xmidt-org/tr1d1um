@@ -61,6 +61,7 @@
     "aws/request",
     "aws/session",
     "aws/signer/v4",
+    "internal/sdkio",
     "internal/sdkrand",
     "internal/shareddefaults",
     "private/protocol",
@@ -72,8 +73,8 @@
     "service/sns/snsiface",
     "service/sts"
   ]
-  revision = "63324a33d7e42a386c04d4daec764a3de243492e"
-  version = "v1.13.0"
+  revision = "4c9c8e98642a1a5e7c27d7a644cf9140809d49ee"
+  version = "v1.13.13"
 
 [[projects]]
   branch = "master"
@@ -102,12 +103,13 @@
 [[projects]]
   name = "github.com/go-ini/ini"
   packages = ["."]
-  revision = "32e4c1e6bc4e7d0d8451aa6b75200d19e37a536a"
-  version = "v1.32.0"
+  revision = "6333e38ac20b8949a8dd68baa3650f4dee8f39f0"
+  version = "v1.33.0"
 
 [[projects]]
   name = "github.com/go-kit/kit"
   packages = [
+    "endpoint",
     "log",
     "log/level",
     "metrics",
@@ -122,6 +124,7 @@
     "metrics/prometheus",
     "metrics/provider",
     "metrics/statsd",
+    "transport/http",
     "util/conn"
   ]
   revision = "a9ca6725cbbea455e61c6bc8a1ed28e81eb3493b"
@@ -132,12 +135,6 @@
   packages = ["."]
   revision = "390ab7935ee28ec6b286364bba9b4dd6410cb3d5"
   version = "v0.3.0"
-
-[[projects]]
-  name = "github.com/go-ozzo/ozzo-validation"
-  packages = ["."]
-  revision = "85dcd8368eba387e65a03488b003e233994e87e9"
-  version = "v3.3"
 
 [[projects]]
   name = "github.com/go-stack/stack"
@@ -192,8 +189,8 @@
     "models",
     "pkg/escape"
   ]
-  revision = "60d27e6995558f38a39e90b35a92cbac080310a3"
-  version = "v1.4.3"
+  revision = "6ac835404e7e64ea7299a6eebcce1ab1ef15fe3c"
+  version = "v1.5.0"
 
 [[projects]]
   name = "github.com/jmespath/go-jmespath"
@@ -233,7 +230,7 @@
   branch = "master"
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
-  revision = "a4e142e9c047c904fa2f1e144d9a84e6133024bc"
+  revision = "00c29f56e2386353d58c599509e8dc3801b0d716"
 
 [[projects]]
   name = "github.com/pelletier/go-toml"
@@ -270,7 +267,7 @@
     "internal/bitbucket.org/ww/goautoneg",
     "model"
   ]
-  revision = "89604d197083d4781071d3c65855d24ecfb0a563"
+  revision = "e4aa40a9169a88835b849a6efb71e05dc04b88f0"
 
 [[projects]]
   branch = "master"
@@ -281,7 +278,7 @@
     "nfs",
     "xfs"
   ]
-  revision = "282c8707aa210456a825798969cc27edda34992a"
+  revision = "54d17b57dd7d4a3aa092476596b3f8a933bde349"
 
 [[projects]]
   name = "github.com/spf13/afero"
@@ -341,10 +338,9 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "37707fdb30a5b38865cfb95e5aab41707daec7fd"
+  revision = "89ac7f292d17a339edab4de8efcba5d8672ff661"
 
 [[projects]]
-  branch = "master"
   name = "golang.org/x/text"
   packages = [
     "internal/gen",
@@ -354,7 +350,8 @@
     "unicode/cldr",
     "unicode/norm"
   ]
-  revision = "4e4a3210bb54bb31f6ab2cdca2edcc0b50c420c1"
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
 
 [[projects]]
   name = "gopkg.in/natefinch/lumberjack.v2"
@@ -363,14 +360,14 @@
   version = "v2.1"
 
 [[projects]]
-  branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
+  revision = "7f97868eec74b32b0982dd158a51a446d1da7eb5"
+  version = "v2.1.1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "80a1d44dda8f56252ec96665a17459b9353ac2a80f2f2c70198d2bc3e9315663"
+  inputs-digest = "fd4908de2b09bac1d1ffff2f695c712bb2569e9dfe25527f2f4d6f1974fa95ad"
   solver-name = "gps-cdcl"
   solver-version = 1
