@@ -42,7 +42,7 @@ func TestSendWRP(t *testing.T) {
 		return
 	}
 
-	resp, err := w.SendWRP(wrpMsg, "auth", "test")
+	resp, err := w.SendWRP(wrpMsg, "auth")
 
 	assert.Nil(err)
 
