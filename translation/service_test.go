@@ -25,11 +25,20 @@ func TestSendWRP(t *testing.T) {
 		TransactionUUID: "tid",
 	}
 
-	var contentTypeValue, authHeaderValue string
+	var (
+		contentTypeValue, authHeaderValue string
+		sentWRP                           = &wrp.Message{}
+	)
 
-	w.RetryDo = func(r *http.Request) (*http.Response, error) {
-		contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get(authHeaderKey)
-		return &http.Response{Header: http.Header{}}, nil
+	//capture sent values of interest
+	w.RetryDo = func(r *http.Request) (resp *http.Response, err error) {
+
+		if err = wrp.NewDecoder(r.Body, wrp.Msgpack).Decode(sentWRP); err == nil {
+			contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get(authHeaderKey)
+			resp = &http.Response{Header: http.Header{}}
+			return
+		}
+		return
 	}
 
 	resp, err := w.SendWRP(wrpMsg, "auth", "test")
@@ -42,4 +51,7 @@ func TestSendWRP(t *testing.T) {
 
 	//verify tid is set in response header
 	assert.EqualValues("tid", resp.Header.Get(HeaderWPATID))
+
+	//verify source in WRP message
+	assert.EqualValues("local/test", sentWRP.Source)
 }

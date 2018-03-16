@@ -45,7 +45,7 @@ func ConfigHandler(t *TranslationOptions) {
 	}
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(t.S),
-		decodeGetRequest(t.ValidServices),
+		serviceDecorate(t.ValidServices, decodeGetRequest),
 		encodeResponse,
 		opts...,
 	)
@@ -54,54 +54,47 @@ func ConfigHandler(t *TranslationOptions) {
 	return
 }
 
-func decodeGetRequest(services []string) kithttp.DecodeRequestFunc {
-	return func(_ context.Context, r *http.Request) (getRequest interface{}, err error) {
-
-		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
-			return nil, ErrInvalidService
-		}
-
-		var getWDMP struct {
-			Command    string   `json:"command"`
-			Names      []string `json:"names"`
-			Attributes string   `json:"attributes,omitemtpy"`
-		}
-
-		if names := r.FormValue("names"); names != "" {
-			getWDMP.Names = strings.Split(names, ",")
-
-			if attributes := r.FormValue("attributes"); attributes != "" {
-				getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
-			} else {
-				getWDMP.Command = CommandGet
-			}
-		} else {
-			return nil, ErrEmptyNames
-		}
-
-		var payload []byte
-
-		if payload, err = json.Marshal(getWDMP); err == nil {
-			var (
-				wrpMsg *wrp.Message
-				tid    string
-			)
-
-			if tid = r.Header.Get(tidHeaderKey); tid == "" {
-				if tid, err = genTID(); err != nil {
-					return
-				}
-			}
-
-			if wrpMsg, err = configWRP(payload, r, tid); err == nil {
-				getRequest = &wrpRequest{
-					WRPMessage: wrpMsg,
-					AuthValue:  r.Header.Get(authHeaderKey),
-				}
-			}
-		}
-		return
+func decodeGetRequest(_ context.Context, r *http.Request) (getRequest interface{}, err error) {
+	var getWDMP struct {
+		Command    string   `json:"command"`
+		Names      []string `json:"names"`
+		Attributes string   `json:"attributes,omitemtpy"`
 	}
+
+	if names := r.FormValue("names"); names != "" {
+		getWDMP.Names = strings.Split(names, ",")
+
+		if attributes := r.FormValue("attributes"); attributes != "" {
+			getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
+		} else {
+			getWDMP.Command = CommandGet
+		}
+	} else {
+		return nil, ErrEmptyNames
+	}
+
+	var payload []byte
+
+	if payload, err = json.Marshal(getWDMP); err == nil {
+		var (
+			wrpMsg *wrp.Message
+			tid    string
+		)
+
+		if tid = r.Header.Get(tidHeaderKey); tid == "" {
+			if tid, err = genTID(); err != nil {
+				return
+			}
+		}
+
+		if wrpMsg, err = configWRP(payload, r, tid); err == nil {
+			getRequest = &wrpRequest{
+				WRPMessage: wrpMsg,
+				AuthValue:  r.Header.Get(authHeaderKey),
+			}
+		}
+	}
+	return
 }
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
@@ -170,6 +163,17 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 		"message": err.Error(),
 	})
 
+}
+
+func serviceDecorate(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
+	return func(c context.Context, r *http.Request) (interface{}, error) {
+
+		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
+			return nil, ErrInvalidService
+		}
+
+		return decoder(c, r)
+	}
 }
 
 func forwardHeadersByPrefix(prefix string, resp *http.Response, w http.ResponseWriter) {
