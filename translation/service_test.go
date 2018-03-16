@@ -23,6 +23,7 @@ func TestSendWRP(t *testing.T) {
 
 	wrpMsg := &wrp.Message{
 		TransactionUUID: "tid",
+		Source:          "test",
 	}
 
 	var (

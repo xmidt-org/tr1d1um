@@ -17,9 +17,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// Error values
 var (
-	ErrEmptyNames     = errors.New("names parameter is required to be valid")
-	ErrInvalidService = errors.New("Unsupported Service")
+	ErrEmptyNames     = errors.New("names parameter is required")
+	ErrInvalidService = errors.New("unsupported Service")
+	ErrInternal       = errors.New("oops! Something unexpected went wrong in our service")
 )
 
 const (
@@ -43,6 +45,7 @@ func ConfigHandler(t *TranslationOptions) {
 		kithttp.ServerErrorLogger(t.Log),
 		kithttp.ServerErrorEncoder(encodeError),
 	}
+
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(t.S),
 		serviceDecorate(t.ValidServices, decodeGetRequest),
@@ -54,23 +57,25 @@ func ConfigHandler(t *TranslationOptions) {
 	return
 }
 
-func decodeGetRequest(_ context.Context, r *http.Request) (getRequest interface{}, err error) {
+func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{}, err error) {
 	var getWDMP struct {
 		Command    string   `json:"command"`
 		Names      []string `json:"names"`
-		Attributes string   `json:"attributes,omitemtpy"`
+		Attributes string   `json:"attributes,omitempty"`
 	}
 
-	if names := r.FormValue("names"); names != "" {
-		getWDMP.Names = strings.Split(names, ",")
+	var names string
 
-		if attributes := r.FormValue("attributes"); attributes != "" {
-			getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
-		} else {
-			getWDMP.Command = CommandGet
-		}
-	} else {
+	if names = r.FormValue("names"); names == "" {
 		return nil, ErrEmptyNames
+	}
+
+	getWDMP.Names = strings.Split(names, ",")
+
+	if attributes := r.FormValue("attributes"); attributes != "" {
+		getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
+	} else {
+		getWDMP.Command = CommandGet
 	}
 
 	var payload []byte
@@ -108,7 +113,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	if body, err = ioutil.ReadAll(resp.Body); err == nil {
 
 		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
-			//todo
 			w.WriteHeader(resp.StatusCode)
 			_, err = w.Write(body)
 			return
@@ -123,7 +127,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			}
 
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			_, err = w.Write(wrpModel.Payload)
 
 			// if possible, use the device response status code
 			if err = json.Unmarshal(wrpModel.Payload, &deviceResponseModel); err == nil {
@@ -131,6 +134,8 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 					w.WriteHeader(deviceResponseModel.StatusCode)
 				}
 			}
+
+			_, err = w.Write(wrpModel.Payload)
 		}
 	}
 
@@ -155,8 +160,14 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 		w.WriteHeader(http.StatusBadRequest)
 	case context.DeadlineExceeded:
 		w.WriteHeader(http.StatusServiceUnavailable)
+	case ErrEmptyNames:
+		w.WriteHeader(http.StatusBadRequest)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
+
+		//todo: based on error logging go-kit timing, this is subject to change
+		//idea is to prevent specific internal errors being shown to users (they are "internal" for a reason)
+		err = ErrInternal
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{

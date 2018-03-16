@@ -3,6 +3,7 @@ package translation
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -17,6 +18,10 @@ func configWRP(WDMP []byte, r *http.Request, tid string) (m *wrp.Message, err er
 		pathVars          = mux.Vars(r)
 	)
 
+	if pathVars == nil {
+		return nil, errors.New("path variables not set by mux")
+	}
+
 	deviceID, _ := pathVars["deviceid"]
 	if canonicalDeviceID, err = device.ParseID(deviceID); err == nil {
 		service, _ := pathVars["service"]
@@ -26,6 +31,7 @@ func configWRP(WDMP []byte, r *http.Request, tid string) (m *wrp.Message, err er
 			Payload:         WDMP,
 			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), service),
 			TransactionUUID: tid,
+			Source:          service,
 		}
 	}
 	return

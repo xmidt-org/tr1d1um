@@ -12,7 +12,7 @@ import (
 
 //Service defines the behavior for the Translation WRP Service
 type Service interface {
-	SendWRP(*wrp.Message, string, string) (*http.Response, error)
+	SendWRP(*wrp.Message, string) (*http.Response, error)
 }
 
 //WRPService represents the Webpa-Tr1d1um service that sends WRP data to the XMiDT cluster
@@ -31,11 +31,11 @@ type WRPService struct {
 }
 
 //SendWRP sends the given wrpMsg to the XMiDT cluster and returns the *http.Response
-func (w *WRPService) SendWRP(wrpMsg *wrp.Message, authValue, xmidtService string) (resp *http.Response, err error) {
+func (w *WRPService) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Response, err error) {
 	var payload []byte
 
-	// set the source
-	wrpMsg.Source = fmt.Sprintf("%s/%s", w.WRPSource, xmidtService)
+	// fill in the rest of the source property
+	wrpMsg.Source = fmt.Sprintf("%s/%s", w.WRPSource, wrpMsg.Source)
 
 	if err = wrp.NewEncoderBytes(&payload, wrp.Msgpack).Encode(wrpMsg); err == nil {
 		var req *http.Request

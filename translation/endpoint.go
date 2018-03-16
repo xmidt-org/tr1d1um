@@ -8,14 +8,13 @@ import (
 )
 
 type wrpRequest struct {
-	WRPMessage   *wrp.Message
-	AuthValue    string
-	XmidtService string
+	WRPMessage *wrp.Message
+	AuthValue  string
 }
 
 func makeTranslationEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		wrpReq := (request).(*wrpRequest)
-		return s.SendWRP(wrpReq.WRPMessage, wrpReq.AuthValue, wrpReq.XmidtService)
+		return s.SendWRP(wrpReq.WRPMessage, wrpReq.AuthValue)
 	}
 }

@@ -87,6 +87,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
 		authenticate            *alice.Chain
 	)
+
+	injectDefaults(v)
+
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
 	r := mux.NewRouter()
