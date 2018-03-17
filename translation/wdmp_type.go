@@ -18,3 +18,10 @@ const (
 
 	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
 )
+
+//GetWDMP serves as container for data used for the GET-flavored commands
+type GetWDMP struct {
+	Command    string   `json:"command"`
+	Names      []string `json:"names"`
+	Attributes string   `json:"attributes,omitempty"`
+}

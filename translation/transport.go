@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
+	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/justinas/alice"
 
@@ -58,45 +60,56 @@ func ConfigHandler(t *TranslationOptions) {
 }
 
 func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{}, err error) {
-	var getWDMP struct {
-		Command    string   `json:"command"`
-		Names      []string `json:"names"`
-		Attributes string   `json:"attributes,omitempty"`
+	var payload []byte
+
+	if payload, err = requestPayload(r.FormValue("names"), r.FormValue("attributes")); err == nil {
+		getRequest, err = wrapInWRP(payload, mux.Vars(r))
 	}
 
-	var names string
+	return
+}
 
-	if names = r.FormValue("names"); names == "" {
+func requestPayload(names, attributes string) ([]byte, error) {
+	if names == "" {
 		return nil, ErrEmptyNames
 	}
 
-	getWDMP.Names = strings.Split(names, ",")
+	getWDMP := &GetWDMP{}
 
-	if attributes := r.FormValue("attributes"); attributes != "" {
+	//default values at this point
+	getWDMP.Names, getWDMP.Command = strings.Split(names, ","), CommandGet
+
+	if attributes != "" {
 		getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
-	} else {
-		getWDMP.Command = CommandGet
 	}
 
-	var payload []byte
+	return json.Marshal(getWDMP)
+}
 
-	if payload, err = json.Marshal(getWDMP); err == nil {
-		var (
-			wrpMsg *wrp.Message
-			tid    string
-		)
+func wrapInWRP(WDMP []byte, pathVars map[string]string) (m *wrp.Message, err error) {
+	var (
+		tid string
+		ok  bool
+	)
 
-		if tid = r.Header.Get(tidHeaderKey); tid == "" {
-			if tid, err = genTID(); err != nil {
-				return
-			}
+	if tid, ok = pathVars[tidHeaderKey]; !ok {
+		if tid, err = genTID(); err != nil {
+			return
 		}
+	}
 
-		if wrpMsg, err = configWRP(payload, r, tid); err == nil {
-			getRequest = &wrpRequest{
-				WRPMessage: wrpMsg,
-				AuthValue:  r.Header.Get(authHeaderKey),
-			}
+	deviceID, _ := pathVars["deviceid"]
+	var canonicalDeviceID device.ID
+
+	if canonicalDeviceID, err = device.ParseID(deviceID); err == nil {
+		service, _ := pathVars["service"]
+
+		m = &wrp.Message{
+			Type:            wrp.SimpleRequestResponseMessageType,
+			Payload:         WDMP,
+			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), service),
+			TransactionUUID: tid,
+			Source:          service,
 		}
 	}
 	return
@@ -140,15 +153,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	}
 
 	return
-}
-
-func contains(i string, elements []string) bool {
-	for _, e := range elements {
-		if e == i {
-			return true
-		}
-	}
-	return false
 }
 
 //encode errors from business logic
@@ -197,4 +201,13 @@ func forwardHeadersByPrefix(prefix string, resp *http.Response, w http.ResponseW
 			}
 		}
 	}
+}
+
+func contains(i string, elements []string) bool {
+	for _, e := range elements {
+		if e == i {
+			return true
+		}
+	}
+	return false
 }
