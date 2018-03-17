@@ -63,7 +63,7 @@ func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{
 	var payload []byte
 
 	if payload, err = requestPayload(r.FormValue("names"), r.FormValue("attributes")); err == nil {
-		getRequest, err = wrapInWRP(payload, mux.Vars(r))
+		getRequest, err = wrapInWRP(payload, r.Header.Get(HeaderWPATID), mux.Vars(r))
 	}
 
 	return
@@ -86,23 +86,17 @@ func requestPayload(names, attributes string) ([]byte, error) {
 	return json.Marshal(getWDMP)
 }
 
-func wrapInWRP(WDMP []byte, pathVars map[string]string) (m *wrp.Message, err error) {
-	var (
-		tid string
-		ok  bool
-	)
-
-	if tid, ok = pathVars[tidHeaderKey]; !ok {
-		if tid, err = genTID(); err != nil {
-			return
-		}
-	}
-
-	deviceID, _ := pathVars["deviceid"]
+func wrapInWRP(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
 	var canonicalDeviceID device.ID
 
-	if canonicalDeviceID, err = device.ParseID(deviceID); err == nil {
-		service, _ := pathVars["service"]
+	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
+		service := pathVars["service"]
+
+		if tid == "" {
+			if tid, err = genTID(); err != nil {
+				return
+			}
+		}
 
 		m = &wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
@@ -117,12 +111,11 @@ func wrapInWRP(WDMP []byte, pathVars map[string]string) (m *wrp.Message, err err
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*http.Response)
-
-	defer resp.Body.Close()
 	var body []byte
 
 	forwardHeadersByPrefix("X", resp, w)
 
+	defer resp.Body.Close()
 	if body, err = ioutil.ReadAll(resp.Body); err == nil {
 
 		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
@@ -142,7 +135,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 			// if possible, use the device response status code
-			if err = json.Unmarshal(wrpModel.Payload, &deviceResponseModel); err == nil {
+			if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
 				if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
 					w.WriteHeader(deviceResponseModel.StatusCode)
 				}
