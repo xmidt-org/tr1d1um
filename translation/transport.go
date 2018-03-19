@@ -43,6 +43,7 @@ type TranslationOptions struct {
 	ValidServices []string
 }
 
+//ConfigHandler sets up the handler for a given service
 func ConfigHandler(t *TranslationOptions) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(t.Log),
@@ -62,36 +63,7 @@ func ConfigHandler(t *TranslationOptions) {
 	return
 }
 
-func markArrivalTime(ctx context.Context, _ *http.Request) context.Context {
-	return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
-}
-
-// helps log entries to splunk related to a transaction
-func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
-	return func(ctx context.Context, code int, r *http.Request) {
-
-		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
-			logging.MessageKey(), "Bookkeeping response",
-			"requestAddress", r.RemoteAddr,
-			"requestURLPath", r.URL.Path,
-			"requestURLQuery", r.URL.RawQuery,
-			"requestMethod", r.Method,
-			"responseCode", code,
-			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
-			"responseError", ctx.Value(common.ContextKeyResponseError),
-		)
-
-		var latency = "-"
-
-		if requestArrivalTime, ok := ctx.Value(common.ContextKeyRequestArrivalTime).(time.Time); ok {
-			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))
-		} else {
-			logging.Error(logger).Log(logging.ErrorKey(), "latency value could not be derived")
-		}
-
-		transactionLogger.Log("latency", latency)
-	}
-}
+/* Request Decoding */
 
 func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{}, err error) {
 	var (
@@ -111,6 +83,75 @@ func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{
 
 	return
 }
+
+/* Response Encoding */
+
+func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
+	resp := response.(*http.Response)
+	var body []byte
+
+	forwardHeadersByPrefix("X", resp, w)
+
+	defer resp.Body.Close()
+	if body, err = ioutil.ReadAll(resp.Body); err == nil {
+
+		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
+			w.WriteHeader(resp.StatusCode)
+			_, err = w.Write(body)
+			return
+		}
+
+		wrpModel := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
+
+		if err = wrp.NewDecoderBytes(body, wrp.Msgpack).Decode(wrpModel); err == nil {
+
+			var deviceResponseModel struct {
+				StatusCode int `json:"statusCode"`
+			}
+
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+			// if possible, use the device response status code
+			if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
+				if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
+					w.WriteHeader(deviceResponseModel.StatusCode)
+				}
+			}
+
+			_, err = w.Write(wrpModel.Payload)
+		}
+	}
+
+	return
+}
+
+/* Error Encoding */
+
+func encodeError(_ context.Context, err error, w http.ResponseWriter) {
+	w.Header().Set(contentTypeHeaderKey, "application/json")
+
+	switch err {
+	case ErrInvalidService:
+		w.WriteHeader(http.StatusBadRequest)
+	case context.DeadlineExceeded:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	case ErrEmptyNames:
+		w.WriteHeader(http.StatusBadRequest)
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+
+		//todo: based on error logging go-kit timing, this is subject to change
+		//idea is to prevent specific internal errors being shown to users (they are "internal" for a reason)
+		err = ErrInternal
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": err.Error(),
+	})
+
+}
+
+/* Helper methods */
 
 func requestPayload(names, attributes string) ([]byte, error) {
 	if names == "" {
@@ -152,70 +193,6 @@ func wrapInWRP(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Mess
 	return
 }
 
-func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	resp := response.(*http.Response)
-	var body []byte
-
-	forwardHeadersByPrefix("X", resp, w)
-
-	defer resp.Body.Close()
-	if body, err = ioutil.ReadAll(resp.Body); err == nil {
-
-		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
-			w.WriteHeader(resp.StatusCode)
-			_, err = w.Write(body)
-			return
-		}
-
-		wrpModel := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
-
-		if err = wrp.NewDecoderBytes(body, wrp.Msgpack).Decode(wrpModel); err == nil {
-
-			var deviceResponseModel struct {
-				StatusCode int `json:"statusCode"`
-			}
-
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-			// if possible, use the device response status code
-			if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
-				if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
-					w.WriteHeader(deviceResponseModel.StatusCode)
-				}
-			}
-
-			_, err = w.Write(wrpModel.Payload)
-		}
-	}
-
-	return
-}
-
-//encode errors from business logic
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set(contentTypeHeaderKey, "application/json")
-
-	switch err {
-	case ErrInvalidService:
-		w.WriteHeader(http.StatusBadRequest)
-	case context.DeadlineExceeded:
-		w.WriteHeader(http.StatusServiceUnavailable)
-	case ErrEmptyNames:
-		w.WriteHeader(http.StatusBadRequest)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-
-		//todo: based on error logging go-kit timing, this is subject to change
-		//idea is to prevent specific internal errors being shown to users (they are "internal" for a reason)
-		err = ErrInternal
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": err.Error(),
-	})
-
-}
-
 func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
 	return func(c context.Context, r *http.Request) (interface{}, error) {
 
@@ -246,4 +223,34 @@ func contains(i string, elements []string) bool {
 		}
 	}
 	return false
+}
+
+func markArrivalTime(ctx context.Context, _ *http.Request) context.Context {
+	return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
+}
+
+func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+	return func(ctx context.Context, code int, r *http.Request) {
+
+		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
+			logging.MessageKey(), "Bookkeeping response",
+			"requestAddress", r.RemoteAddr,
+			"requestURLPath", r.URL.Path,
+			"requestURLQuery", r.URL.RawQuery,
+			"requestMethod", r.Method,
+			"responseCode", code,
+			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
+			"responseError", ctx.Value(common.ContextKeyResponseError),
+		)
+
+		var latency = "-"
+
+		if requestArrivalTime, ok := ctx.Value(common.ContextKeyRequestArrivalTime).(time.Time); ok {
+			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))
+		} else {
+			logging.Error(logger).Log(logging.ErrorKey(), "latency value could not be derived")
+		}
+
+		transactionLogger.Log("latency", latency)
+	}
 }
