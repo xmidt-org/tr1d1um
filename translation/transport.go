@@ -8,9 +8,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Comcast/webpa-common/device"
+	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
+	"github.com/comcast/tr1d1um/common"
 	"github.com/justinas/alice"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -28,10 +31,8 @@ var (
 
 const (
 	applicationName, apiBase = "tr1d1um", "/api/v2"
-
-	contentTypeHeaderKey = "Content-Type"
-	authHeaderKey        = "Authorization"
-	tidHeaderKey         = "X-WebPA-Transaction-Id"
+	contentTypeHeaderKey     = "Content-Type"
+	authHeaderKey            = "Authorization"
 )
 
 type TranslationOptions struct {
@@ -46,11 +47,13 @@ func ConfigHandler(t *TranslationOptions) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(t.Log),
 		kithttp.ServerErrorEncoder(encodeError),
+		kithttp.ServerBefore(markArrivalTime),
+		kithttp.ServerFinalizer(transactionLogging(t.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(t.S),
-		serviceDecorate(t.ValidServices, decodeGetRequest),
+		decodeValidServiceRequest(t.ValidServices, decodeGetRequest),
 		encodeResponse,
 		opts...,
 	)
@@ -59,11 +62,51 @@ func ConfigHandler(t *TranslationOptions) {
 	return
 }
 
+func markArrivalTime(ctx context.Context, _ *http.Request) context.Context {
+	return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
+}
+
+// helps log entries to splunk related to a transaction
+func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+	return func(ctx context.Context, code int, r *http.Request) {
+
+		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
+			logging.MessageKey(), "Bookkeeping response",
+			"requestAddress", r.RemoteAddr,
+			"requestURLPath", r.URL.Path,
+			"requestURLQuery", r.URL.RawQuery,
+			"requestMethod", r.Method,
+			"responseCode", code,
+			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
+			"responseError", ctx.Value(common.ContextKeyResponseError),
+		)
+
+		var latency = "-"
+
+		if requestArrivalTime, ok := ctx.Value(common.ContextKeyRequestArrivalTime).(time.Time); ok {
+			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))
+		} else {
+			logging.Error(logger).Log(logging.ErrorKey(), "latency value could not be derived")
+		}
+
+		transactionLogger.Log("latency", latency)
+	}
+}
+
 func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{}, err error) {
-	var payload []byte
+	var (
+		payload []byte
+		wrpMsg  *wrp.Message
+	)
 
 	if payload, err = requestPayload(r.FormValue("names"), r.FormValue("attributes")); err == nil {
-		getRequest, err = wrapInWRP(payload, r.Header.Get(HeaderWPATID), mux.Vars(r))
+		if wrpMsg, err = wrapInWRP(payload, r.Header.Get(HeaderWPATID), mux.Vars(r)); err == nil {
+			return &wrpRequest{
+				WRPMessage: wrpMsg,
+				AuthValue:  r.Header.Get(authHeaderKey),
+			}, nil
+
+		}
 	}
 
 	return
@@ -173,7 +216,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 }
 
-func serviceDecorate(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
+func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
 	return func(c context.Context, r *http.Request) (interface{}, error) {
 
 		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
