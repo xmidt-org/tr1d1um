@@ -30,6 +30,10 @@ var (
 	//SET errors
 	ErrInvalidSetWDMP = errors.New("invalid XPC SET message")
 	ErrNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
+
+	//PUT errors
+	ErrMissingTable = errors.New("table property is required")
+	ErrMissingRow   = errors.New("row property is required")
 )
 
 const (
@@ -208,4 +212,27 @@ func requestGetPayload(names, attributes string) ([]byte, error) {
 	}
 
 	return json.Marshal(wdmp)
+}
+
+func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err error) {
+	var wdmp = &addRowWDMP{Command: CommandAddRow}
+
+	if table, ok := m["parameter"]; ok {
+		wdmp.Table = table
+	} else {
+		return nil, ErrMissingTable
+	}
+
+	var payload []byte
+	if payload, err = ioutil.ReadAll(input); err == nil {
+		if len(payload) == 0 {
+			return nil, ErrMissingRow
+		}
+
+		if err = json.Unmarshal(payload, &wdmp.Row); err == nil {
+			return json.Marshal(wdmp)
+		}
+	}
+
+	return
 }

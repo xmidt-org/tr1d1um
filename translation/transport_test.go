@@ -54,6 +54,44 @@ func TestRequestGetPayload(t *testing.T) {
 	})
 }
 
+func TestRequestAddPayload(t *testing.T) {
+	t.Run("TableNotProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestAddPayload(nil, nil)
+		assert.Nil(p)
+		assert.EqualValues(ErrMissingTable, e)
+	})
+
+	t.Run("RowNotProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(""))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrMissingRow, e)
+	})
+
+	t.Run("IdealPath", func(t *testing.T) {
+		assert := assert.New(t)
+		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(`{"row": "r0"}`))
+
+		assert.Nil(e)
+
+		expected, err := json.Marshal(&addRowWDMP{
+			Command: CommandAddRow,
+			Table:   "t0",
+			Row:     map[string]string{"row": "r0"},
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		assert.EqualValues(expected, p)
+	})
+}
+
 func TestEncodeResponse(t *testing.T) {
 	assert := assert.New(t)
 

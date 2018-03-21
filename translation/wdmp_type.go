@@ -38,3 +38,9 @@ type setParam struct {
 	Value      interface{}            `json:"value,omitempty"`
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
+
+type addRowWDMP struct {
+	Command string            `json:"command"`
+	Table   string            `json:"table"`
+	Row     map[string]string `json:"row"`
+}
