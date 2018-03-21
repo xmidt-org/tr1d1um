@@ -54,10 +54,11 @@ func TestRequestGetPayload(t *testing.T) {
 	})
 }
 
-func TestHandleResponse(t *testing.T) {
+func TestEncodeResponse(t *testing.T) {
 	assert := assert.New(t)
 
-	//When the Status code from XMiDT is not 200, just forward the response code and body
+	//XMiDT response status code is not 200.
+	//Tr1d1um should just forward such response code and body
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		response := &http.Response{
@@ -74,7 +75,8 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues("test", recorder.Header().Get("X-test"))
 	})
 
-	//Response is not msgpack-encoded
+	//XMiDT response is not msgpack-encoded
+	//Since this is not expected, Tr1d1um considers it an internal error case
 	t.Run("UnexpectedResponseFormat", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		response := &http.Response{
@@ -85,7 +87,8 @@ func TestHandleResponse(t *testing.T) {
 		assert.NotNil(encodeResponse(context.TODO(), recorder, response))
 	})
 
-	//XMiDt gives us a 200 (OK) with a well-formatted RDK device response
+	//XMiDt responds with a 200 (OK) with a well-formatted RDK device response
+	//Tr1d1um returns the status provided by the device
 	t.Run("RDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
@@ -103,11 +106,12 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues(`{"statusCode": 520}`, recorder.Body.String())
 	})
 
-	//If the RDK device is having an internal error, avoid ambiguity confusion by not returning 500 (Tr1d1um is not the one having
-	//an internal error)
+	//RDK device is having an internal error and returns 500.
+	//Tr1d1um, in order to avoid ambiguity, should not return 500.
+	//Rationale: Tr1d1um is not the one having an internal error, it is the device.
 	t.Run("InternalRDKDeviceError", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		internalErrorResponse := []byte(`{"statusCode": 500, "message": "I, the device, suffer`)
+		internalErrorResponse := []byte(`{"statusCode": 500, "message": "I, the device, suffer"}`)
 
 		response := &http.Response{
 			StatusCode: http.StatusOK,
@@ -123,6 +127,7 @@ func TestHandleResponse(t *testing.T) {
 	})
 
 	//For whatever reason, the device may respond with incomplete or unexpected data
+	//In such case, Tr1d1um just forwards as much as it could from the device
 	t.Run("BadRDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
