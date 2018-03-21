@@ -5,9 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/Comcast/tr1d1um/common"
 
 	"github.com/gorilla/mux"
 
@@ -271,12 +268,4 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		forwardHeadersByPrefix("", nil, nil)
 		forwardHeadersByPrefix("", resp, to)
 	})
-}
-
-func TestMarkArrivalTime(t *testing.T) {
-	assert := assert.New(t)
-
-	ctx := markArrivalTime(context.TODO(), nil)
-
-	assert.IsType(time.Now(), ctx.Value(common.ContextKeyRequestArrivalTime))
 }

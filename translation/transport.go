@@ -107,8 +107,10 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 /* Response Encoding */
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	resp := response.(*http.Response)
-	var body []byte
+	var (
+		resp = response.(*http.Response)
+		body []byte
+	)
 
 	forwardHeadersByPrefix("X", resp, w)
 
@@ -121,7 +123,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			return
 		}
 
-		wrpModel := &wrp.Message{Type: wrp.SimpleRequestResponseMessageType}
+		wrpModel := new(wrp.Message)
 
 		if err = wrp.NewDecoderBytes(body, wrp.Msgpack).Decode(wrpModel); err == nil {
 
