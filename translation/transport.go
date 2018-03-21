@@ -8,7 +8,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/Comcast/tr1d1um/common"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/justinas/alice"
 
@@ -49,7 +51,9 @@ func ConfigHandler(t *TranslationOptions) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(t.Log),
 		kithttp.ServerErrorEncoder(encodeError),
-		kithttp.ServerBefore(markArrivalTime),
+		kithttp.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context {
+			return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
+		}),
 		kithttp.ServerFinalizer(transactionLogging(t.Log)),
 	}
 
@@ -73,7 +77,7 @@ func decodeRequest(c context.Context, r *http.Request) (decodedRequest interface
 	)
 
 	if payload, err = requestPayload(r); err == nil {
-		if wrpMsg, err = wrapInWRP(payload, r.Header.Get(HeaderWPATID), mux.Vars(r)); err == nil {
+		if wrpMsg, err = wrap(payload, r.Header.Get(HeaderWPATID), mux.Vars(r)); err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage: wrpMsg,
 				AuthValue:  r.Header.Get(authHeaderKey),

@@ -103,7 +103,7 @@ func getCommandForParams(params []setParam) (command string) {
 
 /* Other transport-level helper functions */
 
-func wrapInWRP(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
+func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
 	var canonicalDeviceID device.ID
 
 	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
@@ -156,10 +156,6 @@ func contains(i string, elements []string) bool {
 		}
 	}
 	return false
-}
-
-func markArrivalTime(ctx context.Context, _ *http.Request) context.Context {
-	return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
 }
 
 func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
