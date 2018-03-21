@@ -4,16 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/Comcast/webpa-common/device"
-	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	"github.com/comcast/tr1d1um/common"
 	"github.com/justinas/alice"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -24,9 +20,14 @@ import (
 
 // Error values
 var (
-	ErrEmptyNames     = errors.New("names parameter is required")
-	ErrInvalidService = errors.New("unsupported Service")
-	ErrInternal       = errors.New("oops! Something unexpected went wrong in our service")
+	ErrEmptyNames        = errors.New("names parameter is required")
+	ErrInvalidService    = errors.New("unsupported Service")
+	ErrInternal          = errors.New("oops! Something unexpected went wrong in our service")
+	ErrUnsupportedMethod = errors.New("unsupported method. Could not decode request payload")
+
+	//SET errors
+	ErrInvalidSetWDMP = errors.New("invalid XPC SET message")
+	ErrNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
 )
 
 const (
@@ -54,7 +55,7 @@ func ConfigHandler(t *TranslationOptions) {
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(t.S),
-		decodeValidServiceRequest(t.ValidServices, decodeGetRequest),
+		decodeValidServiceRequest(t.ValidServices, decodeRequest),
 		encodeResponse,
 		opts...,
 	)
@@ -65,20 +66,35 @@ func ConfigHandler(t *TranslationOptions) {
 
 /* Request Decoding */
 
-func decodeGetRequest(c context.Context, r *http.Request) (getRequest interface{}, err error) {
+func decodeRequest(c context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
 		payload []byte
 		wrpMsg  *wrp.Message
 	)
 
-	if payload, err = requestPayload(r.FormValue("names"), r.FormValue("attributes")); err == nil {
+	if payload, err = requestPayload(r); err == nil {
 		if wrpMsg, err = wrapInWRP(payload, r.Header.Get(HeaderWPATID), mux.Vars(r)); err == nil {
-			return &wrpRequest{
+			decodedRequest = &wrpRequest{
 				WRPMessage: wrpMsg,
 				AuthValue:  r.Header.Get(authHeaderKey),
-			}, nil
-
+			}
 		}
+	}
+
+	return
+}
+
+func requestPayload(r *http.Request) (payload []byte, err error) {
+
+	switch r.Method {
+	case http.MethodGet:
+		payload, err = requestGetPayload(r.FormValue("names"), r.FormValue("attributes"))
+	case http.MethodPatch:
+		payload, err = requestSetPayload(r.Body, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+
+	default:
+		//Unwanted methods should be filtered at the mux level. Thus, we should never get here
+		err = ErrUnsupportedMethod
 	}
 
 	return
@@ -151,106 +167,39 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 }
 
-/* Helper methods */
+/* Request-type specific decoding functions */
 
-func requestPayload(names, attributes string) ([]byte, error) {
+func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, err error) {
+	var (
+		wdmp = new(setWDMP)
+		data []byte
+	)
+
+	//read data into wdmp
+	if data, err = ioutil.ReadAll(in); err == nil {
+		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 {
+			if err = validateAndDeduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+				return json.Marshal(wdmp)
+			}
+		}
+	}
+
+	return
+}
+
+func requestGetPayload(names, attributes string) ([]byte, error) {
 	if names == "" {
 		return nil, ErrEmptyNames
 	}
 
-	getWDMP := &GetWDMP{}
+	wdmp := new(getWDMP)
 
 	//default values at this point
-	getWDMP.Names, getWDMP.Command = strings.Split(names, ","), CommandGet
+	wdmp.Names, wdmp.Command = strings.Split(names, ","), CommandGet
 
 	if attributes != "" {
-		getWDMP.Command, getWDMP.Attributes = CommandGetAttrs, attributes
+		wdmp.Command, wdmp.Attributes = CommandGetAttrs, attributes
 	}
 
-	return json.Marshal(getWDMP)
-}
-
-func wrapInWRP(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
-	var canonicalDeviceID device.ID
-
-	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
-		service := pathVars["service"]
-
-		if tid == "" {
-			if tid, err = genTID(); err != nil {
-				return
-			}
-		}
-
-		m = &wrp.Message{
-			Type:            wrp.SimpleRequestResponseMessageType,
-			Payload:         WDMP,
-			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), service),
-			TransactionUUID: tid,
-			Source:          service,
-		}
-	}
-	return
-}
-
-func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
-	return func(c context.Context, r *http.Request) (interface{}, error) {
-
-		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
-			return nil, ErrInvalidService
-		}
-
-		return decoder(c, r)
-	}
-}
-
-func forwardHeadersByPrefix(prefix string, resp *http.Response, w http.ResponseWriter) {
-	if resp != nil {
-		for headerKey, headerValues := range resp.Header {
-			if strings.HasPrefix(headerKey, prefix) {
-				for _, headerValue := range headerValues {
-					w.Header().Add(headerKey, headerValue)
-				}
-			}
-		}
-	}
-}
-
-func contains(i string, elements []string) bool {
-	for _, e := range elements {
-		if e == i {
-			return true
-		}
-	}
-	return false
-}
-
-func markArrivalTime(ctx context.Context, _ *http.Request) context.Context {
-	return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
-}
-
-func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
-	return func(ctx context.Context, code int, r *http.Request) {
-
-		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
-			logging.MessageKey(), "Bookkeeping response",
-			"requestAddress", r.RemoteAddr,
-			"requestURLPath", r.URL.Path,
-			"requestURLQuery", r.URL.RawQuery,
-			"requestMethod", r.Method,
-			"responseCode", code,
-			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
-			"responseError", ctx.Value(common.ContextKeyResponseError),
-		)
-
-		var latency = "-"
-
-		if requestArrivalTime, ok := ctx.Value(common.ContextKeyRequestArrivalTime).(time.Time); ok {
-			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))
-		} else {
-			logging.Error(logger).Log(logging.ErrorKey(), "latency value could not be derived")
-		}
-
-		transactionLogger.Log("latency", latency)
-	}
+	return json.Marshal(wdmp)
 }
