@@ -52,29 +52,31 @@ const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "/api/v2"
 
-	defaultClientTimeout    = "30s"
-	defaultRespWaitTimeout  = "40s"
-	defaultNetDialerTimeout = "5s"
-	defaultRetryInterval    = "2s"
-	defaultMaxRetries       = 2
-	defaultTargetURL        = "localhost:6000"
-	defaultWRPSource        = "dns:localhost"
-
-	supportedServicesKey = "supportedServices"
-	targetURLKey         = "targetURL"
-	netDialerTimeoutKey  = "netDialerTimeout"
-	clientTimeoutKey     = "clientTimeout"
-	reqRetryIntervalKey  = "requestRetryInterval"
-	reqMaxRetriesKey     = "requestMaxRetries"
-	respWaitTimeoutKey   = "respWaitTimeout"
-	WRPSourcekey         = "WRPSource"
+	translationServicesKey = "supportedServices"
+	targetURLKey           = "targetURL"
+	netDialerTimeoutKey    = "netDialerTimeout"
+	clientTimeoutKey       = "clientTimeout"
+	reqTimeoutKey          = "respWaitTimeout"
+	reqRetryIntervalKey    = "requestRetryInterval"
+	reqMaxRetriesKey       = "requestMaxRetries"
+	WRPSourcekey           = "WRPSource"
 )
+
+var defaults = map[string]interface{}{
+	translationServicesKey: []string{}, // no services allowed by the default
+	targetURLKey:           "localhost:6000",
+	netDialerTimeoutKey:    "5s",
+	clientTimeoutKey:       "50s",
+	reqTimeoutKey:          "40s",
+	reqRetryIntervalKey:    "2s",
+	reqMaxRetriesKey:       2,
+	WRPSourcekey:           "dns:localhost",
+}
 
 func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
-		f                                   = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-		v                                   = viper.New()
+		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
 		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, secure.Metrics)
 	)
 
@@ -88,7 +90,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		authenticate            *alice.Chain
 	)
 
-	injectDefaults(v)
+	for k, va := range defaults {
+		v.SetDefault(k, va)
+	}
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
@@ -103,14 +107,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	service := prepareWRPService(v)
+	ts := prepareWRPService(v)
 
 	translation.ConfigHandler(&translation.TranslationOptions{
-		S:             service,
+		S:             ts,
 		R:             baseRouter,
 		Authenticate:  authenticate,
 		Log:           logger,
-		ValidServices: []string{"config"}, //TODO: read from config
+		ValidServices: v.GetStringSlice(translationServicesKey),
 	})
 
 	var (
@@ -137,9 +141,16 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
+//clientConfigs holds parsable config values for HTTP clients to be used
+//
+type clientConfigs struct {
+	cTimeout time.Duration
+	rTimeotu time.Duration
+}
+
 func prepareWRPService(v *viper.Viper) translation.Service {
 	clientTimeout, _ := time.ParseDuration(v.GetString(clientTimeoutKey))
-	respTimeout, _ := time.ParseDuration(v.GetString(respWaitTimeoutKey))
+	reqTimeout, _ := time.ParseDuration(v.GetString(reqTimeoutKey))
 	dialerTimeout, _ := time.ParseDuration(v.GetString(netDialerTimeoutKey))
 	maxRetries := v.GetInt(reqMaxRetriesKey)
 
@@ -156,7 +167,7 @@ func prepareWRPService(v *viper.Viper) translation.Service {
 			Retries: maxRetries}, client.Do),
 		XmidtURL:   fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
 		WRPSource:  v.GetString(WRPSourcekey),
-		CtxTimeout: respTimeout,
+		CtxTimeout: reqTimeout,
 	}
 }
 
@@ -226,14 +237,6 @@ func getValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator se
 	validator = validators
 
 	return
-}
-
-func injectDefaults(v *viper.Viper) {
-	v.SetDefault(clientTimeoutKey, defaultClientTimeout)
-	v.SetDefault(respWaitTimeoutKey, defaultRespWaitTimeout)
-	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
-	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
-	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
 }
 
 func main() {
