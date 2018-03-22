@@ -3,7 +3,6 @@ package translation
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,25 +17,6 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 
 	"github.com/gorilla/mux"
-)
-
-// Error values
-var (
-	ErrEmptyNames        = errors.New("names parameter is required")
-	ErrInvalidService    = errors.New("unsupported Service")
-	ErrInternal          = errors.New("oops! Something unexpected went wrong in our service")
-	ErrUnsupportedMethod = errors.New("unsupported method. Could not decode request payload")
-
-	//Set command errors
-	ErrInvalidSetWDMP = errors.New("invalid XPC SET message")
-	ErrNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
-
-	//Add/Delete command  errors
-	ErrMissingTable = errors.New("table property is required")
-	ErrMissingRow   = errors.New("row property is required")
-
-	//Replace command error
-	ErrMissingRows = errors.New("rows property is required")
 )
 
 const (
@@ -71,8 +51,11 @@ func ConfigHandler(t *TranslationOptions) {
 		opts...,
 	)
 
-	t.R.Handle("/device/{deviceid}/{service}", t.Authenticate.Then(WRPHandler)).Methods(http.MethodGet)
-	return
+	t.R.Handle("/device/{deviceid}/{service}", t.Authenticate.Then(WRPHandler)).
+		Methods(http.MethodGet, http.MethodPatch)
+
+	t.R.Handle("/device/{deviceid}/{service}/{parameter}", t.Authenticate.Then(WRPHandler)).
+		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
 /* Request Decoding */
@@ -102,6 +85,12 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 		payload, err = requestGetPayload(r.FormValue("names"), r.FormValue("attributes"))
 	case http.MethodPatch:
 		payload, err = requestSetPayload(r.Body, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+	case http.MethodDelete:
+		payload, err = requestDeletePayload(mux.Vars(r))
+	case http.MethodPut:
+		payload, err = requestReplacePayload(mux.Vars(r), r.Body)
+	case http.MethodPost:
+		payload, err = requestAddPayload(mux.Vars(r), r.Body)
 
 	default:
 		//Unwanted methods should be filtered at the mux level. Thus, we should never get here
@@ -262,6 +251,7 @@ func requestReplacePayload(m map[string]string, input io.Reader) (p []byte, err 
 
 	return
 }
+
 func requestDeletePayload(m map[string]string) ([]byte, error) {
 	if row, ok := m["parameter"]; ok {
 		return json.Marshal(&deleteRowDMP{Command: CommandDeleteRow, Row: row})
