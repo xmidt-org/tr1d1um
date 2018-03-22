@@ -6,14 +6,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
-	"github.com/Comcast/tr1d1um/common"
 	"github.com/Comcast/webpa-common/device"
-	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
@@ -137,18 +132,6 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 	}
 }
 
-func forwardHeadersByPrefix(prefix string, resp *http.Response, w http.ResponseWriter) {
-	if resp != nil {
-		for headerKey, headerValues := range resp.Header {
-			if strings.HasPrefix(headerKey, prefix) {
-				for _, headerValue := range headerValues {
-					w.Header().Add(headerKey, headerValue)
-				}
-			}
-		}
-	}
-}
-
 func contains(i string, elements []string) bool {
 	for _, e := range elements {
 		if e == i {
@@ -156,30 +139,4 @@ func contains(i string, elements []string) bool {
 		}
 	}
 	return false
-}
-
-func transactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
-	return func(ctx context.Context, code int, r *http.Request) {
-
-		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
-			logging.MessageKey(), "Bookkeeping response",
-			"requestAddress", r.RemoteAddr,
-			"requestURLPath", r.URL.Path,
-			"requestURLQuery", r.URL.RawQuery,
-			"requestMethod", r.Method,
-			"responseCode", code,
-			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
-			"responseError", ctx.Value(common.ContextKeyResponseError),
-		)
-
-		var latency = "-"
-
-		if requestArrivalTime, ok := ctx.Value(common.ContextKeyRequestArrivalTime).(time.Time); ok {
-			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))
-		} else {
-			logging.Error(logger).Log(logging.ErrorKey(), "latency value could not be derived")
-		}
-
-		transactionLogger.Log("latency", latency)
-	}
 }

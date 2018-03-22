@@ -33,7 +33,7 @@ type TranslationOptions struct {
 	ValidServices []string
 }
 
-//ConfigHandler sets up the handler for a given service
+//ConfigHandler makes the translation service available on the given router
 func ConfigHandler(t *TranslationOptions) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(t.Log),
@@ -41,7 +41,7 @@ func ConfigHandler(t *TranslationOptions) {
 		kithttp.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context {
 			return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
 		}),
-		kithttp.ServerFinalizer(transactionLogging(t.Log)),
+		kithttp.ServerFinalizer(common.TransactionLogging(t.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(
@@ -108,7 +108,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		body []byte
 	)
 
-	forwardHeadersByPrefix("X", resp, w)
+	common.ForwardHeadersByPrefix("X", resp, w)
 
 	defer resp.Body.Close()
 	if body, err = ioutil.ReadAll(resp.Body); err == nil {
