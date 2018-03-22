@@ -148,18 +148,17 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json")
 
-	switch err {
-	case ErrInvalidService:
+	switch {
+	case strings.HasPrefix(err.Error(), "bad request"):
 		w.WriteHeader(http.StatusBadRequest)
-	case context.DeadlineExceeded:
+	case err == context.DeadlineExceeded || err == context.Canceled:
 		w.WriteHeader(http.StatusServiceUnavailable)
-	case ErrEmptyNames:
-		w.WriteHeader(http.StatusBadRequest)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 
-		//todo: based on error logging go-kit timing, this is subject to change
-		//idea is to prevent specific internal errors being shown to users (they are "internal" for a reason)
+		//todo: we might want to change this
+		//this error is logged into our system before encodeError() is called
+		//the idea is to not send the external API consumer internal error messages
 		err = ErrInternal
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -248,5 +249,61 @@ func TestEncodeResponse(t *testing.T) {
 		assert.Nil(err)
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues(`{"statusCode":`, recorder.Body.String())
+	})
+}
+
+func TestEncodeError(t *testing.T) {
+	t.Run("BadRequests", func(t *testing.T) {
+		assert := assert.New(t)
+
+		for _, e := range []error{
+			ErrEmptyNames,
+			ErrInvalidService,
+			ErrInvalidSetWDMP,
+			ErrMissingRow,
+			ErrMissingRows,
+			ErrMissingTable,
+			ErrNewCIDRequired,
+		} {
+			w := httptest.NewRecorder()
+
+			expected := bytes.NewBufferString("")
+			json.NewEncoder(expected).Encode(map[string]string{
+				"message": e.Error()})
+
+			encodeError(context.TODO(), e, w)
+			assert.EqualValues(expected.String(), w.Body.String())
+		}
+	})
+
+	t.Run("Timeouts", func(t *testing.T) {
+		assert := assert.New(t)
+
+		for _, e := range []error{
+			context.DeadlineExceeded,
+			context.Canceled,
+		} {
+			w := httptest.NewRecorder()
+
+			expected := bytes.NewBufferString("")
+			json.NewEncoder(expected).Encode(map[string]string{
+				"message": e.Error()})
+
+			encodeError(context.TODO(), e, w)
+			assert.EqualValues(expected.String(), w.Body.String())
+		}
+	})
+
+	t.Run("InternalError", func(t *testing.T) {
+		assert := assert.New(t)
+
+		w := httptest.NewRecorder()
+		encodeError(context.TODO(), errors.New("something internal went unexpecting wrong"), w)
+
+		expected := bytes.NewBufferString("")
+		json.NewEncoder(expected).Encode(map[string]string{
+			"message": ErrInternal.Error()})
+
+		assert.EqualValues(expected.String(), w.Body.String())
 	})
 }
