@@ -92,6 +92,73 @@ func TestRequestAddPayload(t *testing.T) {
 	})
 }
 
+func TestRequestReplacePayload(t *testing.T) {
+	t.Run("TableNotProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestReplacePayload(nil, nil)
+		assert.Nil(p)
+		assert.EqualValues(ErrMissingTable, e)
+	})
+
+	t.Run("RowsNotProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestReplacePayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(""))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrMissingRows, e)
+	})
+
+	t.Run("IdealPath", func(t *testing.T) {
+		assert := assert.New(t)
+
+		rowsPayload := `{"0": {"row": "r0"}}`
+
+		p, e := requestReplacePayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(rowsPayload))
+
+		assert.Nil(e)
+
+		expected, err := json.Marshal(&replaceRowsWDMP{
+			Command: CommandReplaceRows,
+			Table:   "t0",
+			Rows:    indexRow{"0": map[string]string{"row": "r0"}},
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		assert.EqualValues(expected, p)
+	})
+}
+
+func TestRequestDeletePayload(t *testing.T) {
+	t.Run("NoRowProvided", func(t *testing.T) {
+		assert := assert.New(t)
+		p, e := requestDeletePayload(nil)
+
+		assert.Nil(p)
+		assert.EqualValues(ErrMissingRow, e)
+	})
+
+	t.Run("IdealPath", func(t *testing.T) {
+		assert := assert.New(t)
+
+		expected, err := json.Marshal(&deleteRowDMP{Command: CommandDeleteRow,
+			Row: "0",
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		p, e := requestDeletePayload(map[string]string{"parameter": "0"})
+
+		assert.Nil(e)
+		assert.EqualValues(expected, p)
+	})
+}
+
 func TestEncodeResponse(t *testing.T) {
 	assert := assert.New(t)
 

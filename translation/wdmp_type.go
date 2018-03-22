@@ -44,3 +44,18 @@ type addRowWDMP struct {
 	Table   string            `json:"table"`
 	Row     map[string]string `json:"row"`
 }
+
+//replaceRowsWDMP serves as container for data used for the REPLACE_ROWS command
+type replaceRowsWDMP struct {
+	Command string   `json:"command"`
+	Table   string   `json:"table"`
+	Rows    indexRow `json:"rows"`
+}
+
+//indexRow facilitates data transfer from json data of the form {index1: {key:val}, index2: {key:val}, ... }
+type indexRow map[string]map[string]string
+
+type deleteRowDMP struct {
+	Command string `json:"command"`
+	Row     string `json:"row"`
+}

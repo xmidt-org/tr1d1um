@@ -27,13 +27,16 @@ var (
 	ErrInternal          = errors.New("oops! Something unexpected went wrong in our service")
 	ErrUnsupportedMethod = errors.New("unsupported method. Could not decode request payload")
 
-	//SET errors
+	//Set command errors
 	ErrInvalidSetWDMP = errors.New("invalid XPC SET message")
 	ErrNewCIDRequired = errors.New("NewCid is required for TEST_AND_SET")
 
-	//PUT errors
+	//Add/Delete command  errors
 	ErrMissingTable = errors.New("table property is required")
 	ErrMissingRow   = errors.New("row property is required")
+
+	//Replace command error
+	ErrMissingRows = errors.New("rows property is required")
 )
 
 const (
@@ -235,4 +238,33 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 	}
 
 	return
+}
+
+func requestReplacePayload(m map[string]string, input io.Reader) (p []byte, err error) {
+	var wdmp = &replaceRowsWDMP{Command: CommandReplaceRows}
+
+	if table, ok := m["parameter"]; ok {
+		wdmp.Table = table
+	} else {
+		return nil, ErrMissingTable
+	}
+
+	var payload []byte
+	if payload, err = ioutil.ReadAll(input); err == nil {
+		if len(payload) == 0 {
+			return nil, ErrMissingRows
+		}
+
+		if err = json.Unmarshal(payload, &wdmp.Rows); err == nil {
+			return json.Marshal(wdmp)
+		}
+	}
+
+	return
+}
+func requestDeletePayload(m map[string]string) ([]byte, error) {
+	if row, ok := m["parameter"]; ok {
+		return json.Marshal(&deleteRowDMP{Command: CommandDeleteRow, Row: row})
+	}
+	return nil, ErrMissingRow
 }
