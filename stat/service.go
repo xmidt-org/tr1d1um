@@ -8,14 +8,15 @@ import (
 
 //Service defines the behavior of the Stat Tr1d1um Service
 type Service interface {
-	RequestStat(authVal string, URI string) ([]byte, error)
+	RequestStat(authVal string, URI string) (*http.Response, error)
 }
 
 //SService is the Tr1d1um Service to serve device stats
 type SService struct {
 	RetryDo func(*http.Request) (*http.Response, error)
 
-	XmidtURL string
+	//Base URL for the XMiDT cluster
+	XMiDT string
 
 	CtxTimeout time.Duration
 }
@@ -23,7 +24,7 @@ type SService struct {
 //RequestStat contacts the XMiDT cluster requesting the statistics for a device specified in the uri
 func (s *SService) RequestStat(authVal, URI string) (resp *http.Response, err error) {
 	var r *http.Request
-	if r, err = http.NewRequest(http.MethodGet, s.XmidtURL+URI, nil); err == nil {
+	if r, err = http.NewRequest(http.MethodGet, s.XMiDT+URI, nil); err == nil {
 		r.Header.Add("Authorization", authVal)
 
 		ctx, cancel := context.WithTimeout(r.Context(), s.CtxTimeout)

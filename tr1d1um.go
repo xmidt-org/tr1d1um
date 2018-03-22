@@ -28,6 +28,7 @@ import (
 
 	"github.com/Comcast/webpa-common/xhttp"
 
+	"github.com/Comcast/tr1d1um/stat"
 	"github.com/Comcast/tr1d1um/translation"
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
@@ -107,7 +108,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	ts := prepareWRPService(v)
+	tConfigs, err := newTimeoutConfigs(v)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse timeout configuration values: %s \n", err.Error())
+		return 1
+	}
+
+	ts := wrpService(v, tConfigs)
 
 	translation.ConfigHandler(&translation.TranslationOptions{
 		S:             ts,
@@ -115,6 +123,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Authenticate:  authenticate,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),
+	})
+
+	ss := statService(v, tConfigs)
+
+	stat.ConfigHandler(&stat.StatOptions{
+		S:            ss,
+		R:            baseRouter,
+		Authenticate: authenticate,
+		Log:          logger,
 	})
 
 	var (
@@ -141,33 +158,59 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-//clientConfigs holds parsable config values for HTTP clients to be used
-//
-type clientConfigs struct {
+//timeoutConfigs holds parsable config values for HTTP transactions
+type timeoutConfigs struct {
 	cTimeout time.Duration
-	rTimeotu time.Duration
+	rTimeout time.Duration
+	dTimeout time.Duration
 }
 
-func prepareWRPService(v *viper.Viper) translation.Service {
-	clientTimeout, _ := time.ParseDuration(v.GetString(clientTimeoutKey))
-	reqTimeout, _ := time.ParseDuration(v.GetString(reqTimeoutKey))
-	dialerTimeout, _ := time.ParseDuration(v.GetString(netDialerTimeoutKey))
-	maxRetries := v.GetInt(reqMaxRetriesKey)
+func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
+	var c, r, d time.Duration
+	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
+		if r, err = time.ParseDuration(v.GetString(reqTimeoutKey)); err == nil {
+			if d, err = time.ParseDuration(v.GetString(netDialerTimeoutKey)); err == nil {
+				t = &timeoutConfigs{
+					cTimeout: c,
+					rTimeout: r,
+					dTimeout: d,
+				}
+			}
+		}
+	}
+	return
+}
 
-	client := &http.Client{
-		Timeout: clientTimeout,
+func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
+	return &http.Client{
+		Timeout: t.cTimeout,
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
-				Timeout: dialerTimeout,
+				Timeout: t.dTimeout,
 			}).Dial},
 	}
+}
+
+/* Service Creation functions */
+
+func wrpService(v *viper.Viper, t *timeoutConfigs) translation.Service {
+	var c = newClient(v, t)
 
 	return &translation.WRPService{
 		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Retries: maxRetries}, client.Do),
-		XmidtURL:   fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
-		WRPSource:  v.GetString(WRPSourcekey),
-		CtxTimeout: reqTimeout,
+			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
+		WrpXmidtURL: fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
+		WRPSource:   v.GetString(WRPSourcekey),
+		CtxTimeout:  t.rTimeout,
+	}
+}
+
+func statService(v *viper.Viper, t *timeoutConfigs) stat.Service {
+	var c = newClient(v, t)
+	return &stat.SService{
+		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
+			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
+		XMiDT: v.GetString(targetURLKey),
 	}
 }
 
