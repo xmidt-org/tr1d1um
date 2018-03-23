@@ -148,7 +148,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	ts := wrpService(v, tConfigs)
 
-	translation.ConfigHandler(&translation.TranslationOptions{
+	translation.ConfigHandler(&translation.Configs{
 		S:             ts,
 		R:             baseRouter,
 		Authenticate:  authenticate,
@@ -161,7 +161,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	ss := statService(v, tConfigs)
 
-	stat.ConfigHandler(&stat.StatOptions{
+	stat.ConfigHandler(&stat.Configs{
 		S:            ss,
 		R:            baseRouter,
 		Authenticate: authenticate,

@@ -12,9 +12,9 @@ import (
 func TestSendWRP(t *testing.T) {
 	assert := assert.New(t)
 	w := &WRPService{
-		XmidtURL:   "http://localhost:8090/api/v2",
-		CtxTimeout: time.Second,
-		WRPSource:  "local",
+		WrpXmidtURL: "http://localhost:8090/api/v2",
+		CtxTimeout:  time.Second,
+		WRPSource:   "local",
 	}
 
 	wrpMsg := &wrp.Message{

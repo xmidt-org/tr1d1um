@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Comcast/tr1d1um/common"
 	"github.com/Comcast/webpa-common/wrp"
 
 	"github.com/stretchr/testify/assert"
@@ -302,7 +303,7 @@ func TestEncodeError(t *testing.T) {
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{
-			"message": ErrInternal.Error()})
+			"message": common.ErrTr1d1umInternal.Error()})
 
 		assert.EqualValues(expected.String(), w.Body.String())
 	})
