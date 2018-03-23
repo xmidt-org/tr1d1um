@@ -28,6 +28,7 @@ import (
 
 	"github.com/Comcast/webpa-common/xhttp"
 
+	"github.com/Comcast/tr1d1um/hooks"
 	"github.com/Comcast/tr1d1um/stat"
 	"github.com/Comcast/tr1d1um/translation"
 	"github.com/Comcast/webpa-common/concurrent"
@@ -115,6 +116,36 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
+	//
+	// Webhooks (if not configured, handler for webhooks is not set up)
+	//
+	var snsFactory *webhook.Factory
+
+	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
+		snsFactory, err = webhook.NewFactory(v)
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err.Error())
+			return 1
+		}
+	}
+
+	if snsFactory != nil {
+		hooks.ConfigHandler(&hooks.HooksOptions{
+			R:            r,
+			Authenticate: authenticate,
+			M:            metricsRegistry,
+			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
+			HooksFactory: snsFactory,
+			Log:          logger,
+		})
+
+		go snsFactory.PrepareAndStart()
+	}
+
+	//
+	// WRP Service
+	//
 	ts := wrpService(v, tConfigs)
 
 	translation.ConfigHandler(&translation.TranslationOptions{
@@ -125,6 +156,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		ValidServices: v.GetStringSlice(translationServicesKey),
 	})
 
+	//
+	// Stat Service
+	//
 	ss := statService(v, tConfigs)
 
 	stat.ConfigHandler(&stat.StatOptions{
@@ -207,6 +241,7 @@ func wrpService(v *viper.Viper, t *timeoutConfigs) translation.Service {
 
 func statService(v *viper.Viper, t *timeoutConfigs) stat.Service {
 	var c = newClient(v, t)
+
 	return &stat.SService{
 		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
 			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
