@@ -51,6 +51,10 @@ func ConfigHandler(t *TranslationOptions) {
 		opts...,
 	)
 
+	//TODO: TMP IOT HACK
+	t.R.Handle("/device/{deviceid}/{service:iot}", t.Authenticate.Then(WRPHandler)).
+		Methods(http.MethodPost)
+
 	t.R.Handle("/device/{deviceid}/{service}", t.Authenticate.Then(WRPHandler)).
 		Methods(http.MethodGet, http.MethodPatch)
 
@@ -90,7 +94,15 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 	case http.MethodPut:
 		payload, err = requestReplacePayload(mux.Vars(r), r.Body)
 	case http.MethodPost:
-		payload, err = requestAddPayload(mux.Vars(r), r.Body)
+
+		/****TODO: TMP IOT ENDPOINT HACK****/
+		v := mux.Vars(r)
+		if v["service"] == "iot" && v["parameters"] == "" {
+			return ioutil.ReadAll(r.Body)
+		}
+		/********/
+
+		payload, err = requestAddPayload(v, r.Body)
 
 	default:
 		//Unwanted methods should be filtered at the mux level. Thus, we should never get here
