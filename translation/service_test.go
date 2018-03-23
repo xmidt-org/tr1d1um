@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// testing SendWRP
-type S struct {
-}
-
 func TestSendWRP(t *testing.T) {
 	assert := assert.New(t)
 	w := &WRPService{

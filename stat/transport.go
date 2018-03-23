@@ -69,6 +69,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
+		err = common.ErrTr1d1umInternal
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{

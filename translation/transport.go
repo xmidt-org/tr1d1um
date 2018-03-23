@@ -172,7 +172,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 		//todo: we might want to change this
 		//this error is logged into our system before encodeError() is called
 		//the idea is to not send the external API consumer internal error messages
-		err = ErrInternal
+		err = common.ErrTr1d1umInternal
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{

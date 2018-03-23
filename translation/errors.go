@@ -6,7 +6,6 @@ import "errors"
 var (
 	ErrEmptyNames        = errors.New("bad request, names parameter is required")
 	ErrInvalidService    = errors.New("bad request, unsupported Service")
-	ErrInternal          = errors.New("oops! Something unexpected went wrong in our service")
 	ErrUnsupportedMethod = errors.New("unsupported method. Could not decode request payload")
 
 	//Set command errors
