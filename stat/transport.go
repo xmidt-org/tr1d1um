@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Comcast/webpa-common/device"
@@ -16,32 +17,34 @@ import (
 	"github.com/justinas/alice"
 )
 
-type StatOptions struct {
+//Configs wraps the properties needed to set up the stat server
+type Configs struct {
 	S            Service
 	R            *mux.Router
 	Authenticate *alice.Chain
 	Log          kitlog.Logger
 }
 
-func ConfigHandler(o *StatOptions) {
+//ConfigHandler sets up the server that powers the stat service
+func ConfigHandler(c *Configs) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorLogger(o.Log),
+		kithttp.ServerErrorLogger(c.Log),
 		kithttp.ServerErrorEncoder(encodeError),
 		kithttp.ServerBefore(
 			func(ctx context.Context, _ *http.Request) context.Context {
 				return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
 			}),
-		kithttp.ServerFinalizer(common.TransactionLogging(o.Log)),
+		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
 
 	statHandler := kithttp.NewServer(
-		makeStatEndpoint(o.S),
+		makeStatEndpoint(c.S),
 		decodeRequest,
 		encodeResponse,
 		opts...,
 	)
 
-	o.R.Handle("/device/{deviceid}/stat", o.Authenticate.Then(statHandler)).
+	c.R.Handle("/device/{deviceid}/stat", c.Authenticate.Then(statHandler)).
 		Methods(http.MethodGet)
 }
 
@@ -55,14 +58,13 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 	return
 }
 
-//TODO: need to capture http.Client.Timeout errors
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	switch {
 	case err == device.ErrorInvalidDeviceName:
 		w.WriteHeader(http.StatusBadRequest)
-	case err == context.Canceled || err == context.DeadlineExceeded:
+	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 	default:

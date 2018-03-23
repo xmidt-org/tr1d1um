@@ -25,7 +25,8 @@ const (
 	authHeaderKey            = "Authorization"
 )
 
-type TranslationOptions struct {
+//Configs wraps the properties needed to set up the translation server
+type Configs struct {
 	S             Service
 	R             *mux.Router
 	Authenticate  *alice.Chain
@@ -33,32 +34,32 @@ type TranslationOptions struct {
 	ValidServices []string
 }
 
-//ConfigHandler makes the translation service available on the given router
-func ConfigHandler(t *TranslationOptions) {
+//ConfigHandler sets up the server that powers the translation service
+func ConfigHandler(c *Configs) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorLogger(t.Log),
+		kithttp.ServerErrorLogger(c.Log),
 		kithttp.ServerErrorEncoder(encodeError),
 		kithttp.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context {
 			return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
 		}),
-		kithttp.ServerFinalizer(common.TransactionLogging(t.Log)),
+		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(
-		makeTranslationEndpoint(t.S),
-		decodeValidServiceRequest(t.ValidServices, decodeRequest),
+		makeTranslationEndpoint(c.S),
+		decodeValidServiceRequest(c.ValidServices, decodeRequest),
 		encodeResponse,
 		opts...,
 	)
 
 	//TODO: TMP IOT HACK
-	t.R.Handle("/device/{deviceid}/{service:iot}", t.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(WRPHandler)).
 		Methods(http.MethodPost)
 
-	t.R.Handle("/device/{deviceid}/{service}", t.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(WRPHandler)).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	t.R.Handle("/device/{deviceid}/{service}/{parameter}", t.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(WRPHandler)).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -163,7 +164,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	switch {
 	case strings.HasPrefix(err.Error(), "bad request"):
 		w.WriteHeader(http.StatusBadRequest)
-	case err == context.DeadlineExceeded || err == context.Canceled:
+	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
