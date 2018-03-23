@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -103,4 +104,29 @@ func testErrorEncode(t *testing.T, expectedCode int, es []error) {
 		assert.EqualValues(expectedCode, w.Code)
 		assert.EqualValues(expected.String(), w.Body.String())
 	}
+}
+
+func TestEncodeResponse(t *testing.T) {
+	var assert = assert.New(t)
+
+	var (
+		w = httptest.NewRecorder()
+		p = `{"dBytesSent": "1024"}`
+
+		resp = &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Body: ioutil.NopCloser(bytes.NewBufferString(p)),
+		}
+	)
+
+	//Tr1d1um just forwards the response
+	var e = encodeResponse(context.TODO(), w, resp)
+
+	assert.Nil(e)
+	assert.EqualValues(w.Header().Get("Content-Type"), resp.Header.Get("Content-Type"))
+	assert.EqualValues(p, w.Body.String())
+	assert.EqualValues(resp.StatusCode, w.Code)
 }
