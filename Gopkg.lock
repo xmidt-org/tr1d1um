@@ -23,7 +23,7 @@
     "xlistener",
     "xmetrics"
   ]
-  revision = "a53513b20447d2c0aabcf4868fa8d43459c79d3e"
+  revision = "5ab7c2016cf42b0462097de7ae0e3d9fda248e6d"
 
 [[projects]]
   name = "github.com/SermoDigital/jose"
@@ -73,14 +73,14 @@
     "service/sns/snsiface",
     "service/sts"
   ]
-  revision = "4c9c8e98642a1a5e7c27d7a644cf9140809d49ee"
-  version = "v1.13.13"
+  revision = "c8c4e0c0514d87f930c1342fef390db5329928b7"
+  version = "v1.13.20"
 
 [[projects]]
   branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
-  revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
+  revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
   branch = "master"
@@ -173,6 +173,7 @@
     ".",
     "hcl/ast",
     "hcl/parser",
+    "hcl/printer",
     "hcl/scanner",
     "hcl/strconv",
     "hcl/token",
@@ -180,7 +181,7 @@
     "json/scanner",
     "json/token"
   ]
-  revision = "23c074d0eceb2b8a5bfdbb271ab780cde70f05a8"
+  revision = "f40e974e75af4e271d97ce0fc917af5898ae7bda"
 
 [[projects]]
   name = "github.com/influxdata/influxdb"
@@ -189,8 +190,8 @@
     "models",
     "pkg/escape"
   ]
-  revision = "6ac835404e7e64ea7299a6eebcce1ab1ef15fe3c"
-  version = "v1.5.0"
+  revision = "cdae4ccde4c67c3390d8ae8a1a06bd3b4cdce5c5"
+  version = "v1.5.1"
 
 [[projects]]
   name = "github.com/jmespath/go-jmespath"
@@ -278,7 +279,7 @@
     "nfs",
     "xfs"
   ]
-  revision = "54d17b57dd7d4a3aa092476596b3f8a933bde349"
+  revision = "780932d4fbbe0e69b84c34c20f5c8d0981e109ea"
 
 [[projects]]
   name = "github.com/spf13/afero"
@@ -310,8 +311,8 @@
 [[projects]]
   name = "github.com/spf13/viper"
   packages = ["."]
-  revision = "25b30aa063fc18e48662b86996252eabdcf2f0c7"
-  version = "v1.0.0"
+  revision = "b5e8006cbee93ec955a89ab31e0e3ce3204f3736"
+  version = "v1.0.2"
 
 [[projects]]
   name = "github.com/stretchr/objx"
@@ -338,7 +339,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "89ac7f292d17a339edab4de8efcba5d8672ff661"
+  revision = "91ee8cde435411ca3f1cd365e8f20131aed4d0a1"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -368,6 +369,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fd4908de2b09bac1d1ffff2f695c712bb2569e9dfe25527f2f4d6f1974fa95ad"
+  inputs-digest = "eb4489576203f80d27d6f07108372a7e6a79307d8406d82427e296f385d82d98"
   solver-name = "gps-cdcl"
   solver-version = 1
