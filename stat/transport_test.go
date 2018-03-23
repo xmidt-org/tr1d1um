@@ -9,12 +9,49 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gorilla/mux"
+
 	"github.com/Comcast/tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestDecodeRequest(t *testing.T) {
+
+	t.Run("InvalidDeviceName", func(t *testing.T) {
+		var assert = assert.New(t)
+
+		var r = httptest.NewRequest(http.MethodGet, "http://localhost:8090", nil)
+
+		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:1122@#8!!"})
+
+		resp, err := decodeRequest(context.TODO(), r)
+
+		assert.Nil(resp)
+		assert.Equal(device.ErrorInvalidDeviceName, err)
+
+	})
+
+	t.Run("NormalFlow", func(t *testing.T) {
+		var assert = assert.New(t)
+
+		var r = httptest.NewRequest(http.MethodGet, "http://localhost:8090/api/stat", nil)
+
+		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+		r.Header.Set("Authorization", "a0")
+
+		resp, err := decodeRequest(context.TODO(), r)
+
+		assert.Nil(err)
+
+		assert.Equal(&statRequest{
+			AuthValue: "a0",
+			URI:       "/api/stat",
+		}, resp.(*statRequest))
+	})
+}
 
 func TestEncodeError(t *testing.T) {
 	t.Run("Timeouts", func(t *testing.T) {
