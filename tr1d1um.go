@@ -144,6 +144,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	//
+	// Stat Service (Note: Service path must be configured before WRP Service)
+	//
+	ss := statService(v, tConfigs)
+
+	stat.ConfigHandler(&stat.Configs{
+		S:            ss,
+		R:            baseRouter,
+		Authenticate: authenticate,
+		Log:          logger,
+	})
+
+	//
 	// WRP Service
 	//
 	ts := wrpService(v, tConfigs)
@@ -154,18 +166,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Authenticate:  authenticate,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),
-	})
-
-	//
-	// Stat Service
-	//
-	ss := statService(v, tConfigs)
-
-	stat.ConfigHandler(&stat.Configs{
-		S:            ss,
-		R:            baseRouter,
-		Authenticate: authenticate,
-		Log:          logger,
 	})
 
 	var (
@@ -245,7 +245,8 @@ func statService(v *viper.Viper, t *timeoutConfigs) stat.Service {
 	return &stat.SService{
 		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
 			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
-		XMiDT: v.GetString(targetURLKey),
+		XMiDT:      v.GetString(targetURLKey),
+		CtxTimeout: t.rTimeout,
 	}
 }
 
