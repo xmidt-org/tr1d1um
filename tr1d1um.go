@@ -144,10 +144,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	//
-	// Stat Service (Note: Service path must be configured before WRP Service)
+	// Stat Service
 	//
 	ss := statService(v, tConfigs)
 
+	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
 	stat.ConfigHandler(&stat.Configs{
 		S:            ss,
 		R:            baseRouter,
