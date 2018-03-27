@@ -121,46 +121,58 @@ func TestMakeRequest(t *testing.T) {
 }
 
 func TestHandleResponse(t *testing.T) {
-	assert := assert.New(t)
 	tr1 := NewTR1()
 
+	var testHeader = http.Header{}
+	testHeader.Add("X-test", "test-val")
+
 	t.Run("IncomingErr", func(t *testing.T) {
+		assert := assert.New(t)
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(errors.New(errMsg), nil, recorder, false)
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 	})
 
 	t.Run("StatusNotOK", func(t *testing.T) {
+		assert := assert.New(t)
 		recorder := Tr1d1umResponse{}.New()
-		fakeResponse := newTestingHTTPResponse(http.StatusBadRequest, "expectMe")
+
+		fakeResponse := newTestingHTTPResponse(http.StatusBadRequest, "expectMe", testHeader)
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
+
 		assert.EqualValues(http.StatusBadRequest, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 
 	t.Run("Scytale503s", func(t *testing.T) {
+		assert := assert.New(t)
 		recorder := Tr1d1umResponse{}.New()
-		fakeResponse := newTestingHTTPResponse(http.StatusServiceUnavailable, "expectMe")
+		fakeResponse := newTestingHTTPResponse(http.StatusServiceUnavailable, "expectMe", testHeader)
 
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 		assert.EqualValues(http.StatusServiceUnavailable, recorder.Code)
 		assert.EqualValues("expectMe", string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 
 	t.Run("ExtractPayloadFail", func(t *testing.T) {
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, "")
+		assert := assert.New(t)
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "", testHeader)
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
 
 		assert.EqualValues(http.StatusInternalServerError, recorder.Code)
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 
 	t.Run("IdealReadEntireBody", func(t *testing.T) {
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, "read all of this")
+		assert := assert.New(t)
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, "read all of this", testHeader)
 
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, true)
@@ -168,16 +180,18 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues("read all of this", string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 
 	t.Run("GoodRDKResponse", func(t *testing.T) {
+		assert := assert.New(t)
 		RDKResponse := []byte(`{"statusCode": 202}`)
 		wrpMsg := wrp.Message{
 			Type:    wrp.SimpleRequestResponseMessageType,
 			Payload: RDKResponse}
 
 		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData), testHeader)
 
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
@@ -185,9 +199,11 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues(202, recorder.Code)
 		assert.EqualValues(RDKResponse, string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 
 	t.Run("IgnoredRDKResponseStatusCode", func(t *testing.T) {
+		assert := assert.New(t)
 		RDKResponse := []byte(`{"statusCode": 500}`) //status 500 is ignored to avoid ambiguities (server vs RDK device internal error)
 		wrpMsg := wrp.Message{
 			Type:    wrp.SimpleRequestResponseMessageType,
@@ -195,7 +211,7 @@ func TestHandleResponse(t *testing.T) {
 
 		encodedData := wrp.MustEncode(wrpMsg, wrp.Msgpack)
 
-		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData))
+		fakeResponse := newTestingHTTPResponse(http.StatusOK, string(encodedData), testHeader)
 
 		recorder := Tr1d1umResponse{}.New()
 		tr1.HandleResponse(nil, fakeResponse, recorder, false)
@@ -203,6 +219,7 @@ func TestHandleResponse(t *testing.T) {
 		assert.EqualValues(200, recorder.Code)
 		assert.EqualValues(RDKResponse, string(recorder.Body))
 		assert.True(bodyIsClosed(fakeResponse))
+		assert.EqualValues(testHeader.Get("X-test"), recorder.Headers.Get("X-test"))
 	})
 }
 
@@ -227,9 +244,12 @@ func (b *bodyCloseVerifier) Close() (err error) {
 	return
 }
 
-func newTestingHTTPResponse(code int, body string) (resp *http.Response) {
-	resp = &http.Response{StatusCode: code, Body: &bodyCloseVerifier{bytes.NewBufferString(body), false}}
-	return
+func newTestingHTTPResponse(code int, body string, header http.Header) *http.Response {
+	return &http.Response{
+		StatusCode: code,
+		Body:       &bodyCloseVerifier{bytes.NewBufferString(body), false},
+		Header:     header,
+	}
 }
 
 //bodyIsClosed is a simple helper that returns true if http.Response.Body.Close() was called.
