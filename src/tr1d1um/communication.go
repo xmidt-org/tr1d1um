@@ -99,6 +99,8 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		return
 	}
 
+	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)
+
 	//as a client, we are responsible to close the body after it gets read below
 	defer respFromServer.Body.Close()
 	bodyBytes, errReading := ioutil.ReadAll(respFromServer.Body)
@@ -131,7 +133,6 @@ func (tr1 *Tr1SendAndHandle) HandleResponse(err error, respFromServer *http.Resp
 		errorLogger.Log(logging.MessageKey(), "could not extract payload from wrp body", logging.ErrorKey(), errDecoding)
 	}
 
-	ForwardHeadersByPrefix("X", respFromServer, tr1Resp)
 	return
 }
 

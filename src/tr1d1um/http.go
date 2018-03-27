@@ -256,7 +256,7 @@ func (validator *TR1RequestValidator) isValidRequest(URLVars map[string]string, 
 
 	//check device id
 	if _, err := device.ParseID(URLVars["deviceid"]); err != nil {
-		WriteResponseWriter(fmt.Sprintf("Invalid devideID: %s", err.Error()), http.StatusBadRequest, origin)
+		WriteResponseWriter(fmt.Sprintf("Invalid deviceID: %s", err.Error()), http.StatusBadRequest, origin)
 		logging.Error(validator).Log(logging.ErrorKey(), err.Error(), logging.MessageKey(), "Invalid deviceID")
 		return false
 	}
