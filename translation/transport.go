@@ -161,12 +161,11 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json")
 
-	switch {
-	case strings.HasPrefix(err.Error(), "bad request"):
-		w.WriteHeader(http.StatusBadRequest)
-	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
+	if ce, ok := err.(common.CodedError); ok {
+		w.WriteHeader(ce.StatusCode())
+	} else if err == context.Canceled || err == context.DeadlineExceeded || strings.Contains(err.Error(), "Client.Timeout exceeded") {
 		w.WriteHeader(http.StatusServiceUnavailable)
-	default:
+	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
 		//todo: we might want to change this
