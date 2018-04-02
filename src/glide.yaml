@@ -2,6 +2,6 @@ package: .
 homepage: https://github.com/Comcast/tr1d1um
 import:
 - package: github.com/Comcast/webpa-common
-  version: 75d21caa5da8a1fb952c1c507f8250b0c1eb57a6
+  version: 83585c278d8a6a20f8c7bd46e6f83f2b279ce8f4
 - package: github.com/go-ozzo/ozzo-validation
   version: v3.3
