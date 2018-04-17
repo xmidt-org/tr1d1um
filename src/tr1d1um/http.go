@@ -28,6 +28,7 @@ import (
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/secure/handler"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
@@ -316,6 +317,13 @@ func TransferResponse(from *Tr1d1umResponse, to http.ResponseWriter) {
 
 //helper function that logs desired HTTP request/response info
 func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Request, latency time.Duration, TID string) {
+	var satClientID = "N/A"
+
+	// retrieve satClientID from request context
+	if reqContextValues, ok := handler.FromContext(req.Context()); ok {
+		satClientID = reqContextValues.SatClientID
+	}
+
 	logging.Info(logger).Log(
 		logging.MessageKey(), "Bookkeeping response",
 		"requestAddress", req.RemoteAddr,
@@ -326,5 +334,6 @@ func bookkeepingLog(logger log.Logger, tr1Resp *Tr1d1umResponse, req *http.Reque
 		"responseCode", tr1Resp.Code,
 		"responseError", tr1Resp.err,
 		"latency", latency,
-		"tid", TID)
+		"tid", TID,
+		"satClientID", satClientID)
 }
