@@ -27,7 +27,7 @@ src/tr1d1um/output
 src/tr1d1um/tr1d1um.json
 keys/*.private
 
-# vim
+# Vim
 *.swp
 *.out
 
