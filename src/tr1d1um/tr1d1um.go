@@ -166,8 +166,13 @@ func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *ali
 	baseRouter.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
 	baseRouter.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
 
+	scheme := v.GetString("scheme")
+	if len(scheme) < 1 {
+		scheme = "https"
+	}
+
 	selfURL := &url.URL{
-		Scheme: "https",
+		Scheme: scheme,
 		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
 	}
 
