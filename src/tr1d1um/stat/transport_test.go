@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"tr1d1um/common"
 
-	"github.com/Comcast/tr1d1um/common"
+	"github.com/gorilla/mux"
 
 	"github.com/Comcast/webpa-common/device"
 

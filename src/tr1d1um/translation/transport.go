@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Comcast/tr1d1um/common"
+	"tr1d1um/common"
+
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/justinas/alice"
 

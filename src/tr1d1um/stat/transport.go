@@ -10,7 +10,8 @@ import (
 
 	"github.com/Comcast/webpa-common/device"
 
-	"github.com/Comcast/tr1d1um/common"
+	"tr1d1um/common"
+
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"

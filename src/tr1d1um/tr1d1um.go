@@ -28,9 +28,10 @@ import (
 
 	"github.com/Comcast/webpa-common/xhttp"
 
-	"github.com/Comcast/tr1d1um/hooks"
-	"github.com/Comcast/tr1d1um/stat"
-	"github.com/Comcast/tr1d1um/translation"
+	"tr1d1um/hooks"
+	"tr1d1um/stat"
+	"tr1d1um/translation"
+
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/secure"
