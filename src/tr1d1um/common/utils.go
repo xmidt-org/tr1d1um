@@ -8,14 +8,24 @@ import (
 	"time"
 
 	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/secure/handler"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 )
+
+//HeaderWPATID is the header key for the WebPA transaction UUID
+const HeaderWPATID = "X-WebPA-Transaction-Id"
 
 //TransactionLogging is used by the different Tr1d1um services to
 //keep track of incoming requests and their corresponding responses
 func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
+		var satClientID = "N/A"
+
+		// retrieve satClientID from request context
+		if reqContextValues, ok := handler.FromContext(r.Context()); ok {
+			satClientID = reqContextValues.SatClientID
+		}
 
 		transactionLogger := kitlog.WithPrefix(logging.Info(logger),
 			logging.MessageKey(), "Bookkeeping response",
@@ -26,9 +36,11 @@ func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 			"responseCode", code,
 			"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders),
 			"responseError", ctx.Value(ContextKeyResponseError),
+			"tid", ctx.Value(ContextKeyRequestTID),
+			"satClientID", satClientID,
 		)
 
-		var latency = "-"
+		var latency = "N/A"
 
 		if requestArrivalTime, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time); ok {
 			latency = fmt.Sprintf("%v", time.Now().Sub(requestArrivalTime))

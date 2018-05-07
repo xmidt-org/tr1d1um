@@ -53,7 +53,7 @@ import (
 //convenient global values
 const (
 	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "/api/v2"
+	applicationName, apiBase = "tr1d1um", "api/v2"
 
 	translationServicesKey = "supportedServices"
 	targetURLKey           = "targetURL"
@@ -101,7 +101,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	r := mux.NewRouter()
 
-	baseRouter := r.PathPrefix(apiBase).Subrouter()
+	baseRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 
@@ -147,7 +147,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	// Stat Service
 	//
-	ss := statService(v, tConfigs)
+	ss := stat.NewService(&stat.ServiceOptions{
+		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
+			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+
+		CtxTimeout: tConfigs.rTimeout,
+
+		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
+	})
 
 	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
 	stat.ConfigHandler(&stat.Configs{
@@ -160,7 +167,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	// WRP Service
 	//
-	ts := wrpService(v, tConfigs)
+
+	ts := translation.NewService(&translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
+		WRPSource:   v.GetString(WRPSourcekey),
+		CtxTimeout:  tConfigs.rTimeout,
+		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
+			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+	})
 
 	translation.ConfigHandler(&translation.Configs{
 		S:             ts,
@@ -196,8 +210,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 //timeoutConfigs holds parsable config values for HTTP transactions
 type timeoutConfigs struct {
+	//HTTP client timeout
 	cTimeout time.Duration
+
+	//HTTP request timeout
 	rTimeout time.Duration
+
+	//net dialer timeout
 	dTimeout time.Duration
 }
 
@@ -224,31 +243,6 @@ func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
 			Dial: (&net.Dialer{
 				Timeout: t.dTimeout,
 			}).Dial},
-	}
-}
-
-/* Service Creation functions */
-
-func wrpService(v *viper.Viper, t *timeoutConfigs) translation.Service {
-	var c = newClient(v, t)
-
-	return &translation.WRPService{
-		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
-		WrpXmidtURL: fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
-		WRPSource:   v.GetString(WRPSourcekey),
-		CtxTimeout:  t.rTimeout,
-	}
-}
-
-func statService(v *viper.Viper, t *timeoutConfigs) stat.Service {
-	var c = newClient(v, t)
-
-	return &stat.SService{
-		RetryDo: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Retries: v.GetInt(reqMaxRetriesKey)}, c.Do),
-		XMiDT:      v.GetString(targetURLKey),
-		CtxTimeout: t.rTimeout,
 	}
 }
 

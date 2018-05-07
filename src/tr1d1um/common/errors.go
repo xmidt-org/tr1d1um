@@ -26,7 +26,7 @@ func (b *badRequestError) StatusCode() int {
 	return http.StatusBadRequest
 }
 
-//NewBadRequestError is the constructor for an error returned for many bad HTTP requests to tr1d1um
+//NewBadRequestError is the constructor for an error returned for bad HTTP requests to tr1d1um
 func NewBadRequestError(e error) CodedError {
 	return &badRequestError{e}
 }

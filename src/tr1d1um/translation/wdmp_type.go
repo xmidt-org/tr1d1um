@@ -14,7 +14,6 @@ const (
 	HeaderWPASyncOldCID = "X-Webpa-Sync-Old-Cid"
 	HeaderWPASyncNewCID = "X-Webpa-Sync-New-Cid"
 	HeaderWPASyncCMC    = "X-Webpa-Sync-Cmc"
-	HeaderWPATID        = "X-WebPA-Transaction-Id"
 
 	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
 )

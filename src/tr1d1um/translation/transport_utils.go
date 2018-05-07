@@ -124,7 +124,7 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, 
 func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
 	return func(c context.Context, r *http.Request) (interface{}, error) {
 
-		if vars := mux.Vars(r); vars == nil || !contains(vars["service"], services) {
+		if !contains(mux.Vars(r)["service"], services) {
 			return nil, ErrInvalidService
 		}
 
@@ -133,9 +133,11 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 }
 
 func contains(i string, elements []string) bool {
-	for _, e := range elements {
-		if e == i {
-			return true
+	if elements != nil {
+		for _, e := range elements {
+			if e == i {
+				return true
+			}
 		}
 	}
 	return false

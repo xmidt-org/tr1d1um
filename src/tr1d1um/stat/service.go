@@ -3,34 +3,53 @@ package stat
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 )
 
 //Service defines the behavior of the Stat Tr1d1um Service
 type Service interface {
-	RequestStat(authVal string, URI string) (*http.Response, error)
+	RequestStat(authHeaderValue, deviceID string) (*http.Response, error)
 }
 
-//SService is the Tr1d1um Service to serve device stats
-type SService struct {
-	RetryDo func(*http.Request) (*http.Response, error)
+func NewService(o *ServiceOptions) Service {
+	return &service{
+		Do:           o.Do,
+		XmidtStatURL: o.XmidtStatURL,
+		CtxTimeout:   o.CtxTimeout,
+	}
+}
 
-	//Base URL for the XMiDT cluster
-	XMiDT string
+type ServiceOptions struct {
+	//Do performs the HTTP transaction
+	Do func(*http.Request) (*http.Response, error)
+
+	//Base Endpoint URL for device stats from XMiDT API
+	XmidtStatURL string
+
+	//Deadline enforced on outgoing request
+	CtxTimeout time.Duration
+}
+
+type service struct {
+	Do func(*http.Request) (*http.Response, error)
+
+	XmidtStatURL string
 
 	CtxTimeout time.Duration
 }
 
-//RequestStat contacts the XMiDT cluster requesting the statistics for a device specified in the uri
-func (s *SService) RequestStat(authVal, URI string) (resp *http.Response, err error) {
+//RequestStat contacts the XMiDT cluster for device statistics
+func (s *service) RequestStat(authHeaderValue, deviceID string) (resp *http.Response, err error) {
 	var r *http.Request
-	if r, err = http.NewRequest(http.MethodGet, s.XMiDT+URI, nil); err == nil {
-		r.Header.Add("Authorization", authVal)
+
+	if r, err = http.NewRequest(http.MethodGet, strings.Replace(s.XmidtStatURL, "${device}", deviceID, 1), nil); err == nil {
+		r.Header.Add("Authorization", authHeaderValue)
 
 		ctx, cancel := context.WithTimeout(r.Context(), s.CtxTimeout)
 		defer cancel()
 
-		return s.RetryDo(r.WithContext(ctx))
+		return s.Do(r.WithContext(ctx))
 	}
 	return
 }

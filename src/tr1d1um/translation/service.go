@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 )
@@ -14,24 +15,43 @@ import (
 type Service interface {
 	SendWRP(*wrp.Message, string) (*http.Response, error)
 }
+type ServiceOptions struct {
+	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages
+	XmidtWrpURL string
 
-//WRPService represents the Webpa-Tr1d1um service that sends WRP data to the XMiDT cluster
-type WRPService struct {
-	//RetryDo is http.Client.Do with multiple retries supported
-	RetryDo func(*http.Request) (*http.Response, error)
+	//Do is http.Client.Do with custom client configurations
+	Do func(*http.Request) (*http.Response, error)
 
-	//URL of the XMiDT Service for WRP messages
-	WrpXmidtURL string
+	//WRPSource is currently the prefix of "Source" field in outgoing WRP Messages
+	WRPSource string
 
 	//CtxTimeout is the timeout for any given HTTP transaction
 	CtxTimeout time.Duration
+}
 
-	//WRPSource is currently the prefix of "Source" field in outgoing WRP Messages
+func NewService(o *ServiceOptions) Service {
+	return &service{
+		Do:          o.Do,
+		XmidtWrpURL: o.XmidtWrpURL,
+		WRPSource:   o.WRPSource,
+		CtxTimeout:  o.CtxTimeout,
+	}
+}
+
+//service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
+//which is compatible with the XMiDT API
+type service struct {
+	Do func(*http.Request) (*http.Response, error)
+
+	XmidtWrpURL string
+
+	CtxTimeout time.Duration
+
 	WRPSource string
 }
 
 //SendWRP sends the given wrpMsg to the XMiDT cluster and returns the *http.Response
-func (w *WRPService) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Response, err error) {
+func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Response, err error) {
 	var payload []byte
 
 	// fill in the rest of the source property
@@ -39,18 +59,18 @@ func (w *WRPService) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.
 
 	if err = wrp.NewEncoderBytes(&payload, wrp.Msgpack).Encode(wrpMsg); err == nil {
 		var req *http.Request
-		if req, err = http.NewRequest(http.MethodPost, w.WrpXmidtURL, bytes.NewBuffer(payload)); err == nil {
+		if req, err = http.NewRequest(http.MethodPost, w.XmidtWrpURL, bytes.NewBuffer(payload)); err == nil {
 
-			req.Header.Add(contentTypeHeaderKey, wrp.Msgpack.ContentType())
-			req.Header.Add(authHeaderKey, authValue)
+			req.Header.Add("Content-Type", wrp.Msgpack.ContentType())
+			req.Header.Add("Authorization", authValue)
 
 			ctx, cancel := context.WithTimeout(req.Context(), w.CtxTimeout)
 			defer cancel()
 
-			resp, err = w.RetryDo(req.WithContext(ctx))
+			resp, err = w.Do(req.WithContext(ctx))
 
 			//place TID in response
-			resp.Header.Set(http.CanonicalHeaderKey(HeaderWPATID), wrpMsg.TransactionUUID)
+			resp.Header.Set(common.HeaderWPATID, wrpMsg.TransactionUUID)
 		}
 	}
 	return

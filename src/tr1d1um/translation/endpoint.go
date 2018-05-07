@@ -8,13 +8,13 @@ import (
 )
 
 type wrpRequest struct {
-	WRPMessage *wrp.Message
-	AuthValue  string
+	WRPMessage      *wrp.Message
+	AuthHeaderValue string
 }
 
 func makeTranslationEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		wrpReq := (request).(*wrpRequest)
-		return s.SendWRP(wrpReq.WRPMessage, wrpReq.AuthValue)
+		return s.SendWRP(wrpReq.WRPMessage, wrpReq.AuthHeaderValue)
 	}
 }

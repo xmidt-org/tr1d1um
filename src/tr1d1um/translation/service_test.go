@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/assert"
@@ -11,31 +12,32 @@ import (
 
 func TestSendWRP(t *testing.T) {
 	assert := assert.New(t)
-	w := &WRPService{
-		WrpXmidtURL: "http://localhost:8090/api/v2",
+
+	var (
+		contentTypeValue, authHeaderValue string
+		sentWRP                           = new(wrp.Message)
+	)
+
+	w := NewService(&ServiceOptions{
+		XmidtWrpURL: "http://localhost:8090/api/v2",
 		CtxTimeout:  time.Second,
 		WRPSource:   "local",
-	}
+		Do:
+
+		//capture sent values of interest
+		func(r *http.Request) (resp *http.Response, err error) {
+			if err = wrp.NewDecoder(r.Body, wrp.Msgpack).Decode(sentWRP); err == nil {
+				contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get(authHeaderKey)
+				resp = &http.Response{Header: http.Header{}}
+				return
+			}
+			return
+		},
+	})
 
 	wrpMsg := &wrp.Message{
 		TransactionUUID: "tid",
 		Source:          "test",
-	}
-
-	var (
-		contentTypeValue, authHeaderValue string
-		sentWRP                           = &wrp.Message{}
-	)
-
-	//capture sent values of interest
-	w.RetryDo = func(r *http.Request) (resp *http.Response, err error) {
-
-		if err = wrp.NewDecoder(r.Body, wrp.Msgpack).Decode(sentWRP); err == nil {
-			contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get(authHeaderKey)
-			resp = &http.Response{Header: http.Header{}}
-			return
-		}
-		return
 	}
 
 	resp, err := w.SendWRP(wrpMsg, "auth")
@@ -47,7 +49,7 @@ func TestSendWRP(t *testing.T) {
 	assert.EqualValues("auth", authHeaderValue)
 
 	//verify tid is set in response header
-	assert.EqualValues("tid", resp.Header.Get(HeaderWPATID))
+	assert.EqualValues("tid", resp.Header.Get(common.HeaderWPATID))
 
 	//verify source in WRP message
 	assert.EqualValues("local/test", sentWRP.Source)

@@ -10,21 +10,20 @@ import (
 
 func TestRequestStat(t *testing.T) {
 	assert := assert.New(t)
-	s := &SService{
-		XMiDT:      "http://localhost:8090",
-		CtxTimeout: time.Second,
-	}
-
 	var authHeaderValue, actualURL string
 
-	//capture sent values of interest
-	s.RetryDo = func(r *http.Request) (*http.Response, error) {
-		actualURL, authHeaderValue = r.URL.String(), r.Header.Get("Authorization")
-		return nil, nil
-	}
+	s := NewService(&ServiceOptions{
+		XmidtStatURL: "http://localhost:8090/${device}/stat",
+		CtxTimeout:   time.Second,
+		Do:
+		//capture sent values of interest
+		func(r *http.Request) (*http.Response, error) {
+			actualURL, authHeaderValue = r.URL.String(), r.Header.Get("Authorization")
+			return nil, nil
+		},
+	})
 
-	URI := "/api/v2/device/mac:112233445566/stat"
-	resp, err := s.RequestStat("a0", URI)
+	resp, err := s.RequestStat("a0", "mac:112233445566")
 
 	assert.Nil(err)
 	assert.Nil(resp)
@@ -33,5 +32,5 @@ func TestRequestStat(t *testing.T) {
 	assert.EqualValues("a0", authHeaderValue)
 
 	//verify source in WRP message
-	assert.EqualValues(s.XMiDT+URI, actualURL)
+	assert.EqualValues("http://localhost:8090/mac:112233445566/stat", actualURL)
 }

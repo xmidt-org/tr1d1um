@@ -32,8 +32,10 @@ func ConfigHandler(c *Configs) {
 		kithttp.ServerErrorLogger(c.Log),
 		kithttp.ServerErrorEncoder(encodeError),
 		kithttp.ServerBefore(
-			func(ctx context.Context, _ *http.Request) context.Context {
-				return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
+			func(ctx context.Context, r *http.Request) context.Context {
+				ctx = context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
+				ctx = context.WithValue(ctx, common.ContextKeyRequestTID, r.Header.Get(common.HeaderWPATID))
+				return ctx
 			}),
 		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
@@ -50,10 +52,11 @@ func ConfigHandler(c *Configs) {
 }
 
 func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err error) {
-	if _, err = device.ParseID(mux.Vars(r)["deviceid"]); err == nil {
+	var deviceID device.ID
+	if deviceID, err = device.ParseID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
-			AuthValue: r.Header.Get("Authorization"),
-			URI:       r.URL.RequestURI(),
+			AuthHeaderValue: r.Header.Get("Authorization"),
+			DeviceID:        string(deviceID),
 		}
 	}
 	return
@@ -65,6 +68,8 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	switch {
 	case err == device.ErrorInvalidDeviceName:
 		w.WriteHeader(http.StatusBadRequest)
+
+		//TODO: is there a better way to capture all timeout errors?
 	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
 		w.WriteHeader(http.StatusServiceUnavailable)
 
@@ -80,7 +85,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 //encodeResponse simply forwards
 //TODO: this needs revision. What about if XMiDT cluster reports 500. There would be ambiguity
-//about which machine is actually having the error
+//about which machine is actually having the error (Tr1d1um or the Xmidt machines)
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*http.Response)

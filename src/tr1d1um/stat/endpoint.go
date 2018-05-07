@@ -7,13 +7,13 @@ import (
 )
 
 type statRequest struct {
-	URI       string
-	AuthValue string
+	DeviceID        string
+	AuthHeaderValue string
 }
 
 func makeStatEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, r interface{}) (interface{}, error) {
 		statReq := (r).(*statRequest)
-		return s.RequestStat(statReq.AuthValue, statReq.URI)
+		return s.RequestStat(statReq.AuthHeaderValue, statReq.DeviceID)
 	}
 }

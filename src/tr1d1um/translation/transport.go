@@ -73,10 +73,10 @@ func decodeRequest(c context.Context, r *http.Request) (decodedRequest interface
 	)
 
 	if payload, err = requestPayload(r); err == nil {
-		if wrpMsg, err = wrap(payload, r.Header.Get(HeaderWPATID), mux.Vars(r)); err == nil {
+		if wrpMsg, err = wrap(payload, r.Header.Get(common.HeaderWPATID), mux.Vars(r)); err == nil {
 			decodedRequest = &wrpRequest{
-				WRPMessage: wrpMsg,
-				AuthValue:  r.Header.Get(authHeaderKey),
+				WRPMessage:      wrpMsg,
+				AuthHeaderValue: r.Header.Get(authHeaderKey),
 			}
 		}
 	}
@@ -169,9 +169,8 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
-		//todo: we might want to change this
-		//this error is logged into our system before encodeError() is called
-		//the idea is to not send the external API consumer internal error messages
+		//the real error is logged into our system before encodeError() is called
+		//the idea behind masking it is to not send the external API consumer internal error messages
 		err = common.ErrTr1d1umInternal
 	}
 
@@ -191,7 +190,7 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 
 	//read data into wdmp
 	if data, err = ioutil.ReadAll(in); err == nil {
-		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 {
+		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 { //len(data) == 0 case is for TEST_SET
 			if err = validateAndDeduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
 				return json.Marshal(wdmp)
 			}

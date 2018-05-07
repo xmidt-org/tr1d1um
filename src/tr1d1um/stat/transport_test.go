@@ -48,8 +48,8 @@ func TestDecodeRequest(t *testing.T) {
 		assert.Nil(err)
 
 		assert.Equal(&statRequest{
-			AuthValue: "a0",
-			URI:       "/api/stat",
+			AuthHeaderValue: "a0",
+			DeviceID:        "mac:112233445566",
 		}, resp.(*statRequest))
 	})
 }
