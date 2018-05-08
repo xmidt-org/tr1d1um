@@ -63,6 +63,7 @@ const (
 	reqRetryIntervalKey    = "requestRetryInterval"
 	reqMaxRetriesKey       = "requestMaxRetries"
 	WRPSourcekey           = "WRPSource"
+	hooksSchemeKey         = "hooksScheme"
 )
 
 var defaults = map[string]interface{}{
@@ -74,6 +75,7 @@ var defaults = map[string]interface{}{
 	reqRetryIntervalKey:    "2s",
 	reqMaxRetriesKey:       2,
 	WRPSourcekey:           "dns:localhost",
+	hooksSchemeKey:         "https",
 }
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -139,6 +141,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
 			HooksFactory: snsFactory,
 			Log:          logger,
+			Scheme:       v.GetString(hooksSchemeKey),
 		})
 
 		go snsFactory.PrepareAndStart()

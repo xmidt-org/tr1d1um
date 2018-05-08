@@ -17,6 +17,7 @@ type HooksOptions struct {
 	Host         string
 	HooksFactory *webhook.Factory
 	Log          kitlog.Logger
+	Scheme       string
 }
 
 func ConfigHandler(o *HooksOptions) {
@@ -26,8 +27,7 @@ func ConfigHandler(o *HooksOptions) {
 	o.R.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
 
 	selfURL := &url.URL{
-		//TODO: this scheme needs to be read from configuration
-		Scheme: "https",
+		Scheme: o.Scheme,
 		Host:   o.Host,
 	}
 
