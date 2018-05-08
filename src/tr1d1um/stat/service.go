@@ -12,6 +12,7 @@ type Service interface {
 	RequestStat(authHeaderValue, deviceID string) (*http.Response, error)
 }
 
+//NewService constructs a new stat service instance given some options
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		Do:           o.Do,
@@ -20,6 +21,7 @@ func NewService(o *ServiceOptions) Service {
 	}
 }
 
+//ServiceOptions defines the options needed to build a new stat service
 type ServiceOptions struct {
 	//Do performs the HTTP transaction
 	Do func(*http.Request) (*http.Response, error)

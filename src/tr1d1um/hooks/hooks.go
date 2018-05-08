@@ -26,6 +26,7 @@ func ConfigHandler(o *HooksOptions) {
 	o.R.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
 
 	selfURL := &url.URL{
+		//TODO: this scheme needs to be read from configuration
 		Scheme: "https",
 		Host:   o.Host,
 	}

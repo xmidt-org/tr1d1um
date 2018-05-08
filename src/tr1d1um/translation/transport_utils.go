@@ -24,8 +24,8 @@ func genTID() (tid string, err error) {
 
 /* Functions that help decode a given SET request to TR1D1UM */
 
-//validateAndDeduceSET deduces the command for a given wdmp object and validates it for such
-func validateAndDeduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
+//deduceSET deduces the command for a given wdmp object
+func deduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
 	if newCID == "" && oldCID != "" {
 		return ErrNewCIDRequired
 	} else if newCID == "" && oldCID == "" && syncCMC == "" {
@@ -33,10 +33,6 @@ func validateAndDeduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err er
 	} else {
 		wdmp.Command = CommandTestSet
 		wdmp.NewCid, wdmp.OldCid, wdmp.SyncCmc = newCID, oldCID, syncCMC
-	}
-
-	if !isValidSetWDMP(wdmp) {
-		return ErrInvalidSetWDMP
 	}
 
 	return
@@ -84,7 +80,7 @@ func isValidSetWDMP(wdmp *setWDMP) (isValid bool) {
 //getCommandForParams decides whether the command for some request is a 'SET' or 'SET_ATTRS' based on a given list of parameters
 func getCommandForParams(params []setParam) (command string) {
 	command = CommandSet
-	if params == nil || len(params) < 1 {
+	if len(params) < 1 {
 		return
 	}
 	if wdmp := params[0]; wdmp.Attributes != nil &&
@@ -98,6 +94,7 @@ func getCommandForParams(params []setParam) (command string) {
 
 /* Other transport-level helper functions */
 
+//wrp merges different values from a WDMP request into a WRP message
 func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
 	var canonicalDeviceID device.ID
 

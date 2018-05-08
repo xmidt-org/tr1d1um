@@ -107,7 +107,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 		payload, err = requestAddPayload(v, r.Body)
 
 	default:
-		//Unwanted methods should be filtered at the mux level. Thus, we should never get here
+		//Unwanted methods should be filtered at the mux level. Thus, we "should" never get here
 		err = ErrUnsupportedMethod
 	}
 
@@ -188,10 +188,14 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 		data []byte
 	)
 
-	//read data into wdmp
 	if data, err = ioutil.ReadAll(in); err == nil {
+
+		//read data into wdmp
 		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 { //len(data) == 0 case is for TEST_SET
-			if err = validateAndDeduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+			if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+				if !isValidSetWDMP(wdmp) {
+					return nil, ErrInvalidSetWDMP
+				}
 				return json.Marshal(wdmp)
 			}
 		}

@@ -27,6 +27,7 @@ type Configs struct {
 }
 
 //ConfigHandler sets up the server that powers the stat service
+//That is, it configures the mux paths to access the service
 func ConfigHandler(c *Configs) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(c.Log),
@@ -69,7 +70,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	case err == device.ErrorInvalidDeviceName:
 		w.WriteHeader(http.StatusBadRequest)
 
-		//TODO: is there a better way to capture all timeout errors?
+		//TODO: are we capturing all possible timeout cases we should be here?
 	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
 		w.WriteHeader(http.StatusServiceUnavailable)
 
@@ -83,9 +84,10 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	})
 }
 
-//encodeResponse simply forwards
-//TODO: this needs revision. What about if XMiDT cluster reports 500. There would be ambiguity
-//about which machine is actually having the error (Tr1d1um or the Xmidt machines)
+//encodeResponse simply forwards the response Tr1d1um got from the XMiDT API
+//TODO: What about if XMiDT cluster reports 500. There would be ambiguity
+//about which machine is actually having the error (Tr1d1um or the Xmidt API)
+//do we care to make that distinction?
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*http.Response)

@@ -20,28 +20,33 @@ func TestGenTID(t *testing.T) {
 	assert.NotEmpty(tid)
 }
 func TestValidateAndDeduceSETCommand(t *testing.T) {
-	assert := assert.New(t)
 
 	t.Run("newCIDMissing", func(t *testing.T) {
+		assert := assert.New(t)
 		wdmp := new(setWDMP)
-		err := validateAndDeduceSET(wdmp, "", "old-cid", "sync-cm")
+		err := deduceSET(wdmp, "", "old-cid", "sync-cm")
 		assert.EqualValues(ErrNewCIDRequired, err)
 	})
 
-	t.Run("NilParams", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		assert := assert.New(t)
 		wdmp := new(setWDMP)
-		err := validateAndDeduceSET(wdmp, "", "", "")
-		assert.EqualValues(ErrInvalidSetWDMP, err)
+		err := deduceSET(wdmp, "", "", "")
+		assert.Nil(err)
+		assert.EqualValues(CommandSet, wdmp.Command)
+
 	})
 
 	t.Run("TestSetNilValues", func(t *testing.T) {
+		assert := assert.New(t)
 		wdmp := new(setWDMP)
 
-		err := validateAndDeduceSET(wdmp, "newVal", "oldVal", "")
+		err := deduceSET(wdmp, "newVal", "oldVal", "")
 		assert.Nil(err)
 		assert.EqualValues(CommandTestSet, wdmp.Command)
 	})
 }
+
 func TestIsValidSetWDMP(t *testing.T) {
 	t.Run("TestAndSetZeroParams", func(t *testing.T) {
 		assert := assert.New(t)
@@ -153,7 +158,6 @@ func TestGetCommandForParam(t *testing.T) {
 		assert.EqualValues(CommandSetAttrs, getCommandForParams([]setParam{setCommandParam}))
 	})
 }
-
 func TestWrapInWRP(t *testing.T) {
 	t.Run("EmptyVars", func(t *testing.T) {
 		assert := assert.New(t)

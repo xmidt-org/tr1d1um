@@ -57,6 +57,40 @@ func TestRequestGetPayload(t *testing.T) {
 	})
 }
 
+func TestRequestSetPayload(t *testing.T) {
+	t.Run("ErrAtDeduction", func(t *testing.T) {
+		assert := assert.New(t)
+		_, e := requestSetPayload(bytes.NewBufferString(""), "", "old", "sync")
+
+		assert.EqualValues(ErrNewCIDRequired, e)
+	})
+
+	t.Run("InvalidWDMP", func(t *testing.T) {
+		assert := assert.New(t)
+		_, e := requestSetPayload(bytes.NewBufferString(""), "", "", "")
+
+		assert.EqualValues(ErrInvalidSetWDMP, e)
+	})
+
+	t.Run("Ideal", func(t *testing.T) {
+		assert := assert.New(t)
+		p, e := requestSetPayload(bytes.NewBufferString(""), "new", "old", "sync")
+
+		wdmp := new(setWDMP)
+		err := json.NewDecoder(bytes.NewBuffer(p)).Decode(wdmp)
+
+		if err != nil {
+			panic(err)
+		}
+
+		assert.Nil(e)
+		assert.EqualValues(CommandTestSet, wdmp.Command)
+		assert.EqualValues("new", wdmp.NewCid)
+		assert.EqualValues("old", wdmp.OldCid)
+		assert.EqualValues("sync", wdmp.SyncCmc)
+	})
+}
+
 func TestRequestAddPayload(t *testing.T) {
 	t.Run("TableNotProvided", func(t *testing.T) {
 		assert := assert.New(t)

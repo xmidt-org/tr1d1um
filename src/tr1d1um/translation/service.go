@@ -15,6 +15,8 @@ import (
 type Service interface {
 	SendWRP(*wrp.Message, string) (*http.Response, error)
 }
+
+//ServiceOptions defines the options needed to build a new translation WRP service
 type ServiceOptions struct {
 	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages
 	XmidtWrpURL string
@@ -29,6 +31,7 @@ type ServiceOptions struct {
 	CtxTimeout time.Duration
 }
 
+//NewService constructs a new translation service instance given some options
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		Do:          o.Do,
