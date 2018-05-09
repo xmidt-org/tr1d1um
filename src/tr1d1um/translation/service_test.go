@@ -27,7 +27,7 @@ func TestSendWRP(t *testing.T) {
 		//capture sent values of interest
 		func(r *http.Request) (resp *http.Response, err error) {
 			if err = wrp.NewDecoder(r.Body, wrp.Msgpack).Decode(sentWRP); err == nil {
-				contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get(authHeaderKey)
+				contentTypeValue, authHeaderValue = r.Header.Get(contentTypeHeaderKey), r.Header.Get("Authorization")
 				resp = &http.Response{Header: http.Header{}}
 				return
 			}

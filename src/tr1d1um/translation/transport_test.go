@@ -10,12 +10,99 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gorilla/mux"
+
 	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestDecodeRequest(t *testing.T) {
+	t.Run("PayloadFailure", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		_, e := decodeRequest(context.TODO(), r)
+		assert.EqualValues(ErrEmptyNames, e)
+	})
+
+	t.Run("WRPWrapFailure", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+		wrpMsg, e := decodeRequest(context.TODO(), r)
+		assert.Nil(e)
+		assert.NotEmpty(wrpMsg)
+	})
+
+	t.Run("Ideal", func(t *testing.T) {
+
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+		wrpMsg, e := decodeRequest(context.TODO(), r)
+		assert.Nil(e)
+		assert.NotEmpty(wrpMsg)
+
+	})
+}
+func TestRequestPayload(t *testing.T) {
+	t.Run("Get", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrEmptyNames, e)
+	})
+
+	t.Run("Set", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodPatch, "http://localhost", nil)
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrInvalidSetWDMP, e)
+	})
+
+	t.Run("Del", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodDelete, "http://localhost", nil)
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrMissingRow, e)
+	})
+
+	t.Run("Replace", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodPut, "http://localhost", nil)
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrMissingTable, e)
+	})
+
+	t.Run("Iot", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
+
+		r = mux.SetURLVars(r, map[string]string{"service": "iot"})
+
+		p, e := requestPayload(r)
+		assert.Empty(p)
+		assert.Nil(e)
+	})
+
+	t.Run("Add", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
+
+		r = mux.SetURLVars(r, map[string]string{"service": "add"})
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrMissingTable, e)
+	})
+
+	t.Run("Others", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodOptions, "http://localhost", nil)
+		_, e := requestPayload(r)
+		assert.EqualValues(ErrUnsupportedMethod, e)
+	})
+}
 
 func TestRequestGetPayload(t *testing.T) {
 	t.Run("EmptyNames", func(t *testing.T) {

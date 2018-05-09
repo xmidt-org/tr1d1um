@@ -14,8 +14,6 @@ const (
 	HeaderWPASyncOldCID = "X-Webpa-Sync-Old-Cid"
 	HeaderWPASyncNewCID = "X-Webpa-Sync-New-Cid"
 	HeaderWPASyncCMC    = "X-Webpa-Sync-Cmc"
-
-	ErrUnsuccessfulDataParse = "Unsuccessful Data Parse"
 )
 
 type getWDMP struct {
@@ -44,15 +42,15 @@ type addRowWDMP struct {
 	Row     map[string]string `json:"row"`
 }
 
+//indexRow facilitates data transfer from json data of the form {index1: {key:val}, index2: {key:val}, ... }
+type indexRow map[string]map[string]string
+
 //replaceRowsWDMP serves as container for data used for the REPLACE_ROWS command
 type replaceRowsWDMP struct {
 	Command string   `json:"command"`
 	Table   string   `json:"table"`
 	Rows    indexRow `json:"rows"`
 }
-
-//indexRow facilitates data transfer from json data of the form {index1: {key:val}, index2: {key:val}, ... }
-type indexRow map[string]map[string]string
 
 type deleteRowDMP struct {
 	Command string `json:"command"`
