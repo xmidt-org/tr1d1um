@@ -14,19 +14,23 @@ type CodedError interface {
 	StatusCode() int
 }
 
-type badRequestError struct {
+type codedError struct {
 	error
+	statusCode int
 }
 
-func (b *badRequestError) Error() string {
-	return b.error.Error()
-}
-
-func (b *badRequestError) StatusCode() int {
-	return http.StatusBadRequest
+func (c *codedError) StatusCode() int {
+	return c.statusCode
 }
 
 //NewBadRequestError is the constructor for an error returned for bad HTTP requests to tr1d1um
 func NewBadRequestError(e error) CodedError {
-	return &badRequestError{e}
+	return NewCodedError(e, http.StatusBadRequest)
+}
+
+func NewCodedError(e error, code int) CodedError {
+	return &codedError{
+		error:      e,
+		statusCode: code,
+	}
 }

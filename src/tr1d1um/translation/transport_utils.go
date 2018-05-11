@@ -2,8 +2,6 @@ package translation
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -12,15 +10,6 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
-
-//genTID generates a 16-byte long string
-func genTID() (tid string, err error) {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err == nil {
-		tid = base64.RawURLEncoding.EncodeToString(buf)
-	}
-	return
-}
 
 /* Functions that help decode a given SET request to TR1D1UM */
 
@@ -100,12 +89,6 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, 
 
 	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
 		service := pathVars["service"]
-
-		if tid == "" {
-			if tid, err = genTID(); err != nil {
-				return
-			}
-		}
 
 		m = &wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,

@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
 
 	"tr1d1um/common"
 
@@ -38,11 +37,8 @@ type Configs struct {
 //ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Configs) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorLogger(c.Log),
-		kithttp.ServerErrorEncoder(encodeError),
-		kithttp.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context {
-			return context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
-		}),
+		kithttp.ServerBefore(common.Capture),
+		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
 		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
 
@@ -54,26 +50,27 @@ func ConfigHandler(c *Configs) {
 	)
 
 	//TODO: TMP IOT HACK
-	c.R.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodPost)
 
-	c.R.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.R.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(WRPHandler)).
+	c.R.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
 /* Request Decoding */
 
-func decodeRequest(c context.Context, r *http.Request) (decodedRequest interface{}, err error) {
+func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
 		payload []byte
 		wrpMsg  *wrp.Message
 	)
 
 	if payload, err = requestPayload(r); err == nil {
-		if wrpMsg, err = wrap(payload, r.Header.Get(common.HeaderWPATID), mux.Vars(r)); err == nil {
+		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
+		if wrpMsg, err = wrap(payload, tid, mux.Vars(r)); err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
 				AuthHeaderValue: r.Header.Get(authHeaderKey),
@@ -159,13 +156,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 /* Error Encoding */
 
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
+func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json")
+	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if ce, ok := err.(common.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
-	} else if err == context.Canceled || err == context.DeadlineExceeded || strings.Contains(err.Error(), "Client.Timeout exceeded") {
-		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 

@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"strings"
-	"time"
-
-	"github.com/Comcast/webpa-common/device"
 
 	"tr1d1um/common"
+
+	"github.com/Comcast/webpa-common/device"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
@@ -30,14 +28,8 @@ type Configs struct {
 //That is, it configures the mux paths to access the service
 func ConfigHandler(c *Configs) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorLogger(c.Log),
-		kithttp.ServerErrorEncoder(encodeError),
-		kithttp.ServerBefore(
-			func(ctx context.Context, r *http.Request) context.Context {
-				ctx = context.WithValue(ctx, common.ContextKeyRequestArrivalTime, time.Now())
-				ctx = context.WithValue(ctx, common.ContextKeyRequestTID, r.Header.Get(common.HeaderWPATID))
-				return ctx
-			}),
+		kithttp.ServerBefore(common.Capture),
+		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
 		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
 
@@ -48,7 +40,7 @@ func ConfigHandler(c *Configs) {
 		opts...,
 	)
 
-	c.R.Handle("/device/{deviceid}/stat", c.Authenticate.Then(statHandler)).
+	c.R.Handle("/device/{deviceid}/stat", c.Authenticate.Then(common.Welcome(statHandler))).
 		Methods(http.MethodGet)
 }
 
@@ -59,22 +51,19 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 			AuthHeaderValue: r.Header.Get("Authorization"),
 			DeviceID:        string(deviceID),
 		}
+	} else {
+		err = common.NewBadRequestError(err)
 	}
+
 	return
 }
 
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
+func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	switch {
-	case err == device.ErrorInvalidDeviceName:
-		w.WriteHeader(http.StatusBadRequest)
-
-		//TODO: are we capturing all possible timeout cases we should be here?
-	case strings.Contains(err.Error(), "Client.Timeout exceeded"), err == context.Canceled || err == context.DeadlineExceeded:
-		w.WriteHeader(http.StatusServiceUnavailable)
-
-	default:
+	if ce, ok := err.(common.CodedError); ok {
+		w.WriteHeader(ce.StatusCode())
+	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		err = common.ErrTr1d1umInternal
 	}

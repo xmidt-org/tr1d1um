@@ -70,10 +70,12 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Res
 			ctx, cancel := context.WithTimeout(req.Context(), w.CtxTimeout)
 			defer cancel()
 
-			resp, err = w.Do(req.WithContext(ctx))
-
-			//place TID in response
-			resp.Header.Set(common.HeaderWPATID, wrpMsg.TransactionUUID)
+			if resp, err = w.Do(req.WithContext(ctx)); err == nil {
+				resp.Header.Set(common.HeaderWPATID, wrpMsg.TransactionUUID)
+			} else {
+				//Timeout, network errors, etc.
+				err = common.NewCodedError(err, http.StatusServiceUnavailable)
+			}
 		}
 	}
 	return

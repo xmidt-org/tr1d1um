@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"tr1d1um/common"
 )
 
 //Service defines the behavior of the Stat Tr1d1um Service
@@ -51,7 +52,9 @@ func (s *service) RequestStat(authHeaderValue, deviceID string) (resp *http.Resp
 		ctx, cancel := context.WithTimeout(r.Context(), s.CtxTimeout)
 		defer cancel()
 
-		return s.Do(r.WithContext(ctx))
+		if resp, err = s.Do(r.WithContext(ctx)); err != nil {
+			err = common.NewCodedError(err, http.StatusServiceUnavailable)
+		}
 	}
 	return
 }
