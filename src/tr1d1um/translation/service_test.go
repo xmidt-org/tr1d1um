@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/assert"
@@ -43,13 +42,11 @@ func TestSendWRP(t *testing.T) {
 	resp, err := w.SendWRP(wrpMsg, "auth")
 
 	assert.Nil(err)
+	assert.NotNil(resp)
 
 	//verify correct header values are set in request
 	assert.EqualValues(wrp.Msgpack.ContentType(), contentTypeValue)
 	assert.EqualValues("auth", authHeaderValue)
-
-	//verify tid is set in response header
-	assert.EqualValues("tid", resp.Header.Get(common.HeaderWPATID))
 
 	//verify source in WRP message
 	assert.EqualValues("local/test", sentWRP.Source)

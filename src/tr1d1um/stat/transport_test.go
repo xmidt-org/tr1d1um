@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "testTID")
+
 func TestDecodeRequest(t *testing.T) {
 
 	t.Run("InvalidDeviceName", func(t *testing.T) {
@@ -28,10 +30,10 @@ func TestDecodeRequest(t *testing.T) {
 
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:1122@#8!!"})
 
-		resp, err := decodeRequest(context.TODO(), r)
+		resp, err := decodeRequest(ctxTID, r)
 
 		assert.Nil(resp)
-		assert.Equal(device.ErrorInvalidDeviceName, err)
+		assert.Equal(device.ErrorInvalidDeviceName.Error(), err.Error())
 
 	})
 
@@ -43,7 +45,7 @@ func TestDecodeRequest(t *testing.T) {
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		r.Header.Set("Authorization", "a0")
 
-		resp, err := decodeRequest(context.TODO(), r)
+		resp, err := decodeRequest(ctxTID, r)
 
 		assert.Nil(err)
 
@@ -57,15 +59,13 @@ func TestDecodeRequest(t *testing.T) {
 func TestEncodeError(t *testing.T) {
 	t.Run("Timeouts", func(t *testing.T) {
 		testErrorEncode(t, http.StatusServiceUnavailable, []error{
-			errors.New("somePrefix->Client.Timeout exceeded while<-someSuffix"), // mock an HTTP.Client.Timeout
-			context.Canceled,
-			context.DeadlineExceeded,
+			common.NewCodedError(errors.New("some bad network timeout error"), http.StatusServiceUnavailable),
 		})
 	})
 
 	t.Run("BadRequest", func(t *testing.T) {
 		testErrorEncode(t, http.StatusBadRequest, []error{
-			device.ErrorInvalidDeviceName,
+			common.NewBadRequestError(device.ErrorInvalidDeviceName),
 		})
 	})
 
@@ -80,7 +80,7 @@ func TestEncodeError(t *testing.T) {
 		)
 
 		w := httptest.NewRecorder()
-		encodeError(context.TODO(), errors.New("tremendously unexpected internal error"), w)
+		encodeError(ctxTID, errors.New("tremendously unexpected internal error"), w)
 
 		assert.EqualValues(http.StatusInternalServerError, w.Code)
 		assert.EqualValues(expected.String(), w.Body.String())
@@ -99,7 +99,7 @@ func testErrorEncode(t *testing.T, expectedCode int, es []error) {
 		)
 
 		w := httptest.NewRecorder()
-		encodeError(context.TODO(), e, w)
+		encodeError(ctxTID, e, w)
 
 		assert.EqualValues(expectedCode, w.Code)
 		assert.EqualValues(expected.String(), w.Body.String())
@@ -123,7 +123,7 @@ func TestEncodeResponse(t *testing.T) {
 	)
 
 	//Tr1d1um just forwards the response
-	var e = encodeResponse(context.TODO(), w, resp)
+	var e = encodeResponse(ctxTID, w, resp)
 
 	assert.Nil(e)
 	assert.EqualValues(w.Header().Get("Content-Type"), resp.Header.Get("Content-Type"))

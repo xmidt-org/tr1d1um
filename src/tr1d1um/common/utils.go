@@ -89,9 +89,7 @@ func Welcome(delegate http.Handler) http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 			var ctx = r.Context()
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
-
-			r.WithContext(ctx)
-			delegate.ServeHTTP(w, r)
+			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
 

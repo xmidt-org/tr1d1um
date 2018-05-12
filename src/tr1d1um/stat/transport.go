@@ -60,6 +60,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if ce, ok := err.(common.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
@@ -84,6 +85,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	var rp []byte
 	if rp, err = ioutil.ReadAll(resp.Body); err == nil {
 		w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+		w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 		w.WriteHeader(resp.StatusCode)
 		w.Write(rp)
 	}

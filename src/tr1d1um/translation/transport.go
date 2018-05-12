@@ -139,6 +139,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			}
 
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 			// if possible, use the device response status code
 			if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
@@ -157,7 +158,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 /* Error Encoding */
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set(contentTypeHeaderKey, "application/json")
+	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if ce, ok := err.(common.CodedError); ok {

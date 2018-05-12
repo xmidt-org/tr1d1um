@@ -19,11 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//ctxTID is a context with a defined value for a TID
+var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "test-tid")
+
 func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		_, e := decodeRequest(context.TODO(), r)
+		_, e := decodeRequest(ctxTID, r)
 		assert.EqualValues(ErrEmptyNames, e)
 	})
 
@@ -31,17 +34,16 @@ func TestDecodeRequest(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
-		wrpMsg, e := decodeRequest(context.TODO(), r)
+		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
 	})
 
 	t.Run("Ideal", func(t *testing.T) {
-
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
-		wrpMsg, e := decodeRequest(context.TODO(), r)
+		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
 
@@ -296,7 +298,7 @@ func TestEncodeResponse(t *testing.T) {
 			Header:     http.Header{"X-test": []string{"test"}},
 		}
 
-		err := encodeResponse(context.TODO(), recorder, response)
+		err := encodeResponse(ctxTID, recorder, response)
 
 		assert.Nil(err)
 		assert.EqualValues(http.StatusServiceUnavailable, recorder.Code)
@@ -313,7 +315,7 @@ func TestEncodeResponse(t *testing.T) {
 			Body:       ioutil.NopCloser(bytes.NewBufferString("t")),
 		}
 
-		assert.NotNil(encodeResponse(context.TODO(), recorder, response))
+		assert.NotNil(encodeResponse(ctxTID, recorder, response))
 	})
 
 	//XMiDt responds with a 200 (OK) with a well-formatted RDK device response
@@ -329,7 +331,7 @@ func TestEncodeResponse(t *testing.T) {
 			}, wrp.Msgpack))),
 		}
 
-		err := encodeResponse(context.TODO(), recorder, response)
+		err := encodeResponse(ctxTID, recorder, response)
 		assert.Nil(err)
 		assert.EqualValues(520, recorder.Code)
 		assert.EqualValues(`{"statusCode": 520}`, recorder.Body.String())
@@ -349,7 +351,7 @@ func TestEncodeResponse(t *testing.T) {
 				Payload: internalErrorResponse}, wrp.Msgpack))),
 		}
 
-		err := encodeResponse(context.TODO(), recorder, response)
+		err := encodeResponse(ctxTID, recorder, response)
 		assert.Nil(err)
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues(internalErrorResponse, recorder.Body.Bytes())
@@ -368,7 +370,7 @@ func TestEncodeResponse(t *testing.T) {
 			}, wrp.Msgpack))),
 		}
 
-		err := encodeResponse(context.TODO(), recorder, response)
+		err := encodeResponse(ctxTID, recorder, response)
 		assert.Nil(err)
 		assert.EqualValues(http.StatusOK, recorder.Code)
 		assert.EqualValues(`{"statusCode":`, recorder.Body.String())
@@ -394,8 +396,9 @@ func TestEncodeError(t *testing.T) {
 			json.NewEncoder(expected).Encode(map[string]string{
 				"message": e.Error()})
 
-			encodeError(context.TODO(), e, w)
+			encodeError(ctxTID, e, w)
 			assert.EqualValues(expected.String(), w.Body.String())
+			assert.EqualValues(http.StatusBadRequest, w.Code)
 		}
 	})
 
@@ -403,8 +406,8 @@ func TestEncodeError(t *testing.T) {
 		assert := assert.New(t)
 
 		for _, e := range []error{
-			context.DeadlineExceeded,
-			context.Canceled,
+			common.NewCodedError(errors.New("some network error"), http.StatusServiceUnavailable),
+			common.NewCodedError(errors.New("deadline exceeded"), http.StatusServiceUnavailable),
 		} {
 			w := httptest.NewRecorder()
 
@@ -412,8 +415,9 @@ func TestEncodeError(t *testing.T) {
 			json.NewEncoder(expected).Encode(map[string]string{
 				"message": e.Error()})
 
-			encodeError(context.TODO(), e, w)
+			encodeError(ctxTID, e, w)
 			assert.EqualValues(expected.String(), w.Body.String())
+			assert.EqualValues(http.StatusServiceUnavailable, w.Code)
 		}
 	})
 
@@ -421,7 +425,7 @@ func TestEncodeError(t *testing.T) {
 		assert := assert.New(t)
 
 		w := httptest.NewRecorder()
-		encodeError(context.TODO(), errors.New("something internal went unexpecting wrong"), w)
+		encodeError(ctxTID, errors.New("something internal went unexpecting wrong"), w)
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{

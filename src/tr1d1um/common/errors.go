@@ -28,6 +28,8 @@ func NewBadRequestError(e error) CodedError {
 	return NewCodedError(e, http.StatusBadRequest)
 }
 
+//NewCodedError upgrades an Error to a CodedError
+//e must not be non-nil to avoid panics
 func NewCodedError(e error, code int) CodedError {
 	return &codedError{
 		error:      e,

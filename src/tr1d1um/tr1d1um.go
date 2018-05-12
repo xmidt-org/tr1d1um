@@ -144,7 +144,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			Scheme:       v.GetString(hooksSchemeKey),
 		})
 
-		go snsFactory.PrepareAndStart()
 	}
 
 	//
@@ -200,6 +199,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 	if err != nil {
 		errorLogger.Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
 		return 4
+	}
+
+	//run in a separate goroutine as we want to start listening for signals right away
+	if snsFactory != nil {
+		go snsFactory.PrepareAndStart()
 	}
 
 	signal.Notify(signals)

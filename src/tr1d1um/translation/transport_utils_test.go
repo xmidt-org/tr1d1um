@@ -13,12 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGenTID(t *testing.T) {
-	assert := assert.New(t)
-	tid, err := genTID()
-	assert.Nil(err)
-	assert.NotEmpty(tid)
-}
 func TestValidateAndDeduceSETCommand(t *testing.T) {
 
 	t.Run("newCIDMissing", func(t *testing.T) {
@@ -179,19 +173,6 @@ func TestWrapInWRP(t *testing.T) {
 		assert.EqualValues("mac:112233445566/s0", w.Destination)
 		assert.EqualValues("s0", w.Source)
 		assert.EqualValues("t0", w.TransactionUUID)
-	})
-
-	t.Run("GeneratedTID", func(t *testing.T) {
-		assert := assert.New(t)
-
-		w, e := wrap([]byte{'t'}, "", map[string]string{"deviceid": "mac:112233445566", "service": "s0"})
-
-		assert.Nil(e)
-		assert.EqualValues(wrp.SimpleRequestResponseMessageType, w.Type)
-		assert.EqualValues([]byte{'t'}, w.Payload)
-		assert.EqualValues("mac:112233445566/s0", w.Destination)
-		assert.EqualValues("s0", w.Source)
-		assert.NotEmpty(w.TransactionUUID)
 	})
 }
 

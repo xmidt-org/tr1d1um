@@ -1,9 +1,13 @@
 package common
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Comcast/webpa-common/logging"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -54,4 +58,51 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		ForwardHeadersByPrefix("", nil, nil)
 		ForwardHeadersByPrefix("", resp, to)
 	})
+}
+
+func TestErrorLogEncoder(t *testing.T) {
+	assert := assert.New(t)
+	e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
+		assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
+	}
+	le := ErrorLogEncoder(logging.DefaultLogger(), e)
+
+	assert.NotPanics(func() {
+		//assumes TID is context
+		le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+	})
+}
+
+func TestWelcome(t *testing.T) {
+	assert := assert.New(t)
+	var handler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		assert.NotNil(r.Context().Value(ContextKeyRequestArrivalTime))
+	})
+
+	decorated := Welcome(handler)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+	decorated.ServeHTTP(nil, req)
+}
+
+func TestCapture(t *testing.T) {
+	t.Run("GivenTID", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		r.Header.Set(HeaderWPATID, "tid01")
+		ctx := Capture(context.TODO(), r)
+		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
+	})
+
+	t.Run("GeneratedTID", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		ctx := Capture(context.TODO(), r)
+		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
+	})
+}
+
+func TestGenTID(t *testing.T) {
+	assert := assert.New(t)
+	tid := genTID()
+	assert.NotEmpty(tid)
 }
