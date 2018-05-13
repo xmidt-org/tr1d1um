@@ -18,16 +18,19 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/Comcast/webpa-common/xhttp"
+
+	"tr1d1um/hooks"
+	"tr1d1um/stat"
+	"tr1d1um/translation"
 
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
@@ -37,9 +40,9 @@ import (
 	"github.com/Comcast/webpa-common/server"
 	"github.com/Comcast/webpa-common/webhook"
 	"github.com/Comcast/webpa-common/webhook/aws"
+	"github.com/SermoDigital/jose/jwt"
 
 	"github.com/Comcast/webpa-common/xmetrics"
-	"github.com/SermoDigital/jose/jwt"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -49,38 +52,38 @@ import (
 
 //convenient global values
 const (
-	applicationName, apiBase = "tr1d1um", "/api/v2"
+	DefaultKeyID             = "current"
+	applicationName, apiBase = "tr1d1um", "api/v2"
 
-	DefaultKeyID            = "current"
-	defaultClientTimeout    = "30s"
-	defaultRespWaitTimeout  = "40s"
-	defaultNetDialerTimeout = "5s"
-	defaultRetryInterval    = "2s"
-	defaultMaxRetries       = 2
-
-	supportedServicesKey = "supportedServices"
-	targetURLKey         = "targetURL"
-	netDialerTimeoutKey  = "netDialerTimeout"
-	clientTimeoutKey     = "clientTimeout"
-	reqRetryIntervalKey  = "requestRetryInterval"
-	reqMaxRetriesKey     = "requestMaxRetries"
-	respWaitTimeoutKey   = "respWaitTimeout"
+	translationServicesKey = "supportedServices"
+	targetURLKey           = "targetURL"
+	netDialerTimeoutKey    = "netDialerTimeout"
+	clientTimeoutKey       = "clientTimeout"
+	reqTimeoutKey          = "respWaitTimeout"
+	reqRetryIntervalKey    = "requestRetryInterval"
+	reqMaxRetriesKey       = "requestMaxRetries"
+	WRPSourcekey           = "WRPSource"
+	hooksSchemeKey         = "hooksScheme"
 )
+
+var defaults = map[string]interface{}{
+	translationServicesKey: []string{}, // no services allowed by the default
+	targetURLKey:           "localhost:6000",
+	netDialerTimeoutKey:    "5s",
+	clientTimeoutKey:       "50s",
+	reqTimeoutKey:          "40s",
+	reqRetryIntervalKey:    "2s",
+	reqMaxRetriesKey:       2,
+	WRPSourcekey:           "dns:localhost",
+	hooksSchemeKey:         "https",
+}
 
 func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
-		f                                   = pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-		v                                   = viper.New()
+		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
 		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, secure.Metrics)
 	)
-
-	// set config file value defaults
-	v.SetDefault(clientTimeoutKey, defaultClientTimeout)
-	v.SetDefault(respWaitTimeoutKey, defaultRespWaitTimeout)
-	v.SetDefault(reqRetryIntervalKey, defaultRetryInterval)
-	v.SetDefault(reqMaxRetriesKey, defaultMaxRetries)
-	v.SetDefault(netDialerTimeoutKey, defaultNetDialerTimeout)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
@@ -88,47 +91,105 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	var (
-		infoLogger  = logging.Info(logger)
-		errorLogger = logging.Error(logger)
+		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
+		authenticate            *alice.Chain
 	)
+
+	for k, va := range defaults {
+		v.SetDefault(k, va)
+	}
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to unmarshall config data into struct: %s\n", err.Error())
-		return 1
-	}
-
-	preHandler, err := SetUpPreHandler(v, logger, metricsRegistry)
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error setting up prehandler: %s\n", err.Error())
-		return 1
-	}
-
-	conversionHandler := SetUpHandler(v, logger)
-
 	r := mux.NewRouter()
-	baseRouter := r.PathPrefix(apiBase).Subrouter()
 
-	AddRoutes(baseRouter, preHandler, conversionHandler)
+	baseRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
+		return 1
+	}
+
+	tConfigs, err := newTimeoutConfigs(v)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse timeout configuration values: %s \n", err.Error())
+		return 1
+	}
+
+	//
+	// Webhooks (if not configured, handler for webhooks is not set up)
+	//
 	var snsFactory *webhook.Factory
 
 	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
-		if snsFactory, exitCode = ConfigureWebHooks(baseRouter, r, preHandler, v, logger, metricsRegistry); exitCode != 0 {
-			return
+		snsFactory, err = webhook.NewFactory(v)
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err.Error())
+			return 1
 		}
 	}
+
+	if snsFactory != nil {
+		hooks.ConfigHandler(&hooks.HooksOptions{
+			R:            r,
+			Authenticate: authenticate,
+			M:            metricsRegistry,
+			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
+			HooksFactory: snsFactory,
+			Log:          logger,
+			Scheme:       v.GetString(hooksSchemeKey),
+		})
+
+	}
+
+	//
+	// Stat Service
+	//
+	ss := stat.NewService(&stat.ServiceOptions{
+		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
+			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+
+		CtxTimeout: tConfigs.rTimeout,
+
+		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
+	})
+
+	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
+	stat.ConfigHandler(&stat.Configs{
+		S:            ss,
+		R:            baseRouter,
+		Authenticate: authenticate,
+		Log:          logger,
+	})
+
+	//
+	// WRP Service
+	//
+
+	ts := translation.NewService(&translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
+		WRPSource:   v.GetString(WRPSourcekey),
+		CtxTimeout:  tConfigs.rTimeout,
+		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
+			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+	})
+
+	translation.ConfigHandler(&translation.Configs{
+		S:             ts,
+		R:             baseRouter,
+		Authenticate:  authenticate,
+		Log:           logger,
+		ValidServices: v.GetStringSlice(translationServicesKey),
+	})
 
 	var (
 		_, tr1d1umServer = webPA.Prepare(logger, nil, metricsRegistry, r)
 		signals          = make(chan os.Signal, 1)
 	)
-
-	if snsFactory != nil {
-		go snsFactory.PrepareAndStart()
-	}
 
 	//
 	// Execute the runnable, which runs all the servers, and wait for a signal
@@ -140,6 +201,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 4
 	}
 
+	//run in a separate goroutine as we want to start listening for signals right away
+	if snsFactory != nil {
+		go snsFactory.PrepareAndStart()
+	}
+
 	signal.Notify(signals)
 	s := server.SignalWait(infoLogger, signals, os.Kill, os.Interrupt)
 	errorLogger.Log(logging.MessageKey(), "exiting due to signal", "signal", s)
@@ -149,111 +215,46 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-//ConfigureWebHooks sets route paths, initializes and synchronizes hook registries for this tr1d1um instance
-//baseRouter is pre-configured with the api/v2 prefix path
-//root is the original router used by webHookFactory.Initialize()
-func ConfigureWebHooks(baseRouter *mux.Router, root *mux.Router, preHandler *alice.Chain, v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*webhook.Factory, int) {
-	webHookFactory, err := webhook.NewFactory(v)
+//timeoutConfigs holds parsable config values for HTTP transactions
+type timeoutConfigs struct {
+	//HTTP client timeout
+	cTimeout time.Duration
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err)
-		return nil, 1
-	}
+	//HTTP request timeout
+	rTimeout time.Duration
 
-	webHookRegistry, webHookHandler := webHookFactory.NewRegistryAndHandler(registry)
-
-	// register webHook end points for api
-	baseRouter.Handle("/hook", preHandler.ThenFunc(webHookRegistry.UpdateRegistry))
-	baseRouter.Handle("/hooks", preHandler.ThenFunc(webHookRegistry.GetRegistry))
-
-	scheme := v.GetString("scheme")
-	if len(scheme) < 1 {
-		scheme = "https"
-	}
-
-	selfURL := &url.URL{
-		Scheme: scheme,
-		Host:   v.GetString("fqdn") + v.GetString("primary.address"),
-	}
-
-	webHookFactory.Initialize(root, selfURL, webHookHandler, logger, registry, nil)
-	return webHookFactory, 0
+	//net dialer timeout
+	dTimeout time.Duration
 }
 
-//AddRoutes configures the paths and connection rules to TR1D1UM
-func AddRoutes(r *mux.Router, preHandler *alice.Chain, conversionHandler *ConversionHandler) {
-	var BodyNonEmpty = func(request *http.Request, match *mux.RouteMatch) (accept bool) {
-		if request.Body != nil {
-			var tmp bytes.Buffer
-			p, err := ioutil.ReadAll(request.Body)
-			if accept = err == nil && len(p) > 0; accept {
-				//place back request's body
-				tmp.Write(p)
-				request.Body = ioutil.NopCloser(&tmp)
+func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
+	var c, r, d time.Duration
+	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
+		if r, err = time.ParseDuration(v.GetString(reqTimeoutKey)); err == nil {
+			if d, err = time.ParseDuration(v.GetString(netDialerTimeoutKey)); err == nil {
+				t = &timeoutConfigs{
+					cTimeout: c,
+					rTimeout: r,
+					dTimeout: d,
+				}
 			}
 		}
-		return
 	}
-
-	r.Handle("/device/{deviceid}/stat", preHandler.ThenFunc(conversionHandler.HandleStat)).
-		Methods(http.MethodGet)
-
-	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodGet)
-
-	r.Handle("/device/{deviceid}/{service}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodPatch)
-
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodDelete)
-
-	r.Handle("/device/{deviceid}/{service:iot}", preHandler.ThenFunc(conversionHandler.HandleIOT)).
-		Methods(http.MethodPost) //TODO: path is temporary. Should be deleted once endpoint is not needed in tr1d1um
-
-	r.Handle("/device/{deviceid}/{service}/{parameter}", preHandler.Then(conversionHandler)).
-		Methods(http.MethodPut, http.MethodPost).MatcherFunc(BodyNonEmpty)
-}
-
-//SetUpHandler prepares the main handler under TR1D1UM which is the ConversionHandler
-func SetUpHandler(v *viper.Viper, logger log.Logger) (cHandler *ConversionHandler) {
-	clientTimeout, _ := time.ParseDuration(v.GetString(clientTimeoutKey))
-	respTimeout, _ := time.ParseDuration(v.GetString(respWaitTimeoutKey))
-	retryInterval, _ := time.ParseDuration(v.GetString(reqRetryIntervalKey))
-	dialerTimeout, _ := time.ParseDuration(v.GetString(netDialerTimeoutKey))
-	maxRetries := v.GetInt(reqMaxRetriesKey)
-
-	cHandler = &ConversionHandler{
-		WdmpConvert: &ConversionWDMP{
-			WRPSource: v.GetString("WRPSource")},
-
-		Sender: &Tr1SendAndHandle{
-			RespTimeout: respTimeout,
-			Logger:      logger,
-			client: &http.Client{Timeout: clientTimeout,
-				Transport: &http.Transport{
-					Dial: (&net.Dialer{
-						Timeout: dialerTimeout,
-					}).Dial}}},
-
-		Logger: logger,
-
-		RequestValidator: &TR1RequestValidator{
-			supportedServices: getSupportedServicesMap(v.GetStringSlice(supportedServicesKey)),
-			Logger:            logger,
-		},
-
-		RetryStrategy: RetryStrategyFactory{}.NewRetryStrategy(logger, retryInterval, maxRetries,
-			ShouldRetryOnResponse, OnRetryInternalFailure),
-		WRPRequestURL: fmt.Sprintf("%s%s/device", v.GetString(targetURLKey), apiBase),
-
-		TargetURL: v.GetString(targetURLKey),
-	}
-
 	return
 }
 
-//SetUpPreHandler configures the authorization requirements for requests to reach the main handler
-func SetUpPreHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (preHandler *alice.Chain, err error) {
+func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
+	return &http.Client{
+		Timeout: t.cTimeout,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: t.dTimeout,
+			}).Dial},
+	}
+}
+
+//authenticationHandler configures the authorization requirements for requests to reach the main handler
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (preHandler *alice.Chain, err error) {
 	m := secure.NewJWTValidationMeasures(registry)
 	var validator secure.Validator
 	if validator, err = getValidator(v, m); err == nil {
@@ -274,10 +275,12 @@ func SetUpPreHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Regist
 }
 
 //getValidator returns a validator for JWT/Basic tokens
-//It reads in tokens from a config file. Zero or more tokens
-//can be read.
+//It reads in tokens from a config file. Zero or more tokens can be read.
 func getValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator secure.Validator, err error) {
-	var jwtVals []JWTValidator
+	var jwtVals []struct {
+		Keys   key.ResolverFactory        `json:"keys"`
+		Custom secure.JWTValidatorFactory `json:"custom"`
+	}
 
 	v.UnmarshalKey("jwtValidators", &jwtVals)
 
@@ -315,16 +318,6 @@ func getValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator se
 
 	validator = validators
 
-	return
-}
-
-func getSupportedServicesMap(supportedServices []string) (supportedServicesMap map[string]struct{}) {
-	supportedServicesMap = map[string]struct{}{}
-	if supportedServices != nil {
-		for _, supportedService := range supportedServices {
-			supportedServicesMap[supportedService] = struct{}{}
-		}
-	}
 	return
 }
 
