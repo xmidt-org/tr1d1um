@@ -20,8 +20,6 @@ The Xmidt router agent.
 
 %prep
 %setup -q
-mv %{name}-%{version} %{name}
-
 
 %build
 export GOPATH=$(pwd)
