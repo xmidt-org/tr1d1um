@@ -19,7 +19,7 @@ Provides:       %{name}
 The Xmidt router agent.
 
 %prep
-%setup -c -n %{name}-%{version}/src -a 0
+%setup -q
 mv %{name}-%{version} %{name}
 
 
@@ -34,7 +34,6 @@ popd
 %install
 
 # Install Binary
-# The extra %{name}/ that prefixes the source is due to `dep` needs.
 mkdir -p %{buildroot}%{_bindir}
 %{__install} -p src/%{name}/%{name} %{buildroot}%{_bindir}
 
