@@ -151,7 +151,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	ss := stat.NewService(&stat.ServiceOptions{
 		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+			Logger:   logger,
+			Retries:  v.GetInt(reqMaxRetriesKey),
+			Interval: v.GetDuration(reqRetryIntervalKey),
+		}, newClient(v, tConfigs).Do),
 
 		CtxTimeout: tConfigs.rTimeout,
 
@@ -175,7 +178,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 		WRPSource:   v.GetString(WRPSourcekey),
 		CtxTimeout:  tConfigs.rTimeout,
 		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Retries: v.GetInt(reqMaxRetriesKey)}, newClient(v, tConfigs).Do),
+			Logger:   logger,
+			Retries:  v.GetInt(reqMaxRetriesKey),
+			Interval: v.GetDuration(reqRetryIntervalKey),
+		}, newClient(v, tConfigs).Do),
 	})
 
 	translation.ConfigHandler(&translation.Configs{

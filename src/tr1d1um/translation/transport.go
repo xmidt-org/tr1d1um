@@ -96,8 +96,12 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 
 		/****TODO: TMP IOT ENDPOINT HACK****/
 		v := mux.Vars(r)
-		if v["service"] == "iot" && v["parameters"] == "" {
-			return ioutil.ReadAll(r.Body)
+		if v["service"] == "iot" {
+			if v["parameters"] == "" {
+				return ioutil.ReadAll(r.Body)
+			}
+			//TODO: this might also be doable at the mux level
+			return nil, ErrUnsupportedMethod
 		}
 		/********/
 
