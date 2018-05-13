@@ -101,7 +101,8 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 				return ioutil.ReadAll(r.Body)
 			}
 			//TODO: this might also be doable at the mux level
-			return nil, ErrUnsupportedMethod
+			// /iot endpoint should not pass anything through queries (all request data is in the body)
+			return nil, ErrInvalidService
 		}
 		/********/
 
