@@ -24,16 +24,11 @@ mv %{name}-%{version} %{name}
 
 
 %build
-# All this cobbled up directory structure is to allow `dep` to work.
-# It needs a path of ~/whatever/src/project/src/project
-export GOPATH=%{_builddir}/%{name}-%{version}
-pushd %{name}
-cd src
-pwd
-dep ensure
+export GOPATH=$(pwd)
+pushd src
+glide i --strip-vendor
 cd %{name}
-pwd
-go build -o %{name}
+go build %{name}
 popd
 
 %install
@@ -41,19 +36,17 @@ popd
 # Install Binary
 # The extra %{name}/ that prefixes the source is due to `dep` needs.
 mkdir -p %{buildroot}%{_bindir}
-%{__install} -p %{name}/src/%{name}/%{name} %{buildroot}%{_bindir}
+%{__install} -p src/%{name}/%{name} %{buildroot}%{_bindir}
 
 # Install Service
-# The extra %{name}/ that prefixes the source is due to `dep` needs.
 mkdir -p %{buildroot}%{_initddir}
-%{__install} -p %{name}/etc/init.d/%{name} %{buildroot}%{_initddir}
+%{__install} -p etc/init.d/%{name} %{buildroot}%{_initddir}
 
 # Install Configuration
-# The extra %{name}/ that prefixes the source is due to `dep` needs.
 %{__install} -d %{buildroot}%{_sysconfdir}/%{name}
-%{__install} -p %{name}/etc/%{name}/%{name}.env.example %{buildroot}%{_sysconfdir}/%{name}/%{name}.env.example
-%{__install} -p %{name}/etc/%{name}/%{name}.json %{buildroot}%{_sysconfdir}/%{name}/%{name}.json
-%{__install} -p %{name}/etc/%{name}/supervisord.conf %{buildroot}%{_sysconfdir}/%{name}/supervisord.conf
+%{__install} -p etc/%{name}/%{name}.env.example %{buildroot}%{_sysconfdir}/%{name}/%{name}.env.example
+%{__install} -p etc/%{name}/%{name}.json %{buildroot}%{_sysconfdir}/%{name}/%{name}.json
+%{__install} -p etc/%{name}/supervisord.conf %{buildroot}%{_sysconfdir}/%{name}/supervisord.conf
 
 # Create Logging Location
 %{__install} -d %{buildroot}%{_localstatedir}/log/%{name}
