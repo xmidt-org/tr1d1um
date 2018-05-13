@@ -1,8 +1,0 @@
-[[constraint]]
-  name = "github.com/Comcast/webpa-common"
-  revision = "5ab7c2016cf42b0462097de7ae0e3d9fda248e6d" 
-
-[prune]
-  go-tests = true
-  unused-packages = true
-
