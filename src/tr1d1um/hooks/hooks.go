@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/Comcast/webpa-common/webhook"
@@ -18,13 +19,20 @@ type HooksOptions struct {
 	HooksFactory *webhook.Factory
 	Log          kitlog.Logger
 	Scheme       string
+	ApiBase      string
 }
 
 func ConfigHandler(o *HooksOptions) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
 
-	o.R.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
-	o.R.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
+	o.R.Handle(
+		fmt.Sprintf("%s/hook", o.ApiBase),
+		o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry),
+	)
+	o.R.Handle(
+		fmt.Sprintf("%s/hooks", o.ApiBase),
+		o.Authenticate.ThenFunc(hooksRegistry.GetRegistry),
+	)
 
 	selfURL := &url.URL{
 		Scheme: o.Scheme,
