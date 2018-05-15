@@ -142,6 +142,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			HooksFactory: snsFactory,
 			Log:          logger,
 			Scheme:       v.GetString(hooksSchemeKey),
+			ApiBase:      apiBase,
 		})
 
 	}
