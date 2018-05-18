@@ -1,6 +1,7 @@
 package stat
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -9,28 +10,46 @@ import (
 )
 
 func TestRequestStat(t *testing.T) {
-	assert := assert.New(t)
-	var authHeaderValue, actualURL string
+	var testCases = []struct {
+		Name       string
+		DoResponse *http.Response
+		DoError    error
+	}{
+		// {"Ideal", nil, nil},
+		{"Error", nil, context.DeadlineExceeded},
+	}
 
-	s := NewService(&ServiceOptions{
-		XmidtStatURL: "http://localhost:8090/${device}/stat",
-		CtxTimeout:   time.Second,
-		Do:
-		//capture sent values of interest
-		func(r *http.Request) (*http.Response, error) {
-			actualURL, authHeaderValue = r.URL.String(), r.Header.Get("Authorization")
-			return nil, nil
-		},
-	})
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			assert := assert.New(t)
+			var authHeaderValue, actualURL string
 
-	resp, err := s.RequestStat("a0", "mac:112233445566")
+			s := NewService(&ServiceOptions{
+				XmidtStatURL: "http://localhost:8090/${device}/stat",
+				CtxTimeout:   time.Second,
+				Do:
+				//capture sent values of interest
+				func(r *http.Request) (*http.Response, error) {
+					actualURL, authHeaderValue = r.URL.String(), r.Header.Get("Authorization")
+					return testCase.DoResponse, testCase.DoError
+				},
+			})
 
-	assert.Nil(err)
-	assert.Nil(resp)
+			resp, err := s.RequestStat("a0", "mac:112233445566")
 
-	//verify correct header values are set in request
-	assert.EqualValues("a0", authHeaderValue)
+			if testCase.DoError == nil {
+				assert.Nil(err)
+			} else {
+				assert.EqualValues(testCase.DoError.Error(), err.Error())
+			}
 
-	//verify source in WRP message
-	assert.EqualValues("http://localhost:8090/mac:112233445566/stat", actualURL)
+			assert.EqualValues(testCase.DoResponse, resp)
+
+			//verify correct header values are set in request
+			assert.EqualValues("a0", authHeaderValue)
+
+			//verify URI
+			assert.EqualValues("http://localhost:8090/mac:112233445566/stat", actualURL)
+		})
+	}
 }
