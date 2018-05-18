@@ -15,7 +15,7 @@ func TestRequestStat(t *testing.T) {
 		DoResponse *http.Response
 		DoError    error
 	}{
-		// {"Ideal", nil, nil},
+		{"Ideal", nil, nil},
 		{"Error", nil, context.DeadlineExceeded},
 	}
 
