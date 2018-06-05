@@ -207,9 +207,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 4
 	}
 
-	//run in a separate goroutine as we want to start listening for signals right away
 	if snsFactory != nil {
-		go snsFactory.PrepareAndStart()
+		snsFactory.PrepareAndStart()
 	}
 
 	signal.Notify(signals)
