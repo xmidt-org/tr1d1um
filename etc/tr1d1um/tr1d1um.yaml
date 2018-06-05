@@ -1,0 +1,45 @@
+---
+  fqdn: "localhost"
+
+  server: "localhost"
+  version: "-"
+  region: "-"
+  flavor: "" 
+  
+  primary:
+    address: ":6003"
+
+  health:
+    address: ":6004"
+    logInterval: "60s"
+    options:
+      - "PayloadsOverZero"
+      - "PayloadsOverHundred"
+      - "PayloadsOverThousand"
+      - "PayloadsOverTenThousand"
+
+  pprof:
+    address: ":6005"
+  
+  metrics:
+    address: ":8082"
+  
+  log:
+    file: "tr1d1um.log"
+    level: "DEBUG"
+    maxSize: 52428800
+    maxBackup: 10
+    json: true
+
+  aws:
+    accessKey: "fake-accessKey"
+    secretKey: "fake-secretKey"
+    env: "fake-env"
+    sns:
+      region: "fake region"
+      topicArn: "fake-sns-topic"
+      urlPath: "/api/v2/aws/sns"
+
+  targetURL: "http://localhost:6000"
+  supportedServices: ["config"]
+  authHeader: "test-basic"
