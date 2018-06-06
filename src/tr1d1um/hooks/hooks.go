@@ -11,7 +11,8 @@ import (
 )
 
 type HooksOptions struct {
-	R            *mux.Router
+	APIRouter    *mux.Router
+	RootRouter   *mux.Router
 	Authenticate *alice.Chain
 	M            xmetrics.Registry
 	Host         string
@@ -23,14 +24,14 @@ type HooksOptions struct {
 func ConfigHandler(o *HooksOptions) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
 
-	o.R.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
-	o.R.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
+	o.APIRouter.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
+	o.APIRouter.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
 
 	selfURL := &url.URL{
 		Scheme: o.Scheme,
 		Host:   o.Host,
 	}
 
-	o.HooksFactory.Initialize(o.R, selfURL, hooksHandler, o.Log, o.M, nil)
+	o.HooksFactory.Initialize(o.RootRouter, selfURL, hooksHandler, o.Log, o.M, nil)
 	return
 }

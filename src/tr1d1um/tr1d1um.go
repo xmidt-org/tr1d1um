@@ -135,7 +135,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	if snsFactory != nil {
 		hooks.ConfigHandler(&hooks.HooksOptions{
-			R:            baseRouter,
+			APIRouter:    baseRouter,
+			RootRouter:   r,
 			Authenticate: authenticate,
 			M:            metricsRegistry,
 			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
@@ -143,7 +144,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			Log:          logger,
 			Scheme:       v.GetString(hooksSchemeKey),
 		})
-
 	}
 
 	//
