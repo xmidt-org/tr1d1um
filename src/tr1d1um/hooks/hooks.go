@@ -10,18 +10,27 @@ import (
 	"github.com/justinas/alice"
 )
 
-type HooksOptions struct {
-	APIRouter    *mux.Router
-	RootRouter   *mux.Router
+//Options describes the parameters needed to configure the webhook endpoints
+type Options struct {
+
+	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
+	APIRouter *mux.Router
+
+	//RootRouter is the main Tr1d1um router
+	RootRouter *mux.Router //Router with empty path prefix
+
 	Authenticate *alice.Chain
-	M            xmetrics.Registry
+
+	M xmetrics.Registry
+
 	Host         string
 	HooksFactory *webhook.Factory
 	Log          kitlog.Logger
 	Scheme       string
 }
 
-func ConfigHandler(o *HooksOptions) {
+//ConfigHandler configures a given handler with webhook endpoints
+func ConfigHandler(o *Options) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
 
 	o.APIRouter.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
@@ -32,6 +41,6 @@ func ConfigHandler(o *HooksOptions) {
 		Host:   o.Host,
 	}
 
+	//Initialize must take the router without any prefixes
 	o.HooksFactory.Initialize(o.RootRouter, selfURL, hooksHandler, o.Log, o.M, nil)
-	return
 }
