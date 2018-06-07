@@ -184,9 +184,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}, newClient(v, tConfigs).Do),
 	})
 
-	translation.ConfigHandler(&translation.Configs{
+	translation.ConfigHandler(&translation.Options{
 		S:             ts,
-		R:             APIRouter,
+		APIRouter:     APIRouter,
 		Authenticate:  authenticate,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),
