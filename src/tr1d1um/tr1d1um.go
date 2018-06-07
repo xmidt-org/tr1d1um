@@ -103,7 +103,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	r := mux.NewRouter()
 
-	baseRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 
@@ -134,8 +134,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	if snsFactory != nil {
-		hooks.ConfigHandler(&hooks.HooksOptions{
-			APIRouter:    baseRouter,
+		hooks.ConfigHandler(&hooks.Options{
+			APIRouter:    APIRouter,
 			RootRouter:   r,
 			Authenticate: authenticate,
 			M:            metricsRegistry,
@@ -162,9 +162,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
-	stat.ConfigHandler(&stat.Configs{
+	stat.ConfigHandler(&stat.Options{
 		S:            ss,
-		R:            baseRouter,
+		APIRouter:    APIRouter,
 		Authenticate: authenticate,
 		Log:          logger,
 	})
@@ -184,9 +184,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}, newClient(v, tConfigs).Do),
 	})
 
-	translation.ConfigHandler(&translation.Configs{
+	translation.ConfigHandler(&translation.Options{
 		S:             ts,
-		R:             baseRouter,
+		APIRouter:     APIRouter,
 		Authenticate:  authenticate,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),

@@ -25,17 +25,20 @@ const (
 	authHeaderKey            = "Authorization"
 )
 
-//Configs wraps the properties needed to set up the translation server
-type Configs struct {
-	S             Service
-	R             *mux.Router
+//Options wraps the properties needed to set up the translation server
+type Options struct {
+	S Service
+
+	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
+	APIRouter *mux.Router
+
 	Authenticate  *alice.Chain
 	Log           kitlog.Logger
 	ValidServices []string
 }
 
 //ConfigHandler sets up the server that powers the translation service
-func ConfigHandler(c *Configs) {
+func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
@@ -50,13 +53,13 @@ func ConfigHandler(c *Configs) {
 	)
 
 	//TODO: TMP IOT HACK
-	c.R.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(common.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodPost)
 
-	c.R.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(common.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.R.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(common.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 

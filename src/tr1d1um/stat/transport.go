@@ -16,17 +16,19 @@ import (
 	"github.com/justinas/alice"
 )
 
-//Configs wraps the properties needed to set up the stat server
-type Configs struct {
-	S            Service
-	R            *mux.Router
+//Options wraps the properties needed to set up the stat server
+type Options struct {
+	S Service
+
+	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
+	APIRouter    *mux.Router
 	Authenticate *alice.Chain
 	Log          kitlog.Logger
 }
 
 //ConfigHandler sets up the server that powers the stat service
 //That is, it configures the mux paths to access the service
-func ConfigHandler(c *Configs) {
+func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
@@ -40,7 +42,7 @@ func ConfigHandler(c *Configs) {
 		opts...,
 	)
 
-	c.R.Handle("/device/{deviceid}/stat", c.Authenticate.Then(common.Welcome(statHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(common.Welcome(statHandler))).
 		Methods(http.MethodGet)
 }
 
