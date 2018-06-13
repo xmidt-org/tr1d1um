@@ -103,7 +103,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	r := mux.NewRouter()
 
-	r.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	})
 
