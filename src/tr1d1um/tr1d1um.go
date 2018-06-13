@@ -103,6 +103,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	r := mux.NewRouter()
 
+	r.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	})
+
 	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
