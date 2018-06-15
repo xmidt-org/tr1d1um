@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"time"
+	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/xhttp"
 
@@ -154,14 +155,17 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Stat Service
 	//
 	ss := stat.NewService(&stat.ServiceOptions{
-		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Logger:   logger,
-			Retries:  v.GetInt(reqMaxRetriesKey),
-			Interval: v.GetDuration(reqRetryIntervalKey),
-		}, newClient(v, tConfigs).Do),
-
-		CtxTimeout: tConfigs.rTimeout,
-
+		Tr1d1umTransactor: common.NewTr1d1umTransactor(
+			&common.Tr1d1umTransactorOptions{
+				Do: xhttp.RetryTransactor(
+					xhttp.RetryOptions{
+						Logger:   logger,
+						Retries:  v.GetInt(reqMaxRetriesKey),
+						Interval: v.GetDuration(reqRetryIntervalKey),
+					},
+					newClient(v, tConfigs).Do),
+				RequestTimeout: tConfigs.rTimeout,
+			}),
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
 	})
 
@@ -179,13 +183,20 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	ts := translation.NewService(&translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
-		WRPSource:   v.GetString(WRPSourcekey),
-		CtxTimeout:  tConfigs.rTimeout,
-		Do: xhttp.RetryTransactor(xhttp.RetryOptions{
-			Logger:   logger,
-			Retries:  v.GetInt(reqMaxRetriesKey),
-			Interval: v.GetDuration(reqRetryIntervalKey),
-		}, newClient(v, tConfigs).Do),
+
+		WRPSource: v.GetString(WRPSourcekey),
+
+		Tr1d1umTransactor: common.NewTr1d1umTransactor(
+			&common.Tr1d1umTransactorOptions{
+				RequestTimeout: tConfigs.rTimeout,
+				Do: xhttp.RetryTransactor(
+					xhttp.RetryOptions{
+						Logger:   logger,
+						Retries:  v.GetInt(reqMaxRetriesKey),
+						Interval: v.GetDuration(reqRetryIntervalKey),
+					},
+					newClient(v, tConfigs).Do),
+			}),
 	})
 
 	translation.ConfigHandler(&translation.Options{

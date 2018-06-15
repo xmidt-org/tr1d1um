@@ -2,19 +2,17 @@ package translation
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"time"
 	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 )
 
-//Service defines the behavior for the Translation WRP Service
+//Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
+//which is compatible with the XMiDT API
 type Service interface {
-	SendWRP(*wrp.Message, string) (*xmidtResponse, error)
+	SendWRP(*wrp.Message, string) (*common.XmidtResponse, error)
 }
 
 //ServiceOptions defines the options needed to build a new translation WRP service
@@ -22,40 +20,33 @@ type ServiceOptions struct {
 	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages
 	XmidtWrpURL string
 
-	//Do is http.Client.Do with custom client configurations
-	Do func(*http.Request) (*http.Response, error)
-
 	//WRPSource is currently the prefix of "Source" field in outgoing WRP Messages
 	WRPSource string
 
-	//CtxTimeout is the timeout for any given HTTP transaction
-	CtxTimeout time.Duration
+	//Tr1d1umTransactor is the component that's responsible to make the HTTP
+	//request to the XMiDT API and return only data we care about
+	common.Tr1d1umTransactor
 }
 
 //NewService constructs a new translation service instance given some options
 func NewService(o *ServiceOptions) Service {
 	return &service{
-		Do:          o.Do,
-		XmidtWrpURL: o.XmidtWrpURL,
-		WRPSource:   o.WRPSource,
-		CtxTimeout:  o.CtxTimeout,
+		XmidtWrpURL:       o.XmidtWrpURL,
+		WRPSource:         o.WRPSource,
+		Tr1d1umTransactor: o.Tr1d1umTransactor,
 	}
 }
 
-//service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
-//which is compatible with the XMiDT API
 type service struct {
-	Do func(*http.Request) (*http.Response, error)
+	common.Tr1d1umTransactor
 
 	XmidtWrpURL string
-
-	CtxTimeout time.Duration
 
 	WRPSource string
 }
 
 //SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any
-func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *xmidtResponse, err error) {
+func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *common.XmidtResponse, err error) {
 	var payload []byte
 
 	// fill in the rest of the source property
@@ -68,27 +59,7 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *xmidtR
 			req.Header.Add("Content-Type", wrp.Msgpack.ContentType())
 			req.Header.Add("Authorization", authValue)
 
-			ctx, cancel := context.WithTimeout(req.Context(), w.CtxTimeout)
-			defer cancel()
-
-			var resp *http.Response
-			if resp, err = w.Do(req.WithContext(ctx)); err == nil {
-				result = &xmidtResponse{
-					ForwardedHeaders: make(http.Header),
-					Body:             []byte{},
-				}
-
-				common.ForwardHeadersByPrefix("X", resp.Header, result.ForwardedHeaders)
-				result.Code = resp.StatusCode
-
-				defer resp.Body.Close()
-
-				result.Body, err = ioutil.ReadAll(resp.Body)
-				return
-			}
-
-			//Timeout, network errors, etc.
-			err = common.NewCodedError(err, http.StatusServiceUnavailable)
+			result, err = w.Tr1d1umTransactor.Transact(req)
 		}
 	}
 	return

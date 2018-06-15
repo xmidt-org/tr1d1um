@@ -128,7 +128,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 /* Response Encoding */
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	var resp = response.(*xmidtResponse)
+	var resp = response.(*common.XmidtResponse)
 
 	//equivalent to forwarding all headers
 	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
