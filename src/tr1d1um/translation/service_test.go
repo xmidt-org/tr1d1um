@@ -1,70 +1,50 @@
 package translation
 
 import (
-	"errors"
+	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
+	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSendWRP(t *testing.T) {
-	var testCases = []struct {
-		Name       string
-		DoResponse *http.Response
-		DoError    error
-	}{
-		{"Ideal", nil, nil},
-		{"Error", nil, errors.New("network error")},
+	assert := assert.New(t)
+	m := new(common.MockTr1d1umTransactor)
+
+	s := NewService(&ServiceOptions{
+		XmidtWrpURL:       "http://localhost/wrp",
+		WRPSource:         "local",
+		Tr1d1umTransactor: m,
+	})
+
+	var expected = wrp.MustEncode(wrp.Message{
+		Type:   wrp.SimpleRequestResponseMessageType,
+		Source: "local/test",
+	}, wrp.Msgpack)
+
+	var argMatcher = func(r *http.Request) bool {
+		assert.EqualValues("token", r.Header.Get("Authorization"))
+		assert.EqualValues(wrp.Msgpack.ContentType(), r.Header.Get("Content-Type"))
+
+		data, _ := ioutil.ReadAll(r.Body)
+
+		assert.EqualValues(string(expected), string(data))
+
+		//MatchedBy is not friendly in explicitly showing what's not matching
+		//so we use assertions instead in this function
+		return true
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			assert := assert.New(t)
+	m.On("Transact", mock.MatchedBy(argMatcher)).Return(nil, nil)
+	_, e := s.SendWRP(
+		&wrp.Message{
+			Type:   wrp.SimpleRequestResponseMessageType,
+			Source: "test",
+		}, "token")
 
-			var (
-				contentTypeValue, authHeaderValue string
-				sentWRP                           = new(wrp.Message)
-			)
-
-			w := NewService(&ServiceOptions{
-				XmidtWrpURL: "http://localhost:8090/api/v2",
-				CtxTimeout:  time.Second,
-				WRPSource:   "local",
-				Do:
-
-				//capture sent values of interest
-				func(r *http.Request) (resp *http.Response, err error) {
-					wrp.NewDecoder(r.Body, wrp.Msgpack).Decode(sentWRP)
-					contentTypeValue, authHeaderValue = r.Header.Get("Content-Type"), r.Header.Get("Authorization")
-					resp, err = testCase.DoResponse, testCase.DoError
-					return
-				},
-			})
-
-			wrpMsg := &wrp.Message{
-				TransactionUUID: "tid",
-				Source:          "test",
-			}
-
-			resp, err := w.SendWRP(wrpMsg, "auth")
-
-			if testCase.DoError == nil {
-				assert.Nil(err)
-			} else {
-				assert.EqualValues(testCase.DoError.Error(), err.Error())
-			}
-
-			assert.EqualValues(testCase.DoResponse, resp)
-
-			//verify correct header values are set in request
-			assert.EqualValues(wrp.Msgpack.ContentType(), contentTypeValue)
-			assert.EqualValues("auth", authHeaderValue)
-
-			//verify source in WRP message
-			assert.EqualValues("local/test", sentWRP.Source)
-		})
-	}
+	assert.Nil(e)
 }

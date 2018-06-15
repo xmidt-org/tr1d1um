@@ -58,14 +58,12 @@ func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	}
 }
 
-//ForwardHeadersByPrefix copies headers h from resp to w such that key(h) has p as prefix
-func ForwardHeadersByPrefix(p string, resp *http.Response, w http.ResponseWriter) {
-	if resp != nil {
-		for headerKey, headerValues := range resp.Header {
-			if strings.HasPrefix(headerKey, p) {
-				for _, headerValue := range headerValues {
-					w.Header().Add(headerKey, headerValue)
-				}
+//ForwardHeadersByPrefix copies headers h where the source and target are 'from' and 'to' respectively such that key(h) has p as prefix
+func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
+	for headerKey, headerValues := range from {
+		if strings.HasPrefix(headerKey, p) {
+			for _, headerValue := range headerValues {
+				to.Add(headerKey, headerValue)
 			}
 		}
 	}

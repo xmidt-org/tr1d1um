@@ -16,47 +16,47 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 	t.Run("NoHeaders", func(t *testing.T) {
 		assert := assert.New(t)
 
-		to := httptest.NewRecorder()
-		resp := &http.Response{Header: http.Header{}}
+		var to, from = make(http.Header), make(http.Header)
 
-		ForwardHeadersByPrefix("H", resp, to)
-		assert.Empty(to.Header())
+		ForwardHeadersByPrefix("H", from, to)
+		assert.Empty(to)
 	})
 
 	t.Run("MultipleHeadersFiltered", func(t *testing.T) {
 		assert := assert.New(t)
-		resp, to := &http.Response{Header: http.Header{}}, httptest.NewRecorder()
+		var to, from = make(http.Header), make(http.Header)
 
-		resp.Header.Add("Helium", "3")
-		resp.Header.Add("Hydrogen", "5")
-		resp.Header.Add("Hydrogen", "6")
+		from.Add("Helium", "3")
+		from.Add("Hydrogen", "5")
+		from.Add("Hydrogen", "6")
 
-		ForwardHeadersByPrefix("He", resp, to)
-		assert.NotEmpty(to.Header())
-		assert.EqualValues(1, len(to.Header()))
-		assert.EqualValues("3", to.Header().Get("Helium"))
+		ForwardHeadersByPrefix("He", from, to)
+		assert.NotEmpty(to)
+		assert.Len(to, 1)
+		assert.EqualValues("3", to.Get("Helium"))
 	})
 
 	t.Run("MultipleHeadersFilteredFullArray", func(t *testing.T) {
 		assert := assert.New(t)
-		to := httptest.NewRecorder()
-		resp := &http.Response{Header: http.Header{}}
 
-		resp.Header.Add("Helium", "3")
-		resp.Header.Add("Hydrogen", "5")
-		resp.Header.Add("Hydrogen", "6")
+		var to, from = make(http.Header), make(http.Header)
 
-		ForwardHeadersByPrefix("H", resp, to)
-		assert.NotEmpty(to.Header)
-		assert.EqualValues(2, len(to.Header()))
-		assert.EqualValues([]string{"5", "6"}, to.Header()["Hydrogen"])
+		from.Add("Helium", "3")
+		from.Add("Hydrogen", "5")
+		from.Add("Hydrogen", "6")
+
+		ForwardHeadersByPrefix("H", from, to)
+		assert.NotEmpty(to)
+		assert.Len(to, 2)
+		assert.EqualValues([]string{"5", "6"}, to["Hydrogen"])
 	})
 
 	t.Run("NilCases", func(t *testing.T) {
-		to, resp := httptest.NewRecorder(), &http.Response{}
+		var to, from = make(http.Header), make(http.Header)
 		//none of these should panic
 		ForwardHeadersByPrefix("", nil, nil)
-		ForwardHeadersByPrefix("", resp, to)
+		ForwardHeadersByPrefix("", from, nil)
+		ForwardHeadersByPrefix("", from, to)
 	})
 }
 

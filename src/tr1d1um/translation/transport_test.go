@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -292,10 +291,10 @@ func TestEncodeResponse(t *testing.T) {
 	//Tr1d1um should just forward such response code and body
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		response := &http.Response{
-			StatusCode: http.StatusServiceUnavailable,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("t")),
-			Header:     http.Header{"X-test": []string{"test"}},
+		response := &common.XmidtResponse{
+			Code:             http.StatusServiceUnavailable,
+			Body:             []byte("t"),
+			ForwardedHeaders: http.Header{"X-test": []string{"test"}},
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
@@ -310,9 +309,9 @@ func TestEncodeResponse(t *testing.T) {
 	//Since this is not expected, Tr1d1um considers it an internal error case
 	t.Run("UnexpectedResponseFormat", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		response := &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("t")),
+		response := &common.XmidtResponse{
+			Code: http.StatusOK,
+			Body: []byte("t"),
 		}
 
 		assert.NotNil(encodeResponse(ctxTID, recorder, response))
@@ -323,12 +322,12 @@ func TestEncodeResponse(t *testing.T) {
 	t.Run("RDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
-		response := &http.Response{
-			StatusCode: http.StatusOK,
-			Body: ioutil.NopCloser(bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+		response := &common.XmidtResponse{
+			Code: http.StatusOK,
+			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
 				Payload: []byte(`{"statusCode": 520}`),
-			}, wrp.Msgpack))),
+			}, wrp.Msgpack)).Bytes(),
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
@@ -344,11 +343,11 @@ func TestEncodeResponse(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		internalErrorResponse := []byte(`{"statusCode": 500, "message": "I, the device, suffer"}`)
 
-		response := &http.Response{
-			StatusCode: http.StatusOK,
-			Body: ioutil.NopCloser(bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+		response := &common.XmidtResponse{
+			Code: http.StatusOK,
+			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
-				Payload: internalErrorResponse}, wrp.Msgpack))),
+				Payload: internalErrorResponse}, wrp.Msgpack)).Bytes(),
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
@@ -362,12 +361,12 @@ func TestEncodeResponse(t *testing.T) {
 	t.Run("BadRDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
-		response := &http.Response{
-			StatusCode: http.StatusOK,
-			Body: ioutil.NopCloser(bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+		response := &common.XmidtResponse{
+			Code: http.StatusOK,
+			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
 				Payload: []byte(`{"statusCode":`),
-			}, wrp.Msgpack))),
+			}, wrp.Msgpack)).Bytes(),
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)

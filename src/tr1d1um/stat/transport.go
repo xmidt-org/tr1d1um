@@ -3,7 +3,6 @@ package stat
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"tr1d1um/common"
@@ -80,16 +79,14 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 //TODO: What about if XMiDT cluster reports 500. There would be ambiguity
 //about which machine is actually having the error (Tr1d1um or the Xmidt API)
 //do we care to make that distinction?
-
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	resp := response.(*http.Response)
+	resp := response.(*common.XmidtResponse)
 
-	var rp []byte
-	if rp, err = ioutil.ReadAll(resp.Body); err == nil {
-		w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-		w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
-		w.WriteHeader(resp.StatusCode)
-		w.Write(rp)
-	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
+
+	w.WriteHeader(resp.Code)
+	_, err = w.Write(resp.Body)
 	return
 }
