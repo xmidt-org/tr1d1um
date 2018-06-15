@@ -25,6 +25,12 @@ const (
 	authHeaderKey            = "Authorization"
 )
 
+type xmidtResponse struct {
+	Body             []byte
+	ForwardedHeaders http.Header
+	Code             int
+}
+
 //Options wraps the properties needed to set up the translation server
 type Options struct {
 	S Service
@@ -122,42 +128,36 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 /* Response Encoding */
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	var (
-		resp = response.(*http.Response)
-		body []byte
-	)
+	var resp = response.(*xmidtResponse)
 
-	common.ForwardHeadersByPrefix("X", resp, w)
+	//equivalent to forwarding all headers
+	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
-	defer resp.Body.Close()
-	if body, err = ioutil.ReadAll(resp.Body); err == nil {
+	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
+		w.WriteHeader(resp.Code)
+		_, err = w.Write(resp.Body)
+		return
+	}
 
-		if resp.StatusCode != http.StatusOK { //just forward the XMiDT cluster response {
-			w.WriteHeader(resp.StatusCode)
-			_, err = w.Write(body)
-			return
+	wrpModel := new(wrp.Message)
+
+	if err = wrp.NewDecoderBytes(resp.Body, wrp.Msgpack).Decode(wrpModel); err == nil {
+
+		var deviceResponseModel struct {
+			StatusCode int `json:"statusCode"`
 		}
 
-		wrpModel := new(wrp.Message)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
-		if err = wrp.NewDecoderBytes(body, wrp.Msgpack).Decode(wrpModel); err == nil {
-
-			var deviceResponseModel struct {
-				StatusCode int `json:"statusCode"`
+		// if possible, use the device response status code
+		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
+			if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
+				w.WriteHeader(deviceResponseModel.StatusCode)
 			}
-
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
-
-			// if possible, use the device response status code
-			if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
-				if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
-					w.WriteHeader(deviceResponseModel.StatusCode)
-				}
-			}
-
-			_, err = w.Write(wrpModel.Payload)
 		}
+
+		_, err = w.Write(wrpModel.Payload)
 	}
 
 	return

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 	"tr1d1um/common"
@@ -13,7 +14,7 @@ import (
 
 //Service defines the behavior for the Translation WRP Service
 type Service interface {
-	SendWRP(*wrp.Message, string) (*http.Response, error)
+	SendWRP(*wrp.Message, string) (*xmidtResponse, error)
 }
 
 //ServiceOptions defines the options needed to build a new translation WRP service
@@ -53,8 +54,8 @@ type service struct {
 	WRPSource string
 }
 
-//SendWRP sends the given wrpMsg to the XMiDT cluster and returns the *http.Response
-func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Response, err error) {
+//SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any
+func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *xmidtResponse, err error) {
 	var payload []byte
 
 	// fill in the rest of the source property
@@ -70,10 +71,24 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (resp *http.Res
 			ctx, cancel := context.WithTimeout(req.Context(), w.CtxTimeout)
 			defer cancel()
 
-			if resp, err = w.Do(req.WithContext(ctx)); err != nil {
-				//Timeout, network errors, etc.
-				err = common.NewCodedError(err, http.StatusServiceUnavailable)
+			var resp *http.Response
+			if resp, err = w.Do(req.WithContext(ctx)); err == nil {
+				result = &xmidtResponse{
+					ForwardedHeaders: make(http.Header),
+					Body:             []byte{},
+				}
+
+				common.ForwardHeadersByPrefix("X", resp.Header, result.ForwardedHeaders)
+				result.Code = resp.StatusCode
+
+				defer resp.Body.Close()
+
+				result.Body, err = ioutil.ReadAll(resp.Body)
+				return
 			}
+
+			//Timeout, network errors, etc.
+			err = common.NewCodedError(err, http.StatusServiceUnavailable)
 		}
 	}
 	return
