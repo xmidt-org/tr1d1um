@@ -230,7 +230,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		/// before the server is fully running.
 		/// The hypothesis is that in other servers such as caduceus, we do not see this issue that often due to
 		/// getting "lucky" that ServeTLS in another goroutine finishing before PrepareAndStart())
-		if err = serverReady("https://" + v.GetString("server")); err == nil {
+		if err = serverReady("https://"+v.GetString("server"), errorLogger); err == nil {
 			snsFactory.PrepareAndStart()
 		} else {
 			errorLogger.Log(logging.MessageKey(), "Server was not ready within a time constraint. SNS confirmation could not happen",
@@ -360,9 +360,9 @@ func main() {
 }
 
 //serverReady blocks until the primary server is up and running or
-//until the timeout of 1 minute is reached
-func serverReady(endpoint string) (e error) {
-	var ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
+//until the timeout is reached
+func serverReady(endpoint string, logger log.Logger) (e error) {
+	var ctx, cancel = context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 
 	var check = func() <-chan struct{} {
@@ -375,6 +375,7 @@ func serverReady(endpoint string) (e error) {
 					c <- struct{}{}
 					return
 				}
+				logger.Log(logging.MessageKey(), "checking if server is ready", "endpoint", endpoint, logging.ErrorKey(), err)
 				time.Sleep(time.Second)
 			}
 		}(channel)
