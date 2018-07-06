@@ -230,7 +230,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		/// before the server is fully running.
 		/// The hypothesis is that in other servers such as caduceus, we do not see this issue that often due to
 		/// getting "lucky" that ServeTLS in another goroutine finishing before PrepareAndStart())
-		if err = serverReady("https://"+v.GetString("server"), errorLogger); err == nil {
+		if err = serverReady(v.GetString("server")+v.GetString("primary.address"), errorLogger); err == nil {
 			infoLogger.Log(logging.MessageKey(), "server is ready to take on subscription confirmations")
 			snsFactory.PrepareAndStart()
 		} else {
@@ -376,7 +376,7 @@ func serverReady(endpoint string, logger log.Logger) (e error) {
 			)
 
 			for {
-				if conn, err = net.Dial("tcp", ":443"); err == nil {
+				if conn, err = net.Dial("tcp", endpoint); err == nil {
 					conn.Close()
 					c <- struct{}{}
 					return
