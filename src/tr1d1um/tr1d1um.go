@@ -18,7 +18,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -224,21 +223,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	if snsFactory != nil {
-
-		/// This chunk of code is intended to show that failures in SNS confirmation
-		/// are due to the fact that SNS sends confirmation requests to this server
-		/// before the server is fully running.
-		/// The hypothesis is that in other servers such as caduceus, we do not see this issue that often due to
-		/// getting "lucky" that ServeTLS in another goroutine finishing before PrepareAndStart())
-		if err = serverReady(v.GetString("server")+v.GetString("primary.address"), errorLogger); err == nil {
+		// wait for DNS to propagate before subscribing to SNS
+		if err = snsFactory.DnsReady(); err == nil {
 			infoLogger.Log(logging.MessageKey(), "server is ready to take on subscription confirmations")
 			snsFactory.PrepareAndStart()
 		} else {
 			errorLogger.Log(logging.MessageKey(), "Server was not ready within a time constraint. SNS confirmation could not happen",
 				logging.ErrorKey(), err)
 		}
-		///
-
 	}
 
 	signal.Notify(signals)
@@ -358,42 +350,4 @@ func getValidator(v *viper.Viper, m *secure.JWTValidationMeasures) (validator se
 
 func main() {
 	os.Exit(tr1d1um(os.Args))
-}
-
-//serverReady blocks until the primary server is up and running or
-//until the timeout is reached
-func serverReady(endpoint string, logger log.Logger) (e error) {
-	var ctx, cancel = context.WithTimeout(context.Background(), time.Minute*10)
-	defer cancel()
-
-	var check = func() <-chan struct{} {
-		var channel = make(chan struct{})
-
-		go func(c chan struct{}) {
-			var (
-				err  error
-				conn net.Conn
-			)
-
-			for {
-				if conn, err = net.Dial("tcp", endpoint); err == nil {
-					conn.Close()
-					c <- struct{}{}
-					return
-				}
-				logger.Log(logging.MessageKey(), "checking if server is ready", "endpoint", endpoint, logging.ErrorKey(), err)
-				time.Sleep(time.Second)
-			}
-		}(channel)
-
-		return channel
-	}
-
-	select {
-	case <-check():
-	case <-ctx.Done():
-		e = ctx.Err()
-	}
-
-	return
 }
