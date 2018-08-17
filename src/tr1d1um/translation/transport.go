@@ -133,6 +133,9 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	//equivalent to forwarding all headers
 	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
+	// Write TransactionID for all requests
+	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
 		_, err = w.Write(resp.Body)
@@ -148,7 +151,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		}
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 		// if possible, use the device response status code
 		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
