@@ -81,6 +81,9 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 //do we care to make that distinction?
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*common.XmidtResponse)
+	if resp.Code == 500 {
+		w.Header().Set("xMiDT_statusCode": "500")
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
