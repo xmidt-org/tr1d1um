@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-
 	"tr1d1um/common"
 
+	money "github.com/Comcast/golang-money"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/justinas/alice"
 
@@ -136,7 +136,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	// Write TransactionID for all requests
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
-	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
+	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response
 		w.WriteHeader(resp.Code)
 		_, err = w.Write(resp.Body)
 		return
@@ -160,6 +160,16 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		}
 
 		_, err = w.Write(wrpModel.Payload)
+	}
+
+	tracker, ok := money.TrackerFromContext(ctx)
+	if ok {
+		result, err := tracker.Finish()
+		if err != nil {
+			return err
+		}
+
+		money.WriteMoneySpansHeader(result, w)
 	}
 
 	return

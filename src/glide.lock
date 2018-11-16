@@ -1,5 +1,5 @@
-hash: 38fab8ea3c02d9119d8df4b91ceaead58020855650e4ec30cc2661ba96e5292f
-updated: 2018-11-28T09:46:36.326727-08:00
+hash: 29943f2889376cd0eaf4d0a631b5e2470bd0c2cbfb59cfb9dcd16e6626c45500
+updated: 2018-11-27T14:05:36.626584-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -37,12 +37,19 @@ imports:
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
   subpackages:
   - linux
+- name: github.com/Comcast/golang-money
+  version: 308db6e1b55658e64bb2691b679c9c0481913af0
+  repo: git@github.com:githubsands/golang-money
+  vcs: git
 - name: github.com/Comcast/webpa-common
-  version: fe5c1484b2da90c16669df9a4e92d0517c29fff5
+  version: fb7d571b015fd7b7203af2e1ddd418ec0effaad6
+  repo: git@github.com:githubsands/webpa-common
+  vcs: git
   subpackages:
   - concurrent
   - convey
   - convey/conveyhttp
+  - convey/conveymetric
   - device
   - health
   - logging
@@ -67,7 +74,7 @@ imports:
 - name: github.com/go-ini/ini
   version: 9c8236e659b76e87bf02044d06fde8683008ff3e
 - name: github.com/go-kit/kit
-  version: 4dc7be5d2d12881735283bcab7352178e190fc71
+  version: 12210fb6ace19e0496167bb3e667dcd91fa9f69b
   subpackages:
   - endpoint
   - log
@@ -88,8 +95,6 @@ imports:
   - util/conn
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
-- name: github.com/go-stack/stack
-  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
   version: 8d0c54c1246661d9a51ca0ba455d22116d485eaa
   subpackages:
@@ -118,7 +123,7 @@ imports:
   - models
   - pkg/escape
 - name: github.com/influxdata/platform
-  version: 367ee7965c5a99ffa681424f66b84327fb335c0e
+  version: e2959c61b7824185d16858b815c0b725497d6225
   subpackages:
   - models
   - pkg/escape
@@ -136,6 +141,8 @@ imports:
   version: c12348ce28de40eed0136aa2b644d0ee0650e56c
   subpackages:
   - pbutil
+- name: github.com/miekg/dns
+  version: ba6747e8a94115e9dc7738afb87850687611df1b
 - name: github.com/mitchellh/mapstructure
   version: 3536a929edddb9a5b34bd6861dc4a9647cb459fe
 - name: github.com/pelletier/go-toml
@@ -193,13 +200,26 @@ imports:
   - mock
   - require
 - name: github.com/ugorji/go
-  version: 00a57e09e383d445aeef6c6cd642969dc4360231
+  version: e5e69e061d4f7ee3a69b793cf9c1b41afe21918e
   subpackages:
   - codec
 - name: github.com/VividCortex/gohistogram
   version: 51564d9861991fb0ad0f531c99ef602d0f9866e6
+- name: golang.org/x/crypto
+  version: eb0de9b17e854e9b1ccd9963efafc79862359959
+  subpackages:
+  - ed25519
+  - ed25519/internal/edwards25519
+- name: golang.org/x/net
+  version: adae6a3d119ae4890b46832a2e88a95adc62b8e7
+  subpackages:
+  - bpf
+  - internal/iana
+  - internal/socket
+  - ipv4
+  - ipv6
 - name: golang.org/x/sys
-  version: 4ed8d59d0b35e1e29334a206d1b3f38b1e5dfb31
+  version: 62eef0e2fa9b2c385f7b2778e763486da6880d37
   subpackages:
   - unix
 - name: golang.org/x/text

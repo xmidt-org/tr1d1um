@@ -7,6 +7,7 @@ import (
 
 	"tr1d1um/common"
 
+	money "github.com/Comcast/golang-money"
 	"github.com/Comcast/webpa-common/device"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -88,5 +89,16 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 	w.WriteHeader(resp.Code)
 	_, err = w.Write(resp.Body)
+
+	tracker, ok := money.TrackerFromContext(ctx)
+	if ok {
+		result, err := tracker.Finish()
+		if err != nil {
+			return err
+		}
+
+		money.WriteMoneySpansHeader(result, w)
+	}
+
 	return
 }
