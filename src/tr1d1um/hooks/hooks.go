@@ -27,6 +27,7 @@ type Options struct {
 	HooksFactory *webhook.Factory
 	Log          kitlog.Logger
 	Scheme       string
+	SoAprovider  string
 }
 
 //ConfigHandler configures a given handler with webhook endpoints
@@ -42,5 +43,5 @@ func ConfigHandler(o *Options) {
 	}
 
 	//Initialize must take the router without any prefixes
-	o.HooksFactory.Initialize(o.RootRouter, selfURL, hooksHandler, o.Log, o.M, nil)
+	o.HooksFactory.Initialize(o.RootRouter, selfURL, o.SoAprovider, hooksHandler, o.Log, o.M, nil)
 }
