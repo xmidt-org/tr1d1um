@@ -23,6 +23,7 @@ const (
 	applicationName, apiBase = "tr1d1um", "/api/v2"
 	contentTypeHeaderKey     = "Content-Type"
 	authHeaderKey            = "Authorization"
+	HeaderXmidtError         = "HeaderXmidtError"
 )
 
 type xmidtResponse struct {
@@ -137,8 +138,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
-		w.WriteHeader(resp.Code)
-		_, err = w.Write(resp.Body)
+		w.Header().Set(HeaderXmidtError, string(resp.Code))
 		return
 	}
 
