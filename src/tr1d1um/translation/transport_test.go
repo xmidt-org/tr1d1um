@@ -288,7 +288,7 @@ func TestEncodeResponse(t *testing.T) {
 	assert := assert.New(t)
 
 	//XMiDT response status code is not 200.
-	//Tr1d1um should just forward such response code and body
+	//Tr1d1um should just forward HeaderXmidtError
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		response := &common.XmidtResponse{
