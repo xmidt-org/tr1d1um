@@ -208,8 +208,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	var (
-		_, tr1d1umServer = webPA.Prepare(logger, nil, metricsRegistry, r)
-		signals          = make(chan os.Signal, 1)
+		_, tr1d1umServer, _ = webPA.Prepare(logger, nil, metricsRegistry, r)
+		signals             = make(chan os.Signal, 1)
 	)
 
 	//
