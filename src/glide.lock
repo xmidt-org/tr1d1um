@@ -1,5 +1,5 @@
-hash: 38fab8ea3c02d9119d8df4b91ceaead58020855650e4ec30cc2661ba96e5292f
-updated: 2018-08-20T15:50:11.456596-07:00
+hash: 506158b448f408c9ec81ccc2cdc52cad76e846274a1c4547c0ddd5bcaa7e12f5
+updated: 2018-11-27T13:27:26.903231-08:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -38,11 +38,12 @@ imports:
   subpackages:
   - linux
 - name: github.com/Comcast/webpa-common
-  version: fe5c1484b2da90c16669df9a4e92d0517c29fff5
+  version: 42b2b898ac81eedd56ac25039820766760d66a53
   subpackages:
   - concurrent
   - convey
   - convey/conveyhttp
+  - convey/conveymetric
   - device
   - health
   - logging
@@ -67,7 +68,7 @@ imports:
 - name: github.com/go-ini/ini
   version: bda519ae5f4cbc60d391ff8610711627a08b86ae
 - name: github.com/go-kit/kit
-  version: 4dc7be5d2d12881735283bcab7352178e190fc71
+  version: 12210fb6ace19e0496167bb3e667dcd91fa9f69b
   subpackages:
   - endpoint
   - log
@@ -88,8 +89,6 @@ imports:
   - util/conn
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
-- name: github.com/go-stack/stack
-  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
   version: 9eb2c01ac278a5d89ce4b2be68fe4500955d8179
   subpackages:
@@ -131,6 +130,8 @@ imports:
   version: c12348ce28de40eed0136aa2b644d0ee0650e56c
   subpackages:
   - pbutil
+- name: github.com/miekg/dns
+  version: ba6747e8a94115e9dc7738afb87850687611df1b
 - name: github.com/mitchellh/mapstructure
   version: bb74f1db0675b241733089d5a1faa5dd8b0ef57b
 - name: github.com/pelletier/go-toml
@@ -188,11 +189,24 @@ imports:
   - mock
   - require
 - name: github.com/ugorji/go
-  version: 00a57e09e383d445aeef6c6cd642969dc4360231
+  version: e5e69e061d4f7ee3a69b793cf9c1b41afe21918e
   subpackages:
   - codec
 - name: github.com/VividCortex/gohistogram
   version: 51564d9861991fb0ad0f531c99ef602d0f9866e6
+- name: golang.org/x/crypto
+  version: eb0de9b17e854e9b1ccd9963efafc79862359959
+  subpackages:
+  - ed25519
+  - ed25519/internal/edwards25519
+- name: golang.org/x/net
+  version: adae6a3d119ae4890b46832a2e88a95adc62b8e7
+  subpackages:
+  - bpf
+  - internal/iana
+  - internal/socket
+  - ipv4
+  - ipv6
 - name: golang.org/x/sys
   version: 7138fd3d9dc8335c567ca206f4333fb75eb05d56
   subpackages:
