@@ -139,6 +139,14 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response
 		w.WriteHeader(resp.Code)
 		_, err = w.Write(resp.Body)
+
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, _ := tracker.Finish()
+
+			money.WriteMoneySpansHeader(result, w, resp.Code)
+		}
+
 		return
 	}
 
@@ -156,20 +164,28 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
 			if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
 				w.WriteHeader(deviceResponseModel.StatusCode)
+
+				tracker, ok := money.TrackerFromContext(ctx)
+				if ok {
+					result, _ := tracker.Finish()
+
+					money.WriteMoneySpansHeader(result, w, deviceResponseModel.StatusCode)
+				}
+
 			}
 		}
 
-		_, err = w.Write(wrpModel.Payload)
-	}
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, err := tracker.Finish()
+			if err != nil {
+				return err
+			}
 
-	tracker, ok := money.TrackerFromContext(ctx)
-	if ok {
-		result, err := tracker.Finish()
-		if err != nil {
-			return err
+			money.WriteMoneySpansHeader(result, w, deviceResponseModel.StatusCode)
 		}
 
-		money.WriteMoneySpansHeader(result, w)
+		_, err = w.Write(wrpModel.Payload)
 	}
 
 	return
@@ -183,12 +199,28 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 
 	if ce, ok := err.(common.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
+
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, _ := tracker.Finish()
+
+			money.WriteMoneySpansHeader(result, w, ce.StatusCode())
+		}
+
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
 		//the real error is logged into our system before encodeError() is called
 		//the idea behind masking it is to not send the external API consumer internal error messages
 		err = common.ErrTr1d1umInternal
+
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, _ := tracker.Finish()
+
+			money.WriteMoneySpansHeader(result, w, http.StatusInternalServerError)
+		}
+
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{

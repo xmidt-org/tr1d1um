@@ -66,9 +66,24 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 
 	if ce, ok := err.(common.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
+
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, _ := tracker.Finish()
+
+			money.WriteMoneySpansHeader(result, w, ce.StatusCode())
+		}
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		err = common.ErrTr1d1umInternal
+
+		tracker, ok := money.TrackerFromContext(ctx)
+		if ok {
+			result, _ := tracker.Finish()
+
+			money.WriteMoneySpansHeader(result, w, http.StatusInternalServerError)
+		}
+
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
@@ -92,12 +107,9 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 	tracker, ok := money.TrackerFromContext(ctx)
 	if ok {
-		result, err := tracker.Finish()
-		if err != nil {
-			return err
-		}
+		result, _ := tracker.Finish()
 
-		money.WriteMoneySpansHeader(result, w)
+		money.WriteMoneySpansHeader(result, w, resp.Code)
 	}
 
 	return
