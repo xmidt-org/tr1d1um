@@ -202,6 +202,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	translation.ConfigHandler(&translation.Options{
 		S:             ts,
 		APIRouter:     APIRouter,
+		SoAProvider:   v.GetString("soa.provider")
 		Authenticate:  authenticate,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),

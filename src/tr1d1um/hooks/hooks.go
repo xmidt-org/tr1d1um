@@ -35,7 +35,6 @@ type Options struct {
 //ConfigHandler configures a given handler with webhook endpoints
 func ConfigHandler(o *Options) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
-	//TODO: GET SoAProvider, it is currently nil
 
 	o.APIRouter.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
 	o.APIRouter.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
