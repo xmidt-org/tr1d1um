@@ -2,4 +2,4 @@ package: .
 homepage: https://github.com/Comcast/tr1d1um
 import:
 - package: github.com/Comcast/webpa-common
-  version: 42b2b898ac81eedd56ac25039820766760d66a53
+  version: 6ca7d6c5e78ebba17483f5d0e61c7c119b43619a
