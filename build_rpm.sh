@@ -4,17 +4,23 @@ NAME=tr1d1um
 
 RPM_BUILD_ROOT=/root
 SIGN=1
+SPEC_FILE=${NAME}.spec.in
 
 
 usage()
 {
     echo "usage: build_rpm.sh [--rpm-build-root path] [--no-sign]"
+    echo "       --spec-file      - the spec file to use - defaults to $SPEC_FILE"
     echo "       --rpm-build-root - the path where /rpmbuild exists for your user"
     echo "       --no-sign        - don't try to sign the build"
 }
 
 while [ "$1" != "" ]; do
     case $1 in
+        --spec-file )       shift
+                            SPEC_FILE=$1
+                            ;;
+
         --rpm-build-root )  shift
                             RPM_BUILD_ROOT=$1
                             ;;
@@ -62,11 +68,13 @@ pushd ..
 cp -r ${NAME} ${NAME}-$release
 tar -czvf ${NAME}-$new_release.tar.gz ${NAME}-$release
 mv ${NAME}-$new_release.tar.gz ${RPM_BUILD_ROOT}/rpmbuild/SOURCES
+ls
+echo "moving ${NAME}-$new_release.tar.gz to ${RPM_BUILD_ROOT}/rpmbuild/SOURCES"
 rm -rf ${NAME}-$release
 popd
 
 # Merge the changelog into the spec file so we're consistent
-cat ${NAME}.spec.in > ${NAME}.spec
+cat ${SPEC_FILE} > ${NAME}.spec
 cat ChangeLog >> ${NAME}.spec
 
 if [ 0 == $SIGN ]; then

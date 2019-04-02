@@ -9,38 +9,66 @@ branches:
 
 before_install:
     - docker pull schmidtw/webpa.builder.centos6:latest
-    - docker run -it -e BUILD_NUMBER=$TRAVIS_BUILD_NUMBER -d --name build schmidtw/webpa.builder.centos6 bash
+    - docker run -it -e BUILD_NUMBER=$TRAVIS_BUILD_NUMBER -d --name build6 schmidtw/webpa.builder.centos6 bash
+
+    - docker pull schmidtw/webpa.builder.centos7:latest
+    - docker run -it -e BUILD_NUMBER=$TRAVIS_BUILD_NUMBER -d --name build7 schmidtw/webpa.builder.centos7 bash
+
     - env
-    - docker exec build rpm -q golang
-    - docker exec build go version
-    - docker exec build glide -v
-    - docker exec build git clone https://github.com/Comcast/tr1d1um.git
-    - docker exec build git clone https://github.com/Comcast/tr1d1um.git codecovio_build
+
+    - docker exec build6 rpm -q golang
+    - docker exec build6 go version
+    - docker exec build6 glide -v
+    - docker exec build6 git clone https://github.com/Comcast/tr1d1um.git
+    - docker exec build6 git clone https://github.com/Comcast/tr1d1um.git codecovio_build
 
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then openssl aes-256-cbc -K $encrypted_7bc153b31fc8_key -iv $encrypted_7bc153b31fc8_iv -in keys/RPM-GPG-KEY-comcast-webpa.private.enc -out keys/RPM-GPG-KEY-comcast-webpa.private -d; fi'
-    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker cp keys/RPM-GPG-KEY-comcast-webpa.private build:/RPM-GPG-KEY-comcast-webpa.private; fi'
-    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build bash -c "gpg --allow-secret-key-import --import /RPM-GPG-KEY-comcast-webpa.private"; fi'
-    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build bash -c "pushd tr1d1um; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
-    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker cp keys/RPM-GPG-KEY-comcast-webpa.private build6:/RPM-GPG-KEY-comcast-webpa.private; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build6 bash -c "gpg --allow-secret-key-import --import /RPM-GPG-KEY-comcast-webpa.private"; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build6 bash -c "pushd tr1d1um; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build6 bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
+
+    - docker exec build7 rpm -q golang
+    - docker exec build7 go version
+    - docker exec build7 glide -v
+    - docker exec build7 git clone https://github.com/Comcast/tr1d1um.git
+    - docker exec build7 git clone https://github.com/Comcast/tr1d1um.git codecovio_build
+
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then openssl aes-256-cbc -K $encrypted_7bc153b31fc8_key -iv $encrypted_7bc153b31fc8_iv -in keys/RPM-GPG-KEY-comcast-webpa.private.enc -out keys/RPM-GPG-KEY-comcast-webpa.private -d; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker cp keys/RPM-GPG-KEY-comcast-webpa.private build7:/RPM-GPG-KEY-comcast-webpa.private; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build7 bash -c "gpg --allow-secret-key-import --import /RPM-GPG-KEY-comcast-webpa.private"; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build7 bash -c "pushd tr1d1um; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build7 bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
 
 script:
-    - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
-    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
+    - docker exec build6 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build6 tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build6 bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
+
+    - docker exec build7 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build7 tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build7 bash -c "pushd tr1d1um; ./build_rpm.sh --spec-file tr1d1um-systemd.spec.in; popd"; fi'
 
 after_success:
-    - docker exec build bash -c "pushd codecovio_build ; bash <(curl -s https://codecov.io/bash) -t 2781430c-d1d8-4abd-9b17-f329b8fd97ac; popd"
-    - docker cp build:/root/rpmbuild/RPMS/x86_64 .
-    - docker cp build:/versionno.txt .
-    - BINARY_NAME=`ls x86_64/`
+    - docker exec build6 bash -c "pushd codecovio_build ; bash <(curl -s https://codecov.io/bash) -t 2781430c-d1d8-4abd-9b17-f329b8fd97ac; popd"
+    - docker cp build6:/root/rpmbuild/RPMS/x86_64 .
+    - docker cp build6:/versionno.txt .
+    - CENTOS6_NAME=`ls x86_64/`
     - TRAVIS_TAG=`cat versionno.txt`
-    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker build -t tr1d1um:local .; fi'
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker build6 -t tr1d1um:local .; fi'
+
+    - docker exec build7 bash -c "pushd codecovio_build ; bash <(curl -s https://codecov.io/bash) -t 2781430c-d1d8-4abd-9b17-f329b8fd97ac; popd"
+    - docker cp build7:/root/rpmbuild/RPMS/x86_64 .
+    - docker cp build7:/versionno.txt .
+    - CENTOS7_NAME=`ls x86_64/`
+    - TRAVIS_TAG=`cat versionno.txt`
+    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker build7 -t tr1d1um:local .; fi'
 
 deploy:
   provider: releases
   prerelease: true
   api_key: "$AUTH_TOKEN_BUILD"
   file:
-    - x86_64/$BINARY_NAME
+    - x86_64/$CENTOS6_NAME
+    - x86_64/$CENTOS7_NAME
     - keys/RPM-GPG-KEY-comcast-webpa
   skip_cleanup: true
   on:
