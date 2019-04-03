@@ -41,10 +41,10 @@ before_install:
     - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build7 bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
 
 script:
-    - docker exec build6 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build6 tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
+    - docker exec build6 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build6 bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
 
-    - docker exec build7 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build7 tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
+    - docker exec build7 bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && glide install --strip-vendor && cd tr1d1um && go build tr1d1um && go test -race -coverprofile=coverage.txt ./... && popd"
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build7 bash -c "pushd tr1d1um; ./build_rpm.sh --spec-file tr1d1um-systemd.spec.in; popd"; fi'
 
 after_success:
