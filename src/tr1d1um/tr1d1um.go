@@ -65,6 +65,7 @@ const (
 	reqMaxRetriesKey       = "requestMaxRetries"
 	WRPSourcekey           = "WRPSource"
 	hooksSchemeKey         = "hooksScheme"
+	applicationVersion     = "0.1.1"
 )
 
 var defaults = map[string]interface{}{
@@ -95,6 +96,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
 		authenticate            *alice.Chain
 	)
+
+	// This allows us to communicate the version of the binary upon request.
+	printVer := f.BoolP("version", "v", false, "displays the version number")
+
+	if *printVer {
+		fmt.Println(applicationVersion)
+		return 0
+	}
 
 	for k, va := range defaults {
 		v.SetDefault(k, va)
@@ -142,7 +151,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		hooks.ConfigHandler(&hooks.Options{
 			APIRouter:    APIRouter,
 			RootRouter:   r,
-			SoAProvider:   v.GetString("soa.provider"),
+			SoAProvider:  v.GetString("soa.provider"),
 			Authenticate: authenticate,
 			M:            metricsRegistry,
 			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
