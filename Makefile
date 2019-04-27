@@ -19,8 +19,8 @@ build: glide-install
 rpm:
 	mkdir -p ./OPATH/SOURCES
 	tar -czvf ./OPATH/SOURCES/$(APP)-$(PROGVER).tar.gz . --exclude ./.git --exclude ./OPATH --exclude ./conf --exclude ./deploy --exclude ./vendor
-	cp conf/$(APP).service ./OPATH/SOURCES/
-	cp conf/$(APP).yaml  ./OPATH/SOURCES/
+	cp etc/systemd/$(APP).service ./OPATH/SOURCES/
+	cp etc/$(APP)/$(APP).yaml  ./OPATH/SOURCES/
 	rpmbuild --define "_topdir $(CURDIR)/OPATH" \
 		--define "_version $(PROGVER)" \
 		--define "_release 1" \
