@@ -36,6 +36,7 @@ _obj
 _test
 coverage*
 vendor
+.ignore
 
 # Architecture specific extensions/prefixes
 *.[568vq]

@@ -8,7 +8,7 @@ Summary:    The Xmidt router agent.
 Group:      System Environment/Daemons
 License:    ASL 2.0
 URL:        https://github.com/Comcast/%{name}
-Source0:    %{name}-%{version}-%{_releaseno}.tar.gz
+Source0:    %{name}-%{version}.tar.gz
 
 BuildRequires:  golang >= 1.11
 

@@ -7,6 +7,7 @@ APP          := tr1d1um
 BINARY       := $(FIRST_GOPATH)/bin/$(APP)
 
 PROGVER = $(shell grep 'applicationVersion.*= ' src/$(APP)/$(APP).go | awk '{print $$3}' | sed -e 's/\"//g')
+RELEASE = 1
 
 .PHONY: glide-install
 glide-install:
@@ -17,14 +18,14 @@ build: glide-install
 	cd src/$(APP) && $(GO) build
 
 rpm:
-	mkdir -p ./OPATH/SOURCES
-	tar -czvf ./OPATH/SOURCES/$(APP)-$(PROGVER).tar.gz . --exclude ./.git --exclude ./OPATH --exclude ./conf --exclude ./deploy --exclude ./vendor
-	cp etc/systemd/$(APP).service ./OPATH/SOURCES/
-	cp etc/$(APP)/$(APP).yaml  ./OPATH/SOURCES/
-	rpmbuild --define "_topdir $(CURDIR)/OPATH" \
-		--define "_version $(PROGVER)" \
-		--define "_release 1" \
-		-ba deploy/packaging/$(APP).spec
+	mkdir -p ./.ignore/SOURCES
+	tar -czf ./.ignore/SOURCES/$(APP)-$(PROGVER).tar.gz --transform 's/^\./$(APP)-$(PROGVER)/' --exclude ./keys --exclude ./.git --exclude ./.ignore --exclude ./conf --exclude ./deploy --exclude ./vendor --exclude ./src/vendor .
+	cp etc/systemd/$(APP).service ./.ignore/SOURCES/
+	cp etc/$(APP)/$(APP).yaml  ./.ignore/SOURCES/
+	rpmbuild --define "_topdir $(CURDIR)/.ignore" \
+		--define "_ver $(PROGVER)" \
+		--define "_releaseno $(RELEASE)" \
+		-ba etc/systemd/$(APP).spec
 
 .PHONY: version
 version:
@@ -51,8 +52,8 @@ install: go-mod-vendor
 
 .PHONY: release-artifacts
 release-artifacts: go-mod-vendor
-	GOOS=darwin GOARCH=amd64 go build -o ./OPATH/$(APP)-$(PROGVER).darwin-amd64
-	GOOS=linux  GOARCH=amd64 go build -o ./OPATH/$(APP)-$(PROGVER).linux-amd64
+	GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
+	GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
 
 .PHONY: docker
 docker:
@@ -86,4 +87,4 @@ it:
 
 .PHONY: clean
 clean:
-	rm -rf ./$(APP) ./OPATH ./coverage.txt ./vendor
+	rm -rf ./$(APP) ./.ignore ./coverage.txt ./vendor ./src/vendor
