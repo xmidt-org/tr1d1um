@@ -47,11 +47,11 @@ update-version:
 
 
 .PHONY: install
-install: go-mod-vendor
+install:
 	echo go build -o $(BINARY) $(PROGVER)
 
 .PHONY: release-artifacts
-release-artifacts: go-mod-vendor
+release-artifacts:
 	GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
 	GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
 
@@ -70,7 +70,7 @@ style:
 	! gofmt -d $$(find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
 .PHONY: test
-test: go-mod-vendor
+test:
 	go test -o $(BINARY) -v -race  -coverprofile=cover.out $(go list ./... | grep -v "/vendor/")
 
 .PHONY: test-cover
