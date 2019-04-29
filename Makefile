@@ -52,8 +52,8 @@ install:
 
 .PHONY: release-artifacts
 release-artifacts:
-	GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
-	GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
+	cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
+	cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
 
 .PHONY: docker
 docker:
