@@ -1,9 +1,9 @@
 DEFAULT: build
 
-GO           ?= go
-GOFMT        ?= $(GO)fmt
-FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
+GOPATH       := ${CURDIR}
+GOFMT        ?= gofmt
 APP          := tr1d1um
+FIRST_GOPATH := $(firstword $(subst :, ,$(shell go env GOPATH)))
 BINARY       := $(FIRST_GOPATH)/bin/$(APP)
 
 PROGVER = $(shell grep 'applicationVersion.*= ' src/$(APP)/$(APP).go | awk '{print $$3}' | sed -e 's/\"//g')
@@ -11,11 +11,11 @@ RELEASE = 1
 
 .PHONY: glide-install
 glide-install:
-	cd src && glide install --strip-vendor
+	export GOPATH=$(GOPATH) && cd src && glide install --strip-vendor
 
 .PHONY: build
 build: glide-install
-	cd src/$(APP) && $(GO) build
+	export GOPATH=$(GOPATH) && cd src/$(APP) && go build
 
 rpm:
 	mkdir -p ./.ignore/SOURCES
@@ -52,8 +52,8 @@ install:
 
 .PHONY: release-artifacts
 release-artifacts: glide-install
-	cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
-	cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
 
 .PHONY: docker
 docker:
