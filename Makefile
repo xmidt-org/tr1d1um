@@ -52,8 +52,9 @@ install:
 
 .PHONY: release-artifacts
 release-artifacts: glide-install
-	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64
-	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64
+	mkdir -p ./.ignore
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ../../.ignore/$(APP)-$(PROGVER).darwin-amd64
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ../../.ignore/$(APP)-$(PROGVER).linux-amd64
 
 .PHONY: docker
 docker:
