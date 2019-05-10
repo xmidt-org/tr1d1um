@@ -1,5 +1,5 @@
-hash: 10008b9ea6e2422e88796027528a47f046d0465e556b4beb098e095a8a84f6e3
-updated: 2019-05-10T11:14:57.024331-07:00
+hash: 22591b72263d060709f95a1c5bf039af50599b097e61d742c22ecef6392f34c6
+updated: 2019-05-10T11:36:50.210301-07:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 7be45195c3af1b54a609812f90c05a7e492e2491
@@ -37,12 +37,20 @@ imports:
   version: 19cb9f127a9c8d2034cf59ccb683cdb94b9deb6c
   subpackages:
   - linux
-- name: github.com/Comcast/webpa-common
-  version: 6ca7d6c5e78ebba17483f5d0e61c7c119b43619a
+- name: github.com/Comcast/comcast-bascule
+  version: d07d9e49941c9a0998295574bf6b885148666742
   subpackages:
+  - bascule
+  - bascule/basculehttp
+  - bascule/key
+- name: github.com/Comcast/webpa-common
+  version: f5fa67d65cf557eb746e2799100fe8356c7b5753
+  subpackages:
+  - basculechecks
   - concurrent
   - convey
   - convey/conveyhttp
+  - convey/conveymetric
   - device
   - health
   - logging
@@ -50,11 +58,13 @@ imports:
   - secure
   - secure/handler
   - secure/key
+  - semaphore
   - server
   - types
   - webhook
   - webhook/aws
   - wrp
+  - wrp/wrpmeta
   - xhttp
   - xlistener
   - xmetrics
@@ -67,7 +77,7 @@ imports:
 - name: github.com/go-ini/ini
   version: bda519ae5f4cbc60d391ff8610711627a08b86ae
 - name: github.com/go-kit/kit
-  version: 4dc7be5d2d12881735283bcab7352178e190fc71
+  version: 12210fb6ace19e0496167bb3e667dcd91fa9f69b
   subpackages:
   - endpoint
   - log
@@ -88,12 +98,12 @@ imports:
   - util/conn
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
-- name: github.com/go-stack/stack
-  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
   version: b4deda0973fb4c70b50d226b1af49f3da59f5265
   subpackages:
   - proto
+- name: github.com/goph/emperror
+  version: ae59d9fdc3f0c4814bc5fac2d4a68441dcff5a17
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
@@ -105,6 +115,7 @@ imports:
   subpackages:
   - hcl/ast
   - hcl/parser
+  - hcl/printer
   - hcl/scanner
   - hcl/strconv
   - hcl/token
@@ -137,14 +148,17 @@ imports:
   version: fa473d140ef3c6adf42d6b391fe76707f1f243c8
 - name: github.com/pelletier/go-toml
   version: 78b76feda6f35b2c5c1d283513f6419e59086729
+- name: github.com/pkg/errors
+  version: 2233dee583dcf88f3c8b22cb7a33f05a499800d8
 - name: github.com/pmezard/go-difflib
   version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/prometheus/client_golang
-  version: 967789050ba94deca04a5e84cce8ad472ce313c1
+  version: 505eaef017263e299324067d40ca2c48f6a2cf50
   subpackages:
   - prometheus
+  - prometheus/internal
   - prometheus/promhttp
 - name: github.com/prometheus/client_model
   version: 5c3871d89910bfb32f5fcab2aa4b9ec68e65a99f
@@ -179,7 +193,7 @@ imports:
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
-  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
+  version: 6d33b5a963d922d182c91e8a1c88d81fd150cfd4
 - name: github.com/stretchr/objx
   version: ef50b0de28773081167c97fc27cf29a0bf8b8c71
 - name: github.com/stretchr/testify
@@ -190,7 +204,7 @@ imports:
   - mock
   - require
 - name: github.com/ugorji/go
-  version: 00a57e09e383d445aeef6c6cd642969dc4360231
+  version: e5e69e061d4f7ee3a69b793cf9c1b41afe21918e
   subpackages:
   - codec
 - name: github.com/VividCortex/gohistogram
