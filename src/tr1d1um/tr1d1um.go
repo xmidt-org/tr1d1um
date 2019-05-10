@@ -25,13 +25,14 @@ import (
 	"os"
 	"os/signal"
 	"time"
-	"tr1d1um/common"
+
+	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/xhttp"
 
-	"tr1d1um/hooks"
-	"tr1d1um/stat"
-	"tr1d1um/translation"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/hooks"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/stat"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/translation"
 
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"

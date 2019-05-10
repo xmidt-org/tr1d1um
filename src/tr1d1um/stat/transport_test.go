@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"tr1d1um/common"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
 
 	"github.com/gorilla/mux"
 
