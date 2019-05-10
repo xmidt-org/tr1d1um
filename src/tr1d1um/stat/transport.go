@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"tr1d1um/common"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
 

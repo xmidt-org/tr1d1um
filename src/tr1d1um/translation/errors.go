@@ -3,7 +3,7 @@ package translation
 import (
 	"errors"
 
-	"tr1d1um/common"
+	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
 )
 
 // Error values definitions for the translation service
