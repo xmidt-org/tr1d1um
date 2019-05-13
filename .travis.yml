@@ -22,7 +22,7 @@ before_install:
     - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker exec build bash -c "pushd codecovio_build; git fetch origin +refs/pull/${TRAVIS_PULL_REQUEST}/merge && git checkout -qf FETCH_HEAD; popd"; fi'
 
 script:
-    - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && cd tr1d1um && env GO111MODULE=on go build && envGO111MODULE=on go test -race -coverprofile=coverage.txt ./...  && go build tr1d1um && popd"
+    - docker exec build bash -c "export GOPATH=/codecovio_build && pushd codecovio_build/src && cd tr1d1um && env GO111MODULE=on go build && env GO111MODULE=on go test -race -coverprofile=coverage.txt ./...  && go build tr1d1um && popd"
     - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then docker exec build bash -c "pushd tr1d1um; ./build_rpm.sh; popd"; fi'
 
 after_success:
