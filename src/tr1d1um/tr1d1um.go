@@ -52,10 +52,7 @@ const (
 	translationServicesKey = "supportedServices"
 	targetURLKey           = "targetURL"
 	netDialerTimeoutKey    = "netDialerTimeout"
-	clientTimeoutKey       = "clientTimeout"
 	reqTimeoutKey          = "respWaitTimeout"
-	reqRetryIntervalKey    = "requestRetryInterval"
-	reqMaxRetriesKey       = "requestMaxRetries"
 	WRPSourcekey           = "WRPSource"
 	hooksSchemeKey         = "hooksScheme"
 	applicationVersion     = "0.1.2"
@@ -64,13 +61,9 @@ const (
 var defaults = map[string]interface{}{
 	translationServicesKey: []string{}, // no services allowed by the default
 	targetURLKey:           "localhost:6000",
-	// netDialerTimeoutKey:    "5s",
-	// clientTimeoutKey:       "50s",
-	reqTimeoutKey: "40s",
-	// reqRetryIntervalKey: "2s",
-	reqMaxRetriesKey: 2,
-	WRPSourcekey:     "dns:localhost",
-	hooksSchemeKey:   "https",
+	reqTimeoutKey:          "40s",
+	WRPSourcekey:           "dns:localhost",
+	hooksSchemeKey:         "https",
 }
 
 func tr1d1um(arguments []string) (exitCode int) {

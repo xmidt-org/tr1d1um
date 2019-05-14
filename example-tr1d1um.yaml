@@ -48,8 +48,12 @@
   WRPSource: "dns:tr1d1um.xmidt.comcast.net"
   supportedServices:
     - "config"
-  clientTimeout: "135s"
   respWaitTimeout: "129s"
-  netDialerTimeout: "5s"
-  requestRetryInterval: "2s"
-  requestMaxRetries: 2
+
+clientConfig:
+  timeOut: 135
+dialerConfig:
+  timeOut: 5
+retryOptionsConfig:
+  retries: 2
+  interval: 2
