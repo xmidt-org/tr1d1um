@@ -18,11 +18,7 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -34,31 +30,21 @@ import (
 	"tr1d1um/stat"
 	"tr1d1um/translation"
 
-	"github.com/Comcast/comcast-bascule/bascule"
-	"github.com/Comcast/comcast-bascule/bascule/basculehttp"
-	"github.com/Comcast/comcast-bascule/bascule/key"
-	"github.com/goph/emperror"
-
 	"github.com/Comcast/webpa-common/basculechecks"
-	"github.com/Comcast/webpa-common/xhttp"
+	"github.com/Comcast/webpa-common/client"
 
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/secure"
 	"github.com/Comcast/webpa-common/server"
 	"github.com/Comcast/webpa-common/webhook"
 	"github.com/Comcast/webpa-common/webhook/aws"
-	"github.com/SermoDigital/jose/jwt"
 
-	"github.com/Comcast/webpa-common/xmetrics"
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-//convenient global values
 const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "api/v2"
@@ -78,13 +64,13 @@ const (
 var defaults = map[string]interface{}{
 	translationServicesKey: []string{}, // no services allowed by the default
 	targetURLKey:           "localhost:6000",
-	netDialerTimeoutKey:    "5s",
-	clientTimeoutKey:       "50s",
-	reqTimeoutKey:          "40s",
-	reqRetryIntervalKey:    "2s",
-	reqMaxRetriesKey:       2,
-	WRPSourcekey:           "dns:localhost",
-	hooksSchemeKey:         "https",
+	// netDialerTimeoutKey:    "5s",
+	// clientTimeoutKey:       "50s",
+	reqTimeoutKey: "40s",
+	// reqRetryIntervalKey: "2s",
+	reqMaxRetriesKey: 2,
+	WRPSourcekey:     "dns:localhost",
+	hooksSchemeKey:   "https",
 }
 
 func tr1d1um(arguments []string) (exitCode int) {
@@ -96,6 +82,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
+		return 1
+	}
+
+	oc := client.ClientMetricOptions{InFlight: true, RequestDuration: true, RequestCounter: true, DroppedMessages: true, OutboundRetries: true}
+	webPAClient, err := client.Initialize(v, metricsRegistry, logger, oc, nil, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to initialize client: %s\n", err.Error())
 		return 1
 	}
 
@@ -117,23 +110,24 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
+	reqTimeout, err := time.ParseDuration(v.GetString("reqTimeoutKey"))
+	if err != nil {
+		errorLogger.Log(logging.MessageKey(), "Need reqTimeOutKey", logging.ErrorKey(), err)
+		return 4
+	}
 
 	r := mux.NewRouter()
-
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	})
 
 	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
-
+	authenticateHandler, err := NewAuthenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
 		return 1
 	}
-
-	tConfigs, err := newTimeoutConfigs(v)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to parse timeout configuration values: %s \n", err.Error())
@@ -159,7 +153,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			APIRouter:    APIRouter,
 			RootRouter:   r,
 			SoAProvider:  v.GetString("soa.provider"),
-			Authenticate: authenticate,
+			Authenticate: authenticateHandler,
 			M:            metricsRegistry,
 			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
 			HooksFactory: snsFactory,
@@ -172,25 +166,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Stat Service
 	//
 	ss := stat.NewService(&stat.ServiceOptions{
-		Tr1d1umTransactor: common.NewTr1d1umTransactor(
-			&common.Tr1d1umTransactorOptions{
-				Do: xhttp.RetryTransactor(
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					newClient(v, tConfigs).Do),
-				RequestTimeout: tConfigs.rTimeout,
-			}),
-		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
+		Tr1d1umTransactor: common.NewTr1d1umTransactor(webPAClient, reqTimeout),
+		XmidtStatURL:      fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
 	})
 
 	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
 	stat.ConfigHandler(&stat.Options{
 		S:            ss,
 		APIRouter:    APIRouter,
-		Authenticate: authenticate,
+		Authenticate: authenticateHandler,
 		Log:          logger,
 	})
 
@@ -199,27 +183,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 
 	ts := translation.NewService(&translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
-
-		WRPSource: v.GetString(WRPSourcekey),
-
-		Tr1d1umTransactor: common.NewTr1d1umTransactor(
-			&common.Tr1d1umTransactorOptions{
-				RequestTimeout: tConfigs.rTimeout,
-				Do: xhttp.RetryTransactor(
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					newClient(v, tConfigs).Do),
-			}),
+		XmidtWrpURL:       fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
+		WRPSource:         v.GetString(WRPSourcekey),
+		Tr1d1umTransactor: common.NewTr1d1umTransactor(webPAClient, reqTimeout),
 	})
 
 	translation.ConfigHandler(&translation.Options{
 		S:             ts,
 		APIRouter:     APIRouter,
-		Authenticate:  authenticate,
+		Authenticate:  authenticateHandler,
 		Log:           logger,
 		ValidServices: v.GetStringSlice(translationServicesKey),
 	})
@@ -257,147 +229,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 	waitGroup.Wait()
 
 	return 0
-}
-
-//timeoutConfigs holds parsable config values for HTTP transactions
-type timeoutConfigs struct {
-	//HTTP client timeout
-	cTimeout time.Duration
-
-	//HTTP request timeout
-	rTimeout time.Duration
-
-	//net dialer timeout
-	dTimeout time.Duration
-}
-
-func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
-	var c, r, d time.Duration
-	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
-		if r, err = time.ParseDuration(v.GetString(reqTimeoutKey)); err == nil {
-			if d, err = time.ParseDuration(v.GetString(netDialerTimeoutKey)); err == nil {
-				t = &timeoutConfigs{
-					cTimeout: c,
-					rTimeout: r,
-					dTimeout: d,
-				}
-			}
-		}
-	}
-	return
-}
-
-func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
-	return &http.Client{
-		Timeout: t.cTimeout,
-		Transport: &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: t.dTimeout,
-			}).Dial},
-	}
-}
-
-func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
-	return func(delegate http.Handler) http.Handler {
-		return http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method)))
-				delegate.ServeHTTP(w, ctx)
-			})
-	}
-}
-
-func GetLogger(ctx context.Context) bascule.Logger {
-	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-	return logger
-}
-
-//JWTValidator provides a convenient way to define jwt validator through config files
-type JWTValidator struct {
-	// JWTKeys is used to create the key.Resolver for JWT verification keys
-	Keys key.ResolverFactory `json:"keys"`
-
-	// Custom is an optional configuration section that defines
-	// custom rules for validation over and above the standard RFC rules.
-	Custom secure.JWTValidatorFactory `json:"custom"`
-}
-
-//authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
-
-	var (
-		m *basculechecks.JWTValidationMeasures
-	)
-
-	if registry != nil {
-		m = basculechecks.NewJWTValidationMeasures(registry)
-	}
-	listener := basculechecks.NewMetricListener(m)
-
-	basicAllowed := make(map[string]string)
-	basicAuth := v.GetStringSlice("authHeader")
-	for _, a := range basicAuth {
-		decoded, err := base64.StdEncoding.DecodeString(a)
-		if err != nil {
-			logging.Info(logger).Log(logging.MessageKey(), "failed to decode auth header", "authHeader", a, logging.ErrorKey(), err.Error())
-		}
-
-		i := bytes.IndexByte(decoded, ':')
-		logging.Debug(logger).Log(logging.MessageKey(), "decoded string", "string", decoded, "i", i)
-		if i > 0 {
-			basicAllowed[string(decoded[:i])] = string(decoded[i+1:])
-		}
-	}
-	logging.Debug(logger).Log(logging.MessageKey(), "Created list of allowed basic auths", "allowed", basicAllowed, "config", basicAuth)
-
-	options := []basculehttp.COption{basculehttp.WithCLogger(GetLogger), basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse)}
-	if len(basicAllowed) > 0 {
-		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
-	}
-	var jwtVal JWTValidator
-
-	v.UnmarshalKey("jwtValidator", &jwtVal)
-	if jwtVal.Keys.URI != "" {
-		resolver, err := jwtVal.Keys.NewResolver()
-		if err != nil {
-			return &alice.Chain{}, emperror.With(err, "failed to create resolver")
-		}
-
-		options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
-			DefaultKeyId:  DefaultKeyID,
-			Resolver:      resolver,
-			Parser:        bascule.DefaultJWSParser,
-			JWTValidators: []*jwt.Validator{jwtVal.Custom.New()},
-		}))
-	}
-
-	authConstructor := basculehttp.NewConstructor(options...)
-
-	bearerRules := []bascule.Validator{
-		bascule.CreateNonEmptyPrincipalCheck(),
-		bascule.CreateNonEmptyTypeCheck(),
-		bascule.CreateValidTypeCheck([]string{"jwt"}),
-	}
-
-	// only add capability check if the configuration is set
-	var capabilityConfig basculechecks.CapabilityConfig
-	v.UnmarshalKey("capabilityConfig", &capabilityConfig)
-	if capabilityConfig.FirstPiece != "" && capabilityConfig.SecondPiece != "" && capabilityConfig.ThirdPiece != "" {
-		bearerRules = append(bearerRules, bascule.CreateListAttributeCheck("capabilities", basculechecks.CreateValidCapabilityCheck(capabilityConfig)))
-	}
-
-	authEnforcer := basculehttp.NewEnforcer(
-		basculehttp.WithELogger(GetLogger),
-		basculehttp.WithRules("Basic", []bascule.Validator{
-			bascule.CreateAllowAllCheck(),
-		}),
-		basculehttp.WithRules("Bearer", bearerRules),
-		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
-	)
-
-	chain := alice.New(SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	return &chain, nil
 }
 
 func main() {

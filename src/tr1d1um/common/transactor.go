@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/Comcast/webpa-common/client"
 )
 
 //XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
@@ -29,25 +31,16 @@ type Tr1d1umTransactor interface {
 	Transact(*http.Request) (*XmidtResponse, error)
 }
 
-//Tr1d1umTransactorOptions include parameters needed to configure the transactor
-type Tr1d1umTransactorOptions struct {
-	//RequestTimeout is the deadline duration for the HTTP transaction to be completed
-	RequestTimeout time.Duration
-
-	//Do is the core responsible to perform the actual HTTP request
-	Do func(*http.Request) (*http.Response, error)
-}
-
-func NewTr1d1umTransactor(o *Tr1d1umTransactorOptions) Tr1d1umTransactor {
+func NewTr1d1umTransactor(c *client.WebPAClient, t time.Duration) Tr1d1umTransactor {
 	return &tr1d1umTransactor{
-		Do:             o.Do,
-		RequestTimeout: o.RequestTimeout,
+		RequestTimeout: t,
+		Client:         c,
 	}
 }
 
 type tr1d1umTransactor struct {
 	RequestTimeout time.Duration
-	Do             func(*http.Request) (*http.Response, error)
+	Client         *client.WebPAClient
 }
 
 func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, err error) {
@@ -55,7 +48,7 @@ func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, 
 	defer cancel()
 
 	var resp *http.Response
-	if resp, err = t.Do(req.WithContext(ctx)); err == nil {
+	if resp, err = t.Client.Transact(req.WithContext(ctx)); err == nil {
 		result = &XmidtResponse{
 			ForwardedHeaders: make(http.Header),
 			Body:             []byte{},

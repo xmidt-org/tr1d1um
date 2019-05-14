@@ -24,7 +24,7 @@ func TestTransactError(t *testing.T) {
 	})
 
 	r := httptest.NewRequest(http.MethodGet, "localhost:6003/test", nil)
-	_, e := transactor.Transact(r)
+	_, e := transactor.Client.Transact(r)
 
 	assert.EqualValues(expectedErr, e)
 }
@@ -54,7 +54,7 @@ func TestTransactIdeal(t *testing.T) {
 	})
 
 	r := httptest.NewRequest(http.MethodGet, "localhost:6003/test", nil)
-	actual, e := transactor.Transact(r)
+	actual, e := transactor.Client.Transact(r)
 	assert.Nil(e)
 	assert.EqualValues(expected, actual)
 }
