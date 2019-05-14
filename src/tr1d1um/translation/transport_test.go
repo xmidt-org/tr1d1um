@@ -300,7 +300,7 @@ func TestEncodeResponse(t *testing.T) {
 		err := encodeResponse(ctxTID, recorder, response)
 
 		assert.Nil(err)
-		assert.EqualValues(string(http.StatusServiceUnavailable), recorder.Header.Get(HeaderXmidtError))
+		assert.EqualValues(string(http.StatusServiceUnavailable), recorder.HeaderMap.Get(HeaderXmidtError))
 		assert.EqualValues("test", recorder.Header().Get("X-test"))
 	})
 
