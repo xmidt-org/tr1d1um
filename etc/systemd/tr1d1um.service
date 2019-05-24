@@ -11,6 +11,7 @@ ExecReload=/bin/kill -s HUP $MAINPID
 TimeoutStopSec=10
 KillMode=process
 PrivateTmp=true
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
