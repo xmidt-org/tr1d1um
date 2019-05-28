@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
+	"tr1d1um/common"
 
 	"github.com/stretchr/testify/mock"
 )

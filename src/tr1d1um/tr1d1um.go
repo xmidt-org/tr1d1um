@@ -29,18 +29,18 @@ import (
 	"os/signal"
 	"time"
 
+	"tr1d1um/common"
+	"tr1d1um/hooks"
+	"tr1d1um/stat"
+	"tr1d1um/translation"
+
 	"github.com/Comcast/comcast-bascule/bascule"
 	"github.com/Comcast/comcast-bascule/bascule/basculehttp"
 	"github.com/Comcast/comcast-bascule/bascule/key"
-	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
 	"github.com/goph/emperror"
 
 	"github.com/Comcast/webpa-common/basculechecks"
 	"github.com/Comcast/webpa-common/xhttp"
-
-	"github.com/Comcast/tr1d1um/src/tr1d1um/hooks"
-	"github.com/Comcast/tr1d1um/src/tr1d1um/stat"
-	"github.com/Comcast/tr1d1um/src/tr1d1um/translation"
 
 	"github.com/Comcast/webpa-common/concurrent"
 	"github.com/Comcast/webpa-common/logging"

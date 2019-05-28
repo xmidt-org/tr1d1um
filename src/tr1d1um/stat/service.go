@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Comcast/tr1d1um/src/tr1d1um/common"
+	"tr1d1um/common"
 )
 
 //Service defines the behavior of the device statistics Tr1d1um Service
