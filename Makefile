@@ -1,30 +1,31 @@
 DEFAULT: build
 
-GO           ?= go
-GOFMT        ?= $(GO)fmt
-FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
+GOPATH       := ${CURDIR}
+GOFMT        ?= gofmt
 APP          := tr1d1um
+FIRST_GOPATH := $(firstword $(subst :, ,$(shell go env GOPATH)))
 BINARY       := $(FIRST_GOPATH)/bin/$(APP)
 
 PROGVER = $(shell grep 'applicationVersion.*= ' src/$(APP)/$(APP).go | awk '{print $$3}' | sed -e 's/\"//g')
+RELEASE = 1
 
 .PHONY: glide-install
 glide-install:
-	cd src && glide install --strip-vendor
+	export GOPATH=$(GOPATH) && cd src && glide install --strip-vendor
 
 .PHONY: build
 build: glide-install
-	cd src/$(APP) && $(GO) build
+	export GOPATH=$(GOPATH) && cd src/$(APP) && go build
 
 rpm:
-	mkdir -p ./OPATH/SOURCES
-	tar -czvf ./OPATH/SOURCES/$(APP)-$(PROGVER).tar.gz . --exclude ./.git --exclude ./OPATH --exclude ./conf --exclude ./deploy --exclude ./vendor
-	cp conf/$(APP).service ./OPATH/SOURCES/
-	cp conf/$(APP).yaml  ./OPATH/SOURCES/
-	rpmbuild --define "_topdir $(CURDIR)/OPATH" \
-		--define "_version $(PROGVER)" \
-		--define "_release 1" \
-		-ba deploy/packaging/$(APP).spec
+	mkdir -p ./.ignore/SOURCES
+	tar -czf ./.ignore/SOURCES/$(APP)-$(PROGVER).tar.gz --transform 's/^\./$(APP)-$(PROGVER)/' --exclude ./keys --exclude ./.git --exclude ./.ignore --exclude ./conf --exclude ./deploy --exclude ./vendor --exclude ./src/vendor .
+	cp etc/systemd/$(APP).service ./.ignore/SOURCES/
+	cp etc/$(APP)/$(APP).yaml  ./.ignore/SOURCES/
+	rpmbuild --define "_topdir $(CURDIR)/.ignore" \
+		--define "_ver $(PROGVER)" \
+		--define "_releaseno $(RELEASE)" \
+		-ba etc/systemd/$(APP).spec
 
 .PHONY: version
 version:
@@ -50,9 +51,10 @@ install:
 	echo go build -o $(BINARY) $(PROGVER)
 
 .PHONY: release-artifacts
-release-artifacts:
-	GOOS=darwin GOARCH=amd64 go build -o ./OPATH/$(APP)-$(PROGVER).darwin-amd64
-	GOOS=linux  GOARCH=amd64 go build -o ./OPATH/$(APP)-$(PROGVER).linux-amd64
+release-artifacts: glide-install
+	mkdir -p ./.ignore
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=darwin GOARCH=amd64 go build -o ../../.ignore/$(APP)-$(PROGVER).darwin-amd64
+	export GOPATH=$(GOPATH) && cd src/$(APP) && GOOS=linux  GOARCH=amd64 go build -o ../../.ignore/$(APP)-$(PROGVER).linux-amd64
 
 .PHONY: docker
 docker:
@@ -86,4 +88,4 @@ it:
 
 .PHONY: clean
 clean:
-	rm -rf ./$(APP) ./OPATH ./coverage.txt ./vendor
+	rm -rf ./$(APP) ./.ignore ./coverage.txt ./vendor ./src/vendor

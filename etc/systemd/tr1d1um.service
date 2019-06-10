@@ -1,0 +1,17 @@
+[Unit]
+Description=The tr1d1um tr-181 translation service server
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+PIDFile=/run/tr1d1um.pid
+ExecStartPre=/usr/bin/rm -f /run/tr1d1um.pid
+ExecStart=/usr/bin/tr1d1um
+ExecReload=/bin/kill -s HUP $MAINPID
+TimeoutStopSec=10
+KillMode=process
+PrivateTmp=true
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
