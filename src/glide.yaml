@@ -2,4 +2,6 @@ package: .
 homepage: https://github.com/Comcast/tr1d1um
 import:
 - package: github.com/Comcast/webpa-common
-  version: 6ca7d6c5e78ebba17483f5d0e61c7c119b43619a
+  version: v1.0.1
+- package: github.com/Comcast/comcast-bascule
+  version: v0.2.5

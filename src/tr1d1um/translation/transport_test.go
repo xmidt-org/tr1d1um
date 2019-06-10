@@ -9,12 +9,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
-
 	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/wrp"
-
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 

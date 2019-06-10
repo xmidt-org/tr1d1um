@@ -11,10 +11,8 @@ import (
 
 	"tr1d1um/common"
 
-	"github.com/gorilla/mux"
-
 	"github.com/Comcast/webpa-common/device"
-
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 

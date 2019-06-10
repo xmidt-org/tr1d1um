@@ -3,6 +3,7 @@ package stat
 import (
 	"net/http"
 	"testing"
+
 	"tr1d1um/common"
 
 	"github.com/stretchr/testify/mock"

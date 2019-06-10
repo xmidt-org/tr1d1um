@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Comcast/comcast-bascule/bascule"
+
 	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/secure/handler"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 )
@@ -25,8 +26,8 @@ func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 		var satClientID = "N/A"
 
 		// retrieve satClientID from request context
-		if reqContextValues, ok := handler.FromContext(r.Context()); ok {
-			satClientID = reqContextValues.SatClientID
+		if auth, ok := bascule.FromContext(r.Context()); ok {
+			satClientID = auth.Token.Principal()
 		}
 
 		var rCtx = r.Context()
