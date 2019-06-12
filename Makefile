@@ -68,11 +68,11 @@ local-docker:
 
 .PHONY: style
 style:
-	! gofmt -d $$(find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+	! gofmt -d $$(find src/$(APP) -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
 .PHONY: test
 test:
-	go test -o $(BINARY) -v -race  -coverprofile=cover.out $(go list ./... | grep -v "/vendor/")
+	go test -v -race  -coverprofile=cover.out $(APP)/...
 
 .PHONY: test-cover
 test-cover: test
