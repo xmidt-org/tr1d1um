@@ -53,7 +53,7 @@ func ConfigHandler(c *Options) {
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(c.S),
-		decodeValidServiceRequest(c.ValidServices, decodeRequest),
+		logDecodedSETParameters(c.Log, decodeValidServiceRequest(c.ValidServices, decodeRequest)),
 		encodeResponse,
 		opts...,
 	)
