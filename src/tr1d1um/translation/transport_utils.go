@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
@@ -129,9 +128,7 @@ func logDecodedSETParameters(logger kitlog.Logger, decoder kithttp.DecodeRequest
 
 			if unmarshallErr := json.Unmarshal(wrpMsgPayload, wdmp); unmarshallErr == nil {
 				tid := c.Value(common.ContextKeyRequestTID).(string)
-
-				paramsLogger.Log("tid", tid, "command", wdmp.Command, "parameters", strings.Join(getParamNames(wdmp.Parameters), ","))
-
+				paramsLogger.Log("tid", tid, "command", wdmp.Command, "parameters", getParamNames(wdmp.Parameters))
 			}
 		}
 
