@@ -118,7 +118,7 @@ func TestRequestGetPayload(t *testing.T) {
 		p, e := requestGetPayload("n0,n1", "")
 		assert.Nil(e)
 
-		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGet, Names: []string{"n0", "n1"}})
+		expectedBytes, err := json.Marshal(&common.GetWDMP{Command: common.CommandGet, Names: []string{"n0", "n1"}})
 
 		if err != nil {
 			panic(err)
@@ -133,7 +133,7 @@ func TestRequestGetPayload(t *testing.T) {
 		p, e := requestGetPayload("n0,n1", "attr0")
 		assert.Nil(e)
 
-		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGetAttrs, Names: []string{"n0", "n1"}, Attributes: "attr0"})
+		expectedBytes, err := json.Marshal(&common.GetWDMP{Command: common.CommandGetAttrs, Names: []string{"n0", "n1"}, Attributes: "attr0"})
 
 		if err != nil {
 			panic(err)
@@ -162,7 +162,7 @@ func TestRequestSetPayload(t *testing.T) {
 		assert := assert.New(t)
 		p, e := requestSetPayload(bytes.NewBufferString(""), "new", "old", "sync")
 
-		wdmp := new(setWDMP)
+		wdmp := new(common.SetWDMP)
 		err := json.NewDecoder(bytes.NewBuffer(p)).Decode(wdmp)
 
 		if err != nil {
@@ -170,7 +170,7 @@ func TestRequestSetPayload(t *testing.T) {
 		}
 
 		assert.Nil(e)
-		assert.EqualValues(CommandTestSet, wdmp.Command)
+		assert.EqualValues(common.CommandTestSet, wdmp.Command)
 		assert.EqualValues("new", wdmp.NewCid)
 		assert.EqualValues("old", wdmp.OldCid)
 		assert.EqualValues("sync", wdmp.SyncCmc)
@@ -201,8 +201,8 @@ func TestRequestAddPayload(t *testing.T) {
 
 		assert.Nil(e)
 
-		expected, err := json.Marshal(&addRowWDMP{
-			Command: CommandAddRow,
+		expected, err := json.Marshal(&common.AddRowWDMP{
+			Command: common.CommandAddRow,
 			Table:   "t0",
 			Row:     map[string]string{"row": "r0"},
 		})
@@ -242,10 +242,10 @@ func TestRequestReplacePayload(t *testing.T) {
 
 		assert.Nil(e)
 
-		expected, err := json.Marshal(&replaceRowsWDMP{
-			Command: CommandReplaceRows,
+		expected, err := json.Marshal(&common.ReplaceRowsWDMP{
+			Command: common.CommandReplaceRows,
 			Table:   "t0",
-			Rows:    indexRow{"0": map[string]string{"row": "r0"}},
+			Rows:    common.IndexRow{"0": map[string]string{"row": "r0"}},
 		})
 
 		if err != nil {
@@ -268,7 +268,7 @@ func TestRequestDeletePayload(t *testing.T) {
 	t.Run("IdealPath", func(t *testing.T) {
 		assert := assert.New(t)
 
-		expected, err := json.Marshal(&deleteRowDMP{Command: CommandDeleteRow,
+		expected, err := json.Marshal(&common.DeleteRowWDMP{Command: common.CommandDeleteRow,
 			Row: "0",
 		})
 		if err != nil {
