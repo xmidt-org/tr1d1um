@@ -1,14 +1,10 @@
 package translation
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"tr1d1um/common"
 
 	"github.com/gorilla/mux"
 
@@ -209,65 +205,4 @@ func TestContains(t *testing.T) {
 	assert.False(contains("a", nil))
 	assert.False(contains("a", []string{}))
 	assert.True(contains("a", []string{"a", "b"}))
-}
-
-func TestLogDecodedSETParameters(t *testing.T) {
-	happyPathDecoder := func(_ context.Context, _ *http.Request) (interface{}, error) {
-		return &wrpRequest{WRPMessage: &wrp.Message{Payload: getEncodedSetParamsWDMP()}}, nil
-	}
-	decoratedHappyPathDecoder := func(m *mockLogger) func(context.Context, *http.Request) (interface{}, error) {
-		return logDecodedSETParameters(m, happyPathDecoder)
-	}
-
-	ctx := context.WithValue(context.TODO(), common.ContextKeyRequestTID, "test1234")
-	patchRequest := httptest.NewRequest(http.MethodPatch, "/", bytes.NewBufferString(""))
-
-	t.Run("DecoderFailure", func(t *testing.T) {
-		assert := assert.New(t)
-
-		failingDecoder := func(_ context.Context, _ *http.Request) (interface{}, error) {
-			return nil, errors.New("decoding process failed")
-		}
-
-		m := new(mockLogger)
-		logDecodedSETParameters(m, failingDecoder)(ctx, patchRequest)
-
-		assert.False(m.logCalled)
-	})
-
-	t.Run("RequestMethodNotPatch", func(t *testing.T) {
-		assert := assert.New(t)
-
-		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(""))
-		m := new(mockLogger)
-		decoratedHappyPathDecoder(m)(ctx, r)
-
-		assert.False(m.logCalled)
-	})
-
-	t.Run("HappyPath", func(t *testing.T) {
-		assert := assert.New(t)
-
-		m := new(mockLogger)
-		decoratedHappyPathDecoder(m)(ctx, patchRequest)
-
-		assert.True(m.logCalled)
-	})
-}
-
-func getEncodedSetParamsWDMP() (encodedWDMP []byte) {
-	parameterZeroName := "parameterZero"
-	setParamsWDMP := &setWDMP{Command: CommandSet,
-		Parameters: []setParam{setParam{Name: &parameterZeroName}}}
-	encodedWDMP, _ = json.Marshal(setParamsWDMP)
-	return
-}
-
-type mockLogger struct {
-	logCalled bool
-}
-
-func (m *mockLogger) Log(_ ...interface{}) error {
-	m.logCalled = true
-	return nil
 }

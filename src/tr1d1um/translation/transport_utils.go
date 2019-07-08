@@ -10,9 +10,7 @@ import (
 	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
-	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
@@ -147,26 +145,6 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 		}
 	}
 	return
-}
-
-func logDecodedSETParameters(logger kitlog.Logger, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
-	return func(c context.Context, r *http.Request) (request interface{}, err error) {
-		if request, err = decoder(c, r); err == nil && r.Method == http.MethodPatch {
-			var paramsLogger = kitlog.WithPrefix(logging.Info(logger),
-				logging.MessageKey(), "Parameter Change Request")
-
-			wrpRequest := (request).(*wrpRequest)
-			wrpMsgPayload := wrpRequest.WRPMessage.Payload
-			wdmp := new(setWDMP)
-
-			if unmarshallErr := json.Unmarshal(wrpMsgPayload, wdmp); unmarshallErr == nil {
-				tid := c.Value(common.ContextKeyRequestTID).(string)
-				paramsLogger.Log("tid", tid, "command", wdmp.Command, "parameters", getParamNames(wdmp.Parameters))
-			}
-		}
-
-		return
-	}
 }
 
 func getParamNames(params []setParam) (paramNames []string) {
