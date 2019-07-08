@@ -6,4 +6,6 @@ type contextKey int
 const (
 	ContextKeyRequestArrivalTime contextKey = iota
 	ContextKeyRequestTID
+	ContextKeyRequestWDMPParamNames
+	ContextKeyRequestWDMPCommand
 )

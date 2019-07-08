@@ -1,9 +1,11 @@
 package translation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"tr1d1um/common"
 
@@ -114,6 +116,37 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 
 		return decoder(c, r)
 	}
+}
+
+func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (wdmp *setWDMP, err error) {
+	wdmp = new(setWDMP)
+	if err = json.Unmarshal(encodedWDMP, wdmp); err == nil || len(encodedWDMP) == 0 { //len(data) == 0 case is for TEST_SET
+		if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+			if !isValidSetWDMP(wdmp) {
+				err = ErrInvalidSetWDMP
+			}
+		}
+	}
+
+	return
+}
+
+func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
+	nctx = ctx
+
+	if r.Method == http.MethodPatch {
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		r.Body.Close()
+
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID),
+			r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
+			nctx = context.WithValue(nctx, common.ContextKeyRequestWDMPCommand, wdmp.Command)
+			nctx = context.WithValue(nctx, common.ContextKeyRequestWDMPParamNames, getParamNames(wdmp.Parameters))
+		}
+	}
+	return
 }
 
 func logDecodedSETParameters(logger kitlog.Logger, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {

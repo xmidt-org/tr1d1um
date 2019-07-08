@@ -55,6 +55,15 @@ func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 			logging.Error(logger).Log("tid", ctx.Value(ContextKeyRequestTID), logging.MessageKey(), "latency value could not be derived")
 		}
 
+		if command, ok := ctx.Value(ContextKeyRequestWDMPCommand).(string); ok {
+			if parameters, ok := ctx.Value(ContextKeyRequestWDMPParamNames).([]string); ok {
+				transactionLogger = kitlog.WithPrefix(transactionLogger,
+					"command", command,
+					"parameters", parameters)
+
+			}
+		}
+
 		transactionLogger.Log("latency", latency)
 	}
 }

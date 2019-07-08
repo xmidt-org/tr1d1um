@@ -46,14 +46,14 @@ type Options struct {
 //ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(common.Capture),
+		kithttp.ServerBefore(common.Capture, captureWDMPParameters),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
 		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(c.S),
-		logDecodedSETParameters(c.Log, decodeValidServiceRequest(c.ValidServices, decodeRequest)),
+		decodeValidServiceRequest(c.ValidServices, decodeRequest),
 		encodeResponse,
 		opts...,
 	)
@@ -196,15 +196,8 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 	)
 
 	if data, err = ioutil.ReadAll(in); err == nil {
-
-		//read data into wdmp
-		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 { //len(data) == 0 case is for TEST_SET
-			if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
-				if !isValidSetWDMP(wdmp) {
-					return nil, ErrInvalidSetWDMP
-				}
-				return json.Marshal(wdmp)
-			}
+		if wdmp, err = loadWDMP(data, newCID, oldCID, syncCMC); err == nil {
+			return json.Marshal(wdmp)
 		}
 	}
 
