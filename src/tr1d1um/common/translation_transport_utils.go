@@ -1,16 +1,13 @@
-package translation
+package common
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
-	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
@@ -18,7 +15,7 @@ import (
 /* Functions that help decode a given SET request to TR1D1UM */
 
 //deduceSET deduces the command for a given wdmp object
-func deduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
+func deduceSET(wdmp *SetWDMP, newCID, oldCID, syncCMC string) (err error) {
 	if newCID == "" && oldCID != "" {
 		return ErrNewCIDRequired
 	} else if newCID == "" && oldCID == "" && syncCMC == "" {
@@ -32,7 +29,7 @@ func deduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
 }
 
 //isValidSetWDMP helps verify a given Set WDMP object is valid for its context
-func isValidSetWDMP(wdmp *setWDMP) (isValid bool) {
+func isValidSetWDMP(wdmp *SetWDMP) (isValid bool) {
 	if emptyParams := wdmp.Parameters == nil || len(wdmp.Parameters) == 0; emptyParams {
 		return wdmp.Command == CommandTestSet //TEST_AND_SET can have empty parameters
 	}
@@ -88,7 +85,7 @@ func getCommandForParams(params []setParam) (command string) {
 /* Other transport-level helper functions */
 
 //wrp merges different values from a WDMP request into a WRP message
-func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
+func Wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, err error) {
 	var canonicalDeviceID device.ID
 
 	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
@@ -105,7 +102,8 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string) (m *wrp.Message, 
 	return
 }
 
-func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
+//DecodeValidServiceRequest filters out requests made to an unsupported service before it reaches the service decoder
+func DecodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
 	return func(c context.Context, r *http.Request) (interface{}, error) {
 
 		if !contains(mux.Vars(r)["service"], services) {
@@ -116,24 +114,19 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 	}
 }
 
-func logDecodedSETParameters(logger kitlog.Logger, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
-	return func(c context.Context, r *http.Request) (request interface{}, err error) {
-		if request, err = decoder(c, r); err == nil && r.Method == http.MethodPatch {
-			var paramsLogger = kitlog.WithPrefix(logging.Info(logger),
-				logging.MessageKey(), "Parameter Change Request")
+//LoadWDMP loads a given WDMP payload into an expected WDMP data structure
+func LoadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (wdmp *SetWDMP, err error) {
+	wdmp = new(SetWDMP)
 
-			wrpRequest := (request).(*wrpRequest)
-			wrpMsgPayload := wrpRequest.WRPMessage.Payload
-			wdmp := new(setWDMP)
-
-			if unmarshallErr := json.Unmarshal(wrpMsgPayload, wdmp); unmarshallErr == nil {
-				tid := c.Value(common.ContextKeyRequestTID).(string)
-				paramsLogger.Log("tid", tid, "command", wdmp.Command, "parameters", getParamNames(wdmp.Parameters))
+	if err = json.Unmarshal(encodedWDMP, wdmp); err == nil || len(encodedWDMP) == 0 { //len(data) == 0 case is for TEST_SET
+		if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+			if !isValidSetWDMP(wdmp) {
+				err = ErrInvalidSetWDMP
 			}
 		}
-
-		return
 	}
+
+	return
 }
 
 func getParamNames(params []setParam) (paramNames []string) {

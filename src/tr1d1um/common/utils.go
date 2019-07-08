@@ -1,9 +1,11 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -55,6 +57,16 @@ func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 			logging.Error(logger).Log("tid", ctx.Value(ContextKeyRequestTID), logging.MessageKey(), "latency value could not be derived")
 		}
 
+		if WDMPBody, ok := ctx.Value(ContextKeyRequestWDMPBody).([]byte); ok {
+			if wdmp, e := LoadWDMP(WDMPBody, r.Header.Get(HeaderWPASyncNewCID),
+				r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
+				transactionLogger = kitlog.WithPrefix(transactionLogger,
+					"command", wdmp.Command,
+					"parameters", getParamNames(wdmp.Parameters),
+				)
+			}
+		}
+
 		transactionLogger.Log("latency", latency)
 	}
 }
@@ -95,13 +107,24 @@ func Welcome(delegate http.Handler) http.Handler {
 //Capture (for lack of a better name) captures context values of interest
 //from the incoming request. Unlike Welcome, values captured here are
 //intended to be used only throughout the gokit server flow: (request decoding, business logic,  response encoding)
-func Capture(ctx context.Context, r *http.Request) context.Context {
+func Capture(ctx context.Context, r *http.Request) (nctx context.Context) {
 	var tid string
 	if tid = r.Header.Get(HeaderWPATID); tid == "" {
 		tid = genTID()
 	}
 
-	return context.WithValue(ctx, ContextKeyRequestTID, tid)
+	nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
+
+	if r.Method == http.MethodPatch {
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		r.Body.Close()
+
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		nctx = context.WithValue(nctx, ContextKeyRequestWDMPBody, bodyBytes)
+	}
+
+	return
 }
 
 //genTID generates a 16-byte long string

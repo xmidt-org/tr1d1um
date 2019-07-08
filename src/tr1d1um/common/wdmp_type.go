@@ -1,4 +1,4 @@
-package translation
+package common
 
 //All the supported commands, WebPA Headers and misc
 const (
@@ -16,12 +16,12 @@ const (
 	HeaderWPASyncCMC    = "X-Webpa-Sync-Cmc"
 )
 
-type getWDMP struct {
+type GetWDMP struct {
 	Command    string   `json:"command"`
 	Names      []string `json:"names"`
 	Attributes string   `json:"attributes,omitempty"`
 }
-type setWDMP struct {
+type SetWDMP struct {
 	Command    string     `json:"command"`
 	OldCid     string     `json:"old-cid,omitempty"`
 	NewCid     string     `json:"new-cid,omitempty"`
@@ -36,7 +36,7 @@ type setParam struct {
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
-type addRowWDMP struct {
+type AddRowWDMP struct {
 	Command string            `json:"command"`
 	Table   string            `json:"table"`
 	Row     map[string]string `json:"row"`
@@ -46,13 +46,13 @@ type addRowWDMP struct {
 type indexRow map[string]map[string]string
 
 //replaceRowsWDMP serves as container for data used for the REPLACE_ROWS command
-type replaceRowsWDMP struct {
+type ReplaceRowsWDMP struct {
 	Command string   `json:"command"`
 	Table   string   `json:"table"`
 	Rows    indexRow `json:"rows"`
 }
 
-type deleteRowDMP struct {
+type DeleteRowWDMP struct {
 	Command string `json:"command"`
 	Row     string `json:"row"`
 }

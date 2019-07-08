@@ -53,7 +53,7 @@ func ConfigHandler(c *Options) {
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(c.S),
-		logDecodedSETParameters(c.Log, decodeValidServiceRequest(c.ValidServices, decodeRequest)),
+		common.DecodeValidServiceRequest(c.ValidServices, decodeRequest),
 		encodeResponse,
 		opts...,
 	)
@@ -79,7 +79,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 
 	if payload, err = requestPayload(r); err == nil {
 		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
-		if wrpMsg, err = wrap(payload, tid, mux.Vars(r)); err == nil {
+		if wrpMsg, err = common.Wrap(payload, tid, mux.Vars(r)); err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
 				AuthHeaderValue: r.Header.Get(authHeaderKey),
@@ -96,7 +96,8 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 	case http.MethodGet:
 		payload, err = requestGetPayload(r.FormValue("names"), r.FormValue("attributes"))
 	case http.MethodPatch:
-		payload, err = requestSetPayload(r.Body, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+		payload, err = requestSetPayload(r.Body, r.Header.Get(common.HeaderWPASyncNewCID),
+			r.Header.Get(common.HeaderWPASyncOldCID), r.Header.Get(common.HeaderWPASyncCMC))
 	case http.MethodDelete:
 		payload, err = requestDeletePayload(mux.Vars(r))
 	case http.MethodPut:
@@ -191,20 +192,13 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 
 func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, err error) {
 	var (
-		wdmp = new(setWDMP)
+		wdmp = new(common.SetWDMP)
 		data []byte
 	)
 
 	if data, err = ioutil.ReadAll(in); err == nil {
-
-		//read data into wdmp
-		if err = json.Unmarshal(data, wdmp); err == nil || len(data) == 0 { //len(data) == 0 case is for TEST_SET
-			if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
-				if !isValidSetWDMP(wdmp) {
-					return nil, ErrInvalidSetWDMP
-				}
-				return json.Marshal(wdmp)
-			}
+		if wdmp, err = common.LoadWDMP(data, newCID, oldCID, syncCMC); err == nil {
+			return json.Marshal(wdmp)
 		}
 	}
 
@@ -216,20 +210,20 @@ func requestGetPayload(names, attributes string) ([]byte, error) {
 		return nil, ErrEmptyNames
 	}
 
-	wdmp := new(getWDMP)
+	wdmp := new(common.GetWDMP)
 
 	//default values at this point
-	wdmp.Names, wdmp.Command = strings.Split(names, ","), CommandGet
+	wdmp.Names, wdmp.Command = strings.Split(names, ","), common.CommandGet
 
 	if attributes != "" {
-		wdmp.Command, wdmp.Attributes = CommandGetAttrs, attributes
+		wdmp.Command, wdmp.Attributes = common.CommandGetAttrs, attributes
 	}
 
 	return json.Marshal(wdmp)
 }
 
 func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err error) {
-	var wdmp = &addRowWDMP{Command: CommandAddRow}
+	var wdmp = &common.AddRowWDMP{Command: common.CommandAddRow}
 
 	if table, ok := m["parameter"]; ok {
 		wdmp.Table = table
@@ -252,7 +246,7 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 }
 
 func requestReplacePayload(m map[string]string, input io.Reader) (p []byte, err error) {
-	var wdmp = &replaceRowsWDMP{Command: CommandReplaceRows}
+	var wdmp = &common.ReplaceRowsWDMP{Command: common.CommandReplaceRows}
 
 	if table, ok := m["parameter"]; ok {
 		wdmp.Table = table
@@ -276,7 +270,7 @@ func requestReplacePayload(m map[string]string, input io.Reader) (p []byte, err 
 
 func requestDeletePayload(m map[string]string) ([]byte, error) {
 	if row, ok := m["parameter"]; ok {
-		return json.Marshal(&deleteRowDMP{Command: CommandDeleteRow, Row: row})
+		return json.Marshal(&common.DeleteRowWDMP{Command: common.CommandDeleteRow, Row: row})
 	}
 	return nil, ErrMissingRow
 }
