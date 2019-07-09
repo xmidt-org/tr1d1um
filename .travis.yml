@@ -18,6 +18,9 @@ matrix:
 branches:
   only:
     - master
-
+    
+install:
+  - go get -v github.com/Masterminds/glide
+  
 script:
-  - make style codecov
+  - make build style codecov
