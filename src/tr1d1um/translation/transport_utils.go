@@ -11,6 +11,7 @@ import (
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/wrp"
+	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
@@ -138,12 +139,18 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
-		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID),
-			r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			nctx = context.WithValue(nctx, common.ContextKeyRequestWDMPCommand, wdmp.Command)
-			nctx = context.WithValue(nctx, common.ContextKeyRequestWDMPParamNames, getParamNames(wdmp.Parameters))
+		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
+			if transactionInfoLogger, ok := ctx.Value(common.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
+				transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger,
+					"command", wdmp.Command,
+					"parameters", getParamNames(wdmp.Parameters),
+				)
+
+				nctx = context.WithValue(ctx, common.ContextKeyTransactionInfoLogger, transactionInfoLogger)
+			}
 		}
 	}
+
 	return
 }
 
