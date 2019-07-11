@@ -23,5 +23,4 @@ install:
   - go get -v github.com/Masterminds/glide
   
 script:
-  - go get -v github.com/Masterminds/glide
   - make build style codecov
