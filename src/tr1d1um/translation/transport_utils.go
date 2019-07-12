@@ -1,12 +1,17 @@
 package translation
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"tr1d1um/common"
 
 	"github.com/Comcast/webpa-common/device"
 	"github.com/Comcast/webpa-common/wrp"
+	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 )
@@ -110,6 +115,53 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 
 		return decoder(c, r)
 	}
+}
+
+func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (wdmp *setWDMP, err error) {
+	wdmp = new(setWDMP)
+	if err = json.Unmarshal(encodedWDMP, wdmp); err == nil || len(encodedWDMP) == 0 { //len(data) == 0 case is for TEST_SET
+		if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
+			if !isValidSetWDMP(wdmp) {
+				err = ErrInvalidSetWDMP
+			}
+		}
+	}
+
+	return
+}
+
+func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
+	nctx = ctx
+
+	if r.Method == http.MethodPatch {
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		r.Body.Close()
+
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
+			if transactionInfoLogger, ok := ctx.Value(common.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
+				transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger,
+					"command", wdmp.Command,
+					"parameters", getParamNames(wdmp.Parameters),
+				)
+
+				nctx = context.WithValue(ctx, common.ContextKeyTransactionInfoLogger, transactionInfoLogger)
+			}
+		}
+	}
+
+	return
+}
+
+func getParamNames(params []setParam) (paramNames []string) {
+	paramNames = make([]string, len(params))
+
+	for i, param := range params {
+		paramNames[i] = *param.Name
+	}
+
+	return
 }
 
 func contains(i string, elements []string) bool {

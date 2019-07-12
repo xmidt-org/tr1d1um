@@ -6,4 +6,5 @@ type contextKey int
 const (
 	ContextKeyRequestArrivalTime contextKey = iota
 	ContextKeyRequestTID
+	ContextKeyTransactionInfoLogger
 )
