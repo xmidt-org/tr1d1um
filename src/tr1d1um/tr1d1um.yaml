@@ -34,7 +34,7 @@ flavor: "mint"
 ##############################################################################
 
 # For a complete view of the service config structure, 
-# checkout https://godoc.org/github.com/Comcast/webpa-common/server#WebPA
+# checkout https://godoc.org/github.com/xmidt-org/webpa-common/server#WebPA
 
 ########################################
 #   Primary Endpoint Configuration
@@ -128,7 +128,7 @@ fqdn: "tr1d1um-local-instance-123.example.com"
 # start contains configuration for the logic by which Tr1d1um can 
 # fetch the current WebPA webhooks without having to wait for SNS
 # It does so by pinging the rest of the cluter at the specified apiPath
-# More detaisl at https://godoc.org/github.com/Comcast/webpa-common/webhook#StartConfig
+# More details at https://godoc.org/github.com/xmidt-org/webpa-common/webhook#StartConfig
 start:
   # duration is the max amount of time allowed to wait for webhooks data to be retrieved
   duration: "20s"
@@ -175,7 +175,6 @@ aws:
     topicArn: arn:aws:sns:us-east-1:000000000000:xmidt-local-caduceus
 
     #urlPath is the URL path SNS will use to confirm a subscription with this server
-    url
     urlPath: "/api/v2/aws/sns"
 
 
@@ -196,7 +195,7 @@ authHeader: ["dXNlcjpwYXNz"]
 targetURL: http://localhost:6300
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
-WRPSource: "dns:tr1d1um.xmidt.comcast.net"
+WRPSource: "dns:tr1d1um.example.com"
 
 # supportedServices is a list of endpoints we support for the WRP producing endpoints 
 # we will soon drop this configuration 
