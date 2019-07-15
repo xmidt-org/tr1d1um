@@ -1,0 +1,224 @@
+---
+
+########################################
+#   Labeling/Tracing via HTTP Headers Configuration
+########################################
+
+# The unique fully-qualified-domain-name of the server.  It is provided to 
+# the X-Tr1d1um-Server header for showing what server fulfilled the request 
+# sent.
+# (Optional)
+server: "tr1d1um-local-instance-123.example.com"
+
+# Provides this build number to the X-Tr1d1um-Build header for
+# showing machine version information.  The build number SHOULD
+# match the scheme `version-build` but there is not a strict requirement.
+# (Optional)
+build: "0.1.3-434"
+
+# Provides the region information to the X-Tr1d1um-Region header
+# for showing what region this machine is located in.  The region
+# is arbitrary and optional.
+# (Optional)
+region: "east"
+
+# Provides the flavor information to the X-Tr1d1um-Flavor header
+# for showing what flavor this machine is associated with.  The flavor
+# is arbitrary and optional.
+# (Optional)
+flavor: "mint"
+
+
+##############################################################################
+# WebPA Service configuration
+##############################################################################
+
+# For a complete view of the service config structure, 
+# checkout https://godoc.org/github.com/xmidt-org/webpa-common/server#WebPA
+
+########################################
+#   Primary Endpoint Configuration
+########################################
+
+# primary provides the configuration for the main server for this application
+primary:
+  address: ":6100"
+
+########################################
+#   Health Endpoint Configuration
+########################################
+
+# health defines the details needed for the health check endpoint.  The
+# health check endpoint is generally used by services (like AWS Route53
+# or consul) to determine if this particular machine is healthy or not.
+health:
+  address: ":6101"
+
+########################################
+#   Debugging/Pprof Configuration
+########################################
+
+# pprof defines the details needed for the pprof debug endpoint.
+# (Optional)
+pprof:
+  address: ":6102"
+
+########################################
+#   Metrics Configuration
+########################################
+
+# metric defines the details needed for the prometheus metrics endpoint
+# (Optional)
+metric:
+  address: ":6103"
+  metricsOptions:
+    # namespace is the namespace of the metrics provided
+    # (Optional)
+    namespace: "webpa"
+
+    # subsystem is the subsystem of the metrics provided
+    # (Optional)
+    subsystem: "tr1d1um"
+
+########################################
+#   Logging Related Configuration
+########################################
+
+# log configures the logging subsystem details
+log:
+  # file is the name of the most recent log file.  If set to "stdout" this
+  # will log to os.Stdout.
+  # (Optional) defaults to os.TempDir()
+  file: "stdout"
+
+  # level is the logging level to use - INFO, DEBUG, WARN, ERROR
+  # (Optional) defaults to ERROR
+  level: "DEBUG"
+
+  # maxsize is the maximum log file size in MB
+  # (Optional) defaults to max 100MB
+  maxsize: 50
+
+  # maxage is the maximum number of days to retain old log files
+  # (Optional) defaults to ignore age limit (0)
+  maxage: 30
+
+  # maxbackups is the maximum number of old log files to retain
+  # (Optional) defaults to retain all (0)
+  maxbackups: 10
+
+  # json is a flag indicating whether JSON logging output should be used.
+  # (Optional) defaults to false
+  json: true
+
+
+##############################################################################
+# Webhooks Related configuration 
+##############################################################################
+
+# webhooksEnabled indicates whether or not the webhooks server should be started
+# It is disabled for local testing
+webhooksEnabled: false
+
+# The unique fully-qualified-domain-name of the server.  The webhooks library uses it
+# to know which host to use to confirm this service is ready to receive events 
+# (Optional if not running webhooks)
+fqdn: "tr1d1um-local-instance-123.example.com"
+
+# start contains configuration for the logic by which Tr1d1um can 
+# fetch the current WebPA webhooks without having to wait for SNS
+# It does so by pinging the rest of the cluter at the specified apiPath
+# More details at https://godoc.org/github.com/xmidt-org/webpa-common/webhook#StartConfig
+start:
+  # duration is the max amount of time allowed to wait for webhooks data to be retrieved
+  duration: "20s"
+
+  # path used to query the existing webhooks
+  apiPath: http://localhost:6100/hooks
+
+########################################
+# Webhooks DNS readiness Configuration 
+########################################
+
+# WaitForDns is the duration the webhooks library will wait for this server's DNS record to be
+# propagated. This waiting logic is important so AWS SNS webhook confirmations are not missed
+waitForDns: "30s"
+
+#soa stands for Start of Authority and it's a type of record in a DNS
+soa:
+  # provider is the SOA provider used to verify DNS record readiness of this service
+  provider: "example-123.awsdns-00.com:17" 
+
+########################################
+# Webhooks AWS SNS Configuration 
+########################################
+
+# aws provides the AWS SNS configurations the webhooks library needs
+aws:
+  #AWS access key
+  accessKey: ""
+
+  #AWS secret key
+  secretKey: ""
+
+  env: local-dev
+
+  sns:
+    # awsEndpoint is the AWS endpoint 
+    # this must be left out in produ
+    awsEndpoint: http://goaws:4100
+
+    #region is the AWS SNS region 
+    region: "us-east-1"
+
+    # topicArn describes the SNS topic this server needs to subscribe to
+    topicArn: arn:aws:sns:us-east-1:000000000000:xmidt-local-caduceus
+
+    #urlPath is the URL path SNS will use to confirm a subscription with this server
+    urlPath: "/api/v2/aws/sns"
+
+
+##############################################################################
+# Testing Authorization Credentials
+##############################################################################
+
+# authHeader is a list of Basic Auth credentials intended to be used for local testing purposes
+# WARNING! Be sure to remove this from your production config
+authHeader: ["dXNlcjpwYXNz"]
+
+
+##############################################################################
+# WRP and XMiDT Cloud configurations
+##############################################################################
+
+# targetURL is the base URL of the XMiDT cluster 
+targetURL: http://localhost:6300
+
+# WRPSource is used as 'source' field for all outgoing WRP Messages
+WRPSource: "dns:tr1d1um.example.com"
+
+# supportedServices is a list of endpoints we support for the WRP producing endpoints 
+# we will soon drop this configuration 
+supportedServices:
+  - "config"
+
+
+##############################################################################
+# HTTP Transaction Configurations
+##############################################################################
+
+# clientTimeout is the timeout for the HTTP clients used to contact the XMiDT cloud
+clientTimeout: "135s"
+
+# respWaitTimeout is the max time Tr1d1um will wait for responses from the XMiDT cloud
+respWaitTimeout: "129s"
+
+# netDialerTimeout is the timeout used for the net dialer used within HTTP clients
+netDialerTimeout: "5s"
+
+# requestRetryInterval is the time between HTTP request retries against XMiDT 
+requestRetryInterval: "2s"
+
+# requestMaxRetries is the max number of times an HTTP request is retried against XMiDT in 
+# case of ephemeral errors
+requestMaxRetries: 2

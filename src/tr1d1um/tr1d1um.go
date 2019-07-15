@@ -145,13 +145,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	var snsFactory *webhook.Factory
 
-	if accessKey := v.GetString("aws.accessKey"); accessKey != "" && accessKey != "fake-accessKey" { //only proceed if sure that value was set and not the default one
+	if v.GetBool("webhooksEnabled") {
 		snsFactory, err = webhook.NewFactory(v)
 
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err.Error())
 			return 1
 		}
+
 	}
 
 	if snsFactory != nil {
