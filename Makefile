@@ -21,7 +21,9 @@ rpm:
 	mkdir -p ./.ignore/SOURCES
 	tar -czf ./.ignore/SOURCES/$(APP)-$(PROGVER).tar.gz --transform 's/^\./$(APP)-$(PROGVER)/' --exclude ./keys --exclude ./.git --exclude ./.ignore --exclude ./conf --exclude ./deploy --exclude ./vendor --exclude ./src/vendor .
 	cp etc/systemd/$(APP).service ./.ignore/SOURCES/
-	cp etc/$(APP)/$(APP).yaml  ./.ignore/SOURCES/
+	cp -L etc/$(APP)/$(APP).yaml  ./.ignore/SOURCES/
+	cp LICENSE ./.ignore/SOURCES
+	cp CHANGELOG.md ./.ignore/SOURCES
 	rpmbuild --define "_topdir $(CURDIR)/.ignore" \
 		--define "_ver $(PROGVER)" \
 		--define "_releaseno $(RELEASE)" \
