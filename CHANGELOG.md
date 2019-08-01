@@ -16,7 +16,7 @@ Switching to new build process
 ### Added
 - Initial creation
 
-[Unreleased]: https://github.com/schmidtw/tr1d1um/compare/v0.1.4...HEAD
-[v0.1.4]: https://github.com/schmidtw/tr1d1um/compare/v0.1.2...v0.1.4
-[v0.1.2]: https://github.com/schmidtw/tr1d1um/compare/0.1.1...v0.1.2
-[0.1.1]: https://github.com/schmidtw/tr1d1um/compare/e34399980ec8f7716633c8b8bc5d72727c79b184...0.1.1
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.1.4...HEAD
+[v0.1.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.1.2...v0.1.4
+[v0.1.2]: https://github.com/xmidt-org/tr1d1um/compare/0.1.1...v0.1.2
+[0.1.1]: https://github.com/xmidt-org/tr1d1um/compare/e34399980ec8f7716633c8b8bc5d72727c79b184...0.1.1
