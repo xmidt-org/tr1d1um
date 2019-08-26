@@ -186,6 +186,13 @@ aws:
 # WARNING! Be sure to remove this from your production config
 authHeader: ["dXNlcjpwYXNz"]
 
+# jwtValidator provides Bearer auth configuration
+jwtValidator:
+  keys:
+    factory:
+      uri: "http://sample-jwt-validator-uri/{keyId}"
+    purpose: 0
+    updateInterval: 604800000000000
 
 ##############################################################################
 # WRP and XMiDT Cloud configurations
