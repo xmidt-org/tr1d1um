@@ -76,7 +76,7 @@ then replace `local` in the `docker build` command.
 
 If you'd like to stand up `Tr1d1um` and the XMiDT cluster on Docker for local testing, refer to the [deploy README](https://github.com/xmidt-org/xmidt/tree/master/deploy/README.md).
 
-You can also run the standalone `Tr1d1um` binary:
+You can also run the standalone `tr1d1um` binary with the default `tr1d1um.yaml` config file:
 ```bash
 ./tr1d1um
 ```
