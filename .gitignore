@@ -52,3 +52,6 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+tr1d1um
+.ignore
