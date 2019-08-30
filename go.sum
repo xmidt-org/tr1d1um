@@ -155,8 +155,8 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1
 github.com/ugorji/go v1.1.4 h1:j4s+tAvLfL3bZyefP2SEWmhBzmuIlH/eqNuPdFPgngw=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
-github.com/xmidt-org/bascule v0.3.1 h1:I6qUJE6RHsfGEnwHQdbF47nFBcqOUfNqzhDTbuGj42o=
-github.com/xmidt-org/bascule v0.3.1/go.mod h1:fx2JeJAwEoepVcE3Fgd6JQSBvUAccyuFDzMmct1eWYw=
+github.com/xmidt-org/bascule v0.4.0 h1:iDYUDUeCOA+pcIKlxEzKq8HPmAZVvBfJ3kXkLwQWvcQ=
+github.com/xmidt-org/bascule v0.4.0/go.mod h1:D2DuXSMa5+OpveCtaSWp0+/tmnxZqfYhkCC1oCzLZdI=
 github.com/xmidt-org/webpa-common v1.1.0/go.mod h1:oCpKzOC+9h2vYHVzAU/06tDTQuBN4RZz+rhgIXptpOI=
 github.com/xmidt-org/webpa-common v1.3.0 h1:AembEPW16kQpUWqZ8Kn1uxjdWDuCzccqFGNWoPExK14=
 github.com/xmidt-org/webpa-common v1.3.0/go.mod h1:oCpKzOC+9h2vYHVzAU/06tDTQuBN4RZz+rhgIXptpOI=

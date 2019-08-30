@@ -44,7 +44,6 @@ import (
 
 	"github.com/xmidt-org/webpa-common/concurrent"
 	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/webpa-common/secure"
 	"github.com/xmidt-org/webpa-common/server"
 	"github.com/xmidt-org/webpa-common/webhook"
 	"github.com/xmidt-org/webpa-common/webhook/aws"
@@ -318,9 +317,9 @@ type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory `json:"keys"`
 
-	// Custom is an optional configuration section that defines
-	// custom rules for validation over and above the standard RFC rules.
-	Custom secure.JWTValidatorFactory `json:"custom"`
+	// Leeway is used to set the amount of time buffer should be given to JWT
+	// time values, such as nbf
+	Leeway bascule.Leeway
 }
 
 //authenticationHandler configures the authorization requirements for requests to reach the main handler
@@ -368,7 +367,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 			DefaultKeyId: DefaultKeyID,
 			Resolver:     resolver,
 			Parser:       bascule.DefaultJWTParser,
-			// JWTValidators: *jwt.Validator{jwtVal.Custom.New()},
+			Leeway:       jwtVal.Leeway,
 		}))
 	}
 
