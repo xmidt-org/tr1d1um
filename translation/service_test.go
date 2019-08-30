@@ -7,9 +7,9 @@ import (
 
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/wrp-go/wrp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 func TestSendWRP(t *testing.T) {

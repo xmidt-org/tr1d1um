@@ -11,9 +11,9 @@ import (
 
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/wrp-go/wrp"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 //ctxTID is a context with a defined value for a TID

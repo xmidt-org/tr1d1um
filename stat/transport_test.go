@@ -11,9 +11,9 @@ import (
 
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/webpa-common/device"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/webpa-common/device"
 )
 
 var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "testTID")

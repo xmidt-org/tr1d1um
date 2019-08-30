@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/webpa-common/device"
-	"github.com/xmidt-org/wrp-go/wrp"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
+	"github.com/xmidt-org/webpa-common/device"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 /* Functions that help decode a given SET request to TR1D1UM */

@@ -3,8 +3,8 @@ package translation
 import (
 	"context"
 
-	"github.com/xmidt-org/wrp-go/wrp"
 	"github.com/go-kit/kit/endpoint"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 type wrpRequest struct {

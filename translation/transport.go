@@ -10,8 +10,8 @@ import (
 
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/wrp-go/wrp"
 	"github.com/justinas/alice"
+	"github.com/xmidt-org/wrp-go/wrp"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"

@@ -11,9 +11,9 @@ import (
 
 	"github.com/xmidt-org/bascule"
 
-	"github.com/xmidt-org/webpa-common/logging"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/xmidt-org/webpa-common/logging"
 )
 
 //HeaderWPATID is the header key for the WebPA transaction UUID

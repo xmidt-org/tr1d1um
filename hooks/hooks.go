@@ -4,11 +4,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/xmidt-org/webpa-common/webhook"
-	"github.com/xmidt-org/webpa-common/xmetrics"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/xmidt-org/webpa-common/webhook"
+	"github.com/xmidt-org/webpa-common/xmetrics"
 )
 
 //Options describes the parameters needed to configure the webhook endpoints

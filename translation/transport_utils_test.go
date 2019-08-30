@@ -8,9 +8,9 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/xmidt-org/webpa-common/device"
 	"github.com/xmidt-org/wrp-go/wrp"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateAndDeduceSETCommand(t *testing.T) {
