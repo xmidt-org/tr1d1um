@@ -2,9 +2,9 @@
 %define __os_install_post %{nil}
 
 Name:       tr1d1um
-Version:    %{_ver}
-Release:    %{_releaseno}%{?dist}
-Summary:    The Xmidt router agent.
+Version:    %{_version}
+Release:    %{_release}%{?dist}
+Summary:    The Webpa object translator.
 
 Vendor:     Comcast
 Packager:   Comcast
@@ -19,8 +19,8 @@ BuildRequires: systemd
 BuildRequires: golang >= 1.12
 
 %description
-The shield to protect our users from incoming events for the codex project.
-aka. The receiver of data from XMiDT Caduceus
+The Webpa object translator.
+
 
 %build
 GO111MODULE=on go build -o $RPM_SOURCE_DIR/%{name} %{_topdir}/..

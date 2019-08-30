@@ -3,7 +3,6 @@ module github.com/xmidt-org/tr1d1um
 go 1.12
 
 require (
-	github.com/SermoDigital/jose v0.9.2-0.20161205224733-f6df55f235c2
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.23.11 // indirect
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b // indirect

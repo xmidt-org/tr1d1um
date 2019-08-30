@@ -54,4 +54,4 @@ _testmain.go
 *.prof
 
 tr1d1um
-OPATH
+.ignore
