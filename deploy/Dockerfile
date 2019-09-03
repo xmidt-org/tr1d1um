@@ -19,4 +19,5 @@ EXPOSE 8080
 
 COPY --from=builder /go/src/github.com/xmidt-org/tr1d1um/tr1d1um_linux_amd64 /
 COPY tr1d1um.yaml /
+COPY deploy/Dockerfile NOTICE LICENSE CHANGELOG.md /
 ENTRYPOINT ["/tr1d1um_linux_amd64"]
