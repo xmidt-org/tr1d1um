@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/bascule/bascule"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"

@@ -29,15 +29,17 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/SermoDigital/jose/jwt"
 	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/hooks"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
+	"github.com/xmidt-org/webpa-common/secure"
 
 	"github.com/goph/emperror"
-	"github.com/xmidt-org/bascule"
-	"github.com/xmidt-org/bascule/basculehttp"
-	"github.com/xmidt-org/bascule/key"
+	"github.com/xmidt-org/bascule/bascule"
+	"github.com/xmidt-org/bascule/bascule/basculehttp"
+	"github.com/xmidt-org/bascule/bascule/key"
 
 	"github.com/xmidt-org/webpa-common/basculechecks"
 	"github.com/xmidt-org/webpa-common/xhttp"
@@ -317,9 +319,9 @@ type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory `json:"keys"`
 
-	// Leeway is used to set the amount of time buffer should be given to JWT
-	// time values, such as nbf
-	Leeway bascule.Leeway
+	// Custom is an optional configuration section that defines
+	// custom rules for validation over and above the standard RFC rules.
+	Custom secure.JWTValidatorFactory `json:"custom"`
 }
 
 //authenticationHandler configures the authorization requirements for requests to reach the main handler
@@ -364,10 +366,10 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		}
 
 		options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
-			DefaultKeyId: DefaultKeyID,
-			Resolver:     resolver,
-			Parser:       bascule.DefaultJWTParser,
-			Leeway:       jwtVal.Leeway,
+			DefaultKeyId:  DefaultKeyID,
+			Resolver:      resolver,
+			Parser:        bascule.DefaultJWSParser,
+			JWTValidators: []*jwt.Validator{jwtVal.Custom.New()},
 		}))
 	}
 
