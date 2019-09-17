@@ -3,7 +3,6 @@ module github.com/xmidt-org/tr1d1um
 go 1.12
 
 require (
-	github.com/SermoDigital/jose v0.9.2-0.20161205224733-f6df55f235c2
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.23.11 // indirect
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b // indirect
@@ -18,8 +17,8 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.3.0
-	github.com/xmidt-org/bascule v0.2.7
-	github.com/xmidt-org/webpa-common v1.3.2
+	github.com/xmidt-org/bascule v0.5.0
+	github.com/xmidt-org/webpa-common v1.3.0
 	github.com/xmidt-org/wrp-go v1.3.1
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6 // indirect
