@@ -1,1 +1,2 @@
+ - migrated from glide to go modules
  - bumped bascule version and removed any dependencies on webpa-common secure package 
