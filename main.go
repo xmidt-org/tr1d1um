@@ -70,7 +70,7 @@ const (
 	reqMaxRetriesKey       = "requestMaxRetries"
 	WRPSourcekey           = "WRPSource"
 	hooksSchemeKey         = "hooksScheme"
-	applicationVersion     = "0.1.4"
+	applicationVersion     = "0.1.5"
 )
 
 var defaults = map[string]interface{}{
