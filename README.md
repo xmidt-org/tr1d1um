@@ -2,8 +2,11 @@
 
 [![Build Status](https://travis-ci.com/xmidt-org/tr1d1um.svg?branch=master)](https://travis-ci.com/xmidt-org/tr1d1um) 
 [![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=master)](https://codecov.io/github/xmidt-org/tr1d1um?branch=master)
+[![Code Climate](https://codeclimate.com/github/xmidt-org/tr1d1um/badges/gpa.svg)](https://codeclimate.com/github/xmidt-org/tr1d1um)
+[![Issue Count](https://codeclimate.com/github/xmidt-org/tr1d1um/badges/issue_count.svg)](https://codeclimate.com/github/xmidt-org/tr1d1um)
 [![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/tr1d1um)](https://goreportcard.com/report/github.com/xmidt-org/tr1d1um)
 [![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/tr1d1um/blob/master/LICENSE)
+[![GitHub release](https://img.shields.io/github/release/xmidt-org/tr1d1um.svg)](CHANGELOG.md)
 
 
 ## Summary
