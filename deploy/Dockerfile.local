@@ -2,12 +2,17 @@ FROM golang:alpine as builder
 MAINTAINER Jack Murdock <jack_murdock@comcast.com>
 
 WORKDIR /go/src/github.com/xmidt-org/tr1d1um
+ARG VERSION=unknown
+ARG GITCOMMIT=unknown
+ARG BUILDTIME=unknown
 
-RUN apk add --update git curl
+RUN apk add --no-cache --update git curl
 
 COPY . .
 
-RUN go build -o tr1d1um_linux_amd64
+RUN GO111MODULE=on go build \
+  -o tr1d1um_linux_amd64 \
+  -ldflags "-X 'main.BuildTime=${BUILDTIME}' -X main.GitCommit=${GITCOMMIT} -X main.Version=${VERSION}"
 
 FROM alpine
 
