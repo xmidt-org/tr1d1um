@@ -22,11 +22,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"time"
 
 	"github.com/xmidt-org/tr1d1um/common"
@@ -70,7 +72,13 @@ const (
 	reqMaxRetriesKey       = "requestMaxRetries"
 	WRPSourcekey           = "WRPSource"
 	hooksSchemeKey         = "hooksScheme"
-	applicationVersion     = "0.1.5"
+)
+
+var (
+	// dynamic versioning
+	Version   string
+	BuildTime string
+	GitCommit string
 )
 
 var defaults = map[string]interface{}{
@@ -92,6 +100,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, basculechecks.Metrics)
 	)
 
+	// This allows us to communicate the version of the binary upon request.
+	if parseErr, done := printVersion(f, arguments); done {
+		// if we're done, we're exiting no matter what
+		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
+		os.Exit(0)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
 		return 1
@@ -101,14 +116,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
 		authenticate            *alice.Chain
 	)
-
-	// This allows us to communicate the version of the binary upon request.
-	printVer := f.BoolP("version", "v", false, "displays the version number")
-
-	if *printVer {
-		fmt.Println(applicationVersion)
-		return 0
-	}
 
 	for k, va := range defaults {
 		v.SetDefault(k, va)
@@ -397,6 +404,38 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 
 	chain := alice.New(SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
 	return &chain, nil
+}
+
+func printVersion(f *pflag.FlagSet, arguments []string) (error, bool) {
+	printVer := f.BoolP("version", "v", false, "displays the version number")
+	if err := f.Parse(arguments); err != nil {
+		return err, true
+	}
+
+	if *printVer {
+		printVersionInfo(os.Stdout)
+		return nil, true
+	}
+	return nil, false
+}
+
+func exitIfError(logger log.Logger, err error) {
+	if err != nil {
+		if logger != nil {
+			logging.Error(logger, emperror.Context(err)...).Log(logging.ErrorKey(), err.Error())
+		}
+		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
+		os.Exit(1)
+	}
+}
+
+func printVersionInfo(writer io.Writer) {
+	fmt.Fprintf(writer, "%s:\n", applicationName)
+	fmt.Fprintf(writer, "  version: \t%s\n", Version)
+	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
+	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
+	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
+	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
 
 func main() {
