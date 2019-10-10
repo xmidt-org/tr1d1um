@@ -58,10 +58,6 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	//TODO: TMP IOT HACK
-	c.APIRouter.Handle("/device/{deviceid}/{service:iot}", c.Authenticate.Then(common.Welcome(WRPHandler))).
-		Methods(http.MethodPost)
-
 	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(common.Welcome(WRPHandler))).
 		Methods(http.MethodGet, http.MethodPatch)
 
@@ -102,21 +98,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 	case http.MethodPut:
 		payload, err = requestReplacePayload(mux.Vars(r), r.Body)
 	case http.MethodPost:
-
-		/****TODO: TMP IOT ENDPOINT HACK****/
-		v := mux.Vars(r)
-		if v["service"] == "iot" {
-			if v["parameters"] == "" {
-				return ioutil.ReadAll(r.Body)
-			}
-			//TODO: this might also be doable at the mux level
-			// /iot endpoint should not pass anything through queries (all request data is in the body)
-			return nil, ErrInvalidService
-		}
-		/********/
-
-		payload, err = requestAddPayload(v, r.Body)
-
+		payload, err = requestAddPayload(mux.Vars(r), r.Body)
 	default:
 		//Unwanted methods should be filtered at the mux level. Thus, we "should" never get here
 		err = ErrUnsupportedMethod

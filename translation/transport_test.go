@@ -75,17 +75,6 @@ func TestRequestPayload(t *testing.T) {
 		assert.EqualValues(ErrMissingTable, e)
 	})
 
-	t.Run("Iot", func(t *testing.T) {
-		assert := assert.New(t)
-		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
-
-		r = mux.SetURLVars(r, map[string]string{"service": "iot"})
-
-		p, e := requestPayload(r)
-		assert.Empty(p)
-		assert.Nil(e)
-	})
-
 	t.Run("Add", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
