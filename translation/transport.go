@@ -98,7 +98,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 	case http.MethodPut:
 		payload, err = requestReplacePayload(mux.Vars(r), r.Body)
 	case http.MethodPost:
-		payload, err = requestAddPayload(v, r.Body)
+		payload, err = requestAddPayload(mux.Vars(r), r.Body)
 	default:
 		//Unwanted methods should be filtered at the mux level. Thus, we "should" never get here
 		err = ErrUnsupportedMethod
