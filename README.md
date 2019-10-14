@@ -12,6 +12,19 @@
 ## Summary
 An implementation of the WebPA API which enables communication with TR-181 data model devices connected to the [XMiDT](https://github.com/xmidt-org/xmidt) cloud as well as subscription capabilities to device events.
 
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Details](#details)
+- [Build](#build)
+- [Deploy](#deploy)
+- [Contributing](#contributing)
+
+## Code of Conduct
+
+This project and everyone participating in it are governed by the [XMiDT Code Of Conduct](https://xmidt.io/code_of_conduct/). 
+By participating, you agree to this Code.
+
 
 ## Details 
 The WebPA API operations can be divided into the following categories:
