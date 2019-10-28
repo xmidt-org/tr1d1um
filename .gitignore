@@ -56,3 +56,7 @@ _testmain.go
 tr1d1um
 .ignore
 .vscode
+
+# helm 
+!deploy/helm/tr1d1um
+rendered.yaml
