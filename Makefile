@@ -3,10 +3,13 @@ DEFAULT: build
 GO           ?= go
 GOFMT        ?= $(GO)fmt
 APP          := tr1d1um
+DOCKER_ORG   := xmidt
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
-BINARY    := $(FIRST_GOPATH)/bin/$(APP)
+BINARY    	 := $(FIRST_GOPATH)/bin/$(APP)
 
 PROGVER = $(shell git describe --tags `git rev-list --tags --max-count=1` | tail -1 | sed 's/v\(.*\)/\1/')
+RPM_VERSION=$(shell echo $(PROGVER) | sed 's/\(.*\)-\(.*\)/\1/')
+RPM_RELEASE=$(shell echo $(PROGVER) | sed -n 's/.*-\(.*\)/\1/p'  | grep . && (echo "$(echo $(PROGVER) | sed 's/.*-\(.*\)/\1/')") || echo "1")
 BUILDTIME = $(shell date -u '+%Y-%m-%d %H:%M:%S')
 GITCOMMIT = $(shell git rev-parse --short HEAD)
 
@@ -20,15 +23,15 @@ build: go-mod-vendor
 
 rpm:
 	mkdir -p ./.ignore/SOURCES
-	tar -czf ./.ignore/SOURCES/$(APP)-$(PROGVER).tar.gz --transform 's/^\./$(APP)-$(PROGVER)/' --exclude ./.git --exclude ./.ignore --exclude ./conf --exclude ./deploy --exclude ./vendor --exclude ./vendor .
-	cp conf/$(APP).service ./.ignore/SOURCES
-	cp $(APP).yaml  ./.ignore/SOURCES
-	cp LICENSE ./.ignore/SOURCES
-	cp NOTICE ./.ignore/SOURCES
-	cp CHANGELOG.md ./.ignore/SOURCES
+	tar -czvf ./.ignore/SOURCES/$(APP)-$(RPM_VERSION)-$(RPM_RELEASE).tar.gz . --exclude ./.git --exclude ./.ignore --exclude ./conf --exclude ./deploy --exclude ./vendor
+	cp conf/$(APP).service ./.ignore/SOURCES/
+	cp conf/$(APP).yaml  ./.ignore/SOURCES/
+	cp LICENSE ./.ignore/SOURCES/
+	cp NOTICE ./.ignore/SOURCES/
+	cp CHANGELOG.md ./.ignore/SOURCES/
 	rpmbuild --define "_topdir $(CURDIR)/.ignore" \
-    		--define "_version $(PROGVER)" \
-    		--define "_release 1" \
+    		--define "_version $(RPM_VERSION)" \
+    		--define "_release $(RPM_RELEASE)" \
     		-ba deploy/packaging/$(APP).spec
 
 .PHONY: version
@@ -65,17 +68,15 @@ docker:
 		--build-arg VERSION=$(PROGVER) \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile -t $(APP):$(PROGVER) .
+		-f ./deploy/Dockerfile -t $(DOCKER_ORG)/$(APP):$(PROGVER) .
 
-# build docker without running modules
 .PHONY: local-docker
 local-docker:
-	GOOS=linux  GOARCH=amd64 $(GO) build -o $(APP)_linux_amd64
 	docker build \
-		--build-arg VERSION=$(PROGVER) \
+		--build-arg VERSION=$(PROGVER)+local \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile.local -t $(APP):local .
+		-f ./deploy/Dockerfile.local -t $(DOCKER_ORG)/$(APP):local .
 
 .PHONY: style
 style:
@@ -99,4 +100,4 @@ it:
 
 .PHONY: clean
 clean:
-	rm -rf ./$(APP) ./OPATH ./coverage.txt ./vendor
+	rm -rf ./$(APP) ./.ignore ./coverage.txt ./vendor
