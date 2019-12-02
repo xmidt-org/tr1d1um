@@ -1,0 +1,33 @@
+# Default values for xmitd-talaria.
+
+tr1d1um:
+  # docker image used
+  image: xmidt/tr1d1um
+  address:
+    host: ""
+    port: "6100"
+
+health:
+  address:
+    host: ""
+    port: "6101"
+
+pprof:
+  address:
+    host: ""
+    port: "6102"
+
+control:
+  address:
+    host: ""
+    port: "6103"
+
+metric:
+  address:
+    host: ""
+    port: "6104"  
+
+# Pull secret used when images are stored in a private repository
+# imagePullSecretName:
+
+

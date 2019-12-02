@@ -97,6 +97,13 @@ You can also run the standalone `tr1d1um` binary with the default `tr1d1um.yaml`
 ./tr1d1um
 ```
 
+### Kubernetes
+
+A helm chart can be used to deploy tr1d1um to kubernetes
+```
+helm install xmidt-tr1d1um deploy/helm/tr1d1um
+```
+
 ## Contributing
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
