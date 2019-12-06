@@ -3,6 +3,7 @@ DEFAULT: build
 GO           ?= go
 GOFMT        ?= $(GO)fmt
 APP          := tr1d1um
+DOCKER_ORG   := xmidt
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 BINARY    := $(FIRST_GOPATH)/bin/$(APP)
 
@@ -65,7 +66,7 @@ docker:
 		--build-arg VERSION=$(PROGVER) \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile -t $(APP):$(PROGVER) .
+		-f ./deploy/Dockerfile -t $(DOCKER_ORG)/$(APP):$(PROGVER) .
 
 # build docker without running modules
 .PHONY: local-docker
@@ -75,7 +76,7 @@ local-docker:
 		--build-arg VERSION=$(PROGVER) \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile.local -t $(APP):local .
+		-f ./deploy/Dockerfile.local -t $(DOCKER_ORG)/$(APP):local .
 
 .PHONY: style
 style:
