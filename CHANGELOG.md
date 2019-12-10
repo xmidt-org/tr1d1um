@@ -5,12 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+ - bumped bascule, webpa-common, and wrp-go
+ - removed temporary `/iot` endpoint 
+ - updated release pipeline to use travis [#135](https://github.com/xmidt-org/tr1d1um/pull/135)
 
 ## [v0.1.5]
  - migrated from glide to go modules
  - bumped bascule version and removed any dependencies on webpa-common secure package 
-
-
 
 ## [v0.1.4]
 Add logging of WDMP parameters
