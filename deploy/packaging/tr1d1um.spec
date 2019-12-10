@@ -3,7 +3,7 @@
 
 Name:       tr1d1um
 Version:    {{{ git_tag_version }}}
-Release:    %{?dist}
+Release:    1%{?dist}
 Summary:    The Webpa object translator.
 
 Vendor:     Comcast
