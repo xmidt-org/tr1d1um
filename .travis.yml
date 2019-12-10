@@ -20,11 +20,11 @@ script:
 
 jobs:
   include:
-    - stage: integration
-      name: "Integration Tests"
-      if: branch = master
-      script:
-        - make it
+    # - stage: integration
+    #   name: "Integration Tests"
+    #   if: branch = master
+    #   script:
+    #     - make it
     - stage: tag
       name: "Tag For Release"
       if: branch = master && type = push
