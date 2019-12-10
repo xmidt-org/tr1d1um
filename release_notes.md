@@ -1,2 +1,0 @@
- - bumped bascule, webpa-common, and wrp-go
- - removed temporary `/iot` endpoint 
