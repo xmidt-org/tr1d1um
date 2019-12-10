@@ -60,7 +60,6 @@ make build
 
 The Makefile has the following options you may find helpful:
 * `make build`: builds the Tr1d1um binary in the tr1d1um/src/tr1d1um folder
-* `make rpm`: builds an rpm containing Tr1d1um
 * `make docker`: fetches dependencies and builds a docker image for Tr1d1um
 * `make local-docker`: builds a docker image for Tr1d1um assuming dependencies
    have been fetched
