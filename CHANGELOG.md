@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
  - bumped bascule, webpa-common, and wrp-go
  - removed temporary `/iot` endpoint 
  - updated release pipeline to use travis [#135](https://github.com/xmidt-org/tr1d1um/pull/135)
+- added configurable way to check capabilities and log the result, without rejecting requests [#137](https://github.com/xmidt-org/tr1d1um/pull/137)
 
 ## [v0.1.5]
  - migrated from glide to go modules

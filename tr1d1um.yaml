@@ -194,6 +194,30 @@ jwtValidator:
     purpose: 0
     updateInterval: 604800000000000
 
+# capabilityCheck provides the details needed for checking an incoming JWT's
+# capabilities.  If the type of check isn't provided, no checking is done.  The 
+# type can be "monitor" or "enforce".  If it is empty or a different value, no 
+# checking is done.  If "monitor" is provided, the capabilities are checked but 
+# the request isn't rejected when there isn't a valid capability for the 
+# request. Instead, a message is logged.  When "enforce" is provided, a request 
+# that doesn't have the needed capability is rejected.
+#
+# The capability is expected to have the format:
+#
+# {prefix}{endpoint}:{method}
+#
+# The prefix can be a regular expression.  If it's empty, no capability check 
+# is done.  The endpoint is a regular expression that should match the endpoint
+# the request was sent to. The method is usually the method of the request, such as 
+# GET.  The accept all method is a catchall string that indicates the capability 
+# is approved for all methods.
+# (Optional)
+# capabilityCheck:
+#   type: "enforce"
+#   prefix: "prefix Here"
+#   acceptAllMethod: "all"
+
+
 ##############################################################################
 # WRP and XMiDT Cloud configurations
 ##############################################################################
