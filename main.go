@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,25 +37,23 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
 
+	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
-
 	"github.com/xmidt-org/webpa-common/basculechecks"
-	"github.com/xmidt-org/webpa-common/xhttp"
-
+	"github.com/xmidt-org/webpa-common/basculemetrics"
 	"github.com/xmidt-org/webpa-common/concurrent"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/server"
 	"github.com/xmidt-org/webpa-common/webhook"
 	"github.com/xmidt-org/webpa-common/webhook/aws"
-
-	"github.com/go-kit/kit/log"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/xmidt-org/webpa-common/xhttp"
 	"github.com/xmidt-org/webpa-common/xmetrics"
 )
 
@@ -337,15 +336,13 @@ type CapabilityConfig struct {
 
 //authenticationHandler configures the authorization requirements for requests to reach the main handler
 func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
-
-	var (
-		m *basculechecks.JWTValidationMeasures
-	)
-
-	if registry != nil {
-		m = basculechecks.NewJWTValidationMeasures(registry)
+	if registry == nil {
+		return nil, errors.New("nil registry")
 	}
-	listener := basculechecks.NewMetricListener(m)
+
+	basculeMeasures := basculemetrics.NewAuthValidationMeasures(registry)
+	capabilityCheckMeasures := basculechecks.NewAuthCapabilityCheckMeasures(registry)
+	listener := basculemetrics.NewMetricListener(basculeMeasures)
 
 	basicAllowed := make(map[string]string)
 	basicAuth := v.GetStringSlice("authHeader")
@@ -396,11 +393,11 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	var capabilityCheck CapabilityConfig
 	v.UnmarshalKey("capabilityConfig", &capabilityCheck)
 	if capabilityCheck.Type == "enforce" {
-		check, err := basculechecks.NewCapabilityChecker(capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
+		check, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
 		if err != nil {
-			return &alice.Chain{}, emperror.With(err, "failed to create capability check")
+			return nil, emperror.With(err, "failed to create capability check")
 		}
-		bearerRules = append(bearerRules, bascule.CreateListAttributeCheck(basculechecks.DefaultKey, check.EnforceCapabilities))
+		bearerRules = append(bearerRules, check)
 	}
 
 	authEnforcer := basculehttp.NewEnforcer(
@@ -415,7 +412,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer}
 
 	if capabilityCheck.Type == "monitor" {
-		check, err := basculechecks.NewCapabilityLogger(logger, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
+		check, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
 		if err != nil {
 			return &alice.Chain{}, emperror.With(err, "failed to create capability check listener")
 		}
