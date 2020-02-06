@@ -96,7 +96,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
 		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, basculechecks.Metrics)
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 	)
 
 	// This allows us to communicate the version of the binary upon request.
@@ -391,13 +391,13 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 
 	// only add capability check if the configuration is set
 	var capabilityCheck CapabilityConfig
-	v.UnmarshalKey("capabilityConfig", &capabilityCheck)
-	if capabilityCheck.Type == "enforce" {
-		check, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
+	v.UnmarshalKey("capabilityCheck", &capabilityCheck)
+	if capabilityCheck.Type == "enforce" || capabilityCheck.Type == "monitor" {
+		checker, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
 		if err != nil {
 			return nil, emperror.With(err, "failed to create capability check")
 		}
-		bearerRules = append(bearerRules, check)
+		bearerRules = append(bearerRules, checker.CreateBasculeCheck(capabilityCheck.Type == "enforce"))
 	}
 
 	authEnforcer := basculehttp.NewEnforcer(
@@ -409,17 +409,8 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 
-	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer}
+	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
-	if capabilityCheck.Type == "monitor" {
-		check, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
-		if err != nil {
-			return &alice.Chain{}, emperror.With(err, "failed to create capability check listener")
-		}
-		constructors = append(constructors, basculehttp.NewListenerDecorator(listener, check))
-	} else {
-		constructors = append(constructors, basculehttp.NewListenerDecorator(listener))
-	}
 	chain := alice.New(constructors...)
 	return &chain, nil
 }
