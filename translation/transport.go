@@ -102,37 +102,30 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 	)
 	if payload, err = requestPayload(r); err == nil {
 		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
+		var partnerIDs []string
 		auth, ok := bascule.FromContext(ctx)
+		//if no token
+		if !ok {
+			partnerIDs = getPartnerIDs(r.Header)
+		}
 		tokenType := auth.Token.Type()
+		//if not jwt type
+		if tokenType != "jwt" {
+			partnerIDs = getPartnerIDs(r.Header)
+		}
 		if tokenType == "jwt" {
-			partnerIDs, ok := auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
-			if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
-				decodedRequest = &wrpRequest{
-					WRPMessage:      wrpMsg,
-					AuthHeaderValue: r.Header.Get(authHeaderKey),
-				}
-			}
+			partnerIDs, ok = auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
 			//if no partner ids
 			if !ok {
-				getPartners := getPartnerIDs(r.Header)
-				if wrpMsg, err = wrap(payload, tid, mux.Vars(r), getPartners); err == nil {
-					decodedRequest = &wrpRequest{
-						WRPMessage:      wrpMsg,
-						AuthHeaderValue: r.Header.Get(authHeaderKey),
-					}
-				}
+				partnerIDs = getPartnerIDs(r.Header)
 			}
 		}
-		//if no token or not jwt type
-		if !ok || tokenType != "jwt" {
-			getPartners := getPartnerIDs(r.Header)
-			if wrpMsg, err = wrap(payload, tid, mux.Vars(r), getPartners); err == nil {
+		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
 				decodedRequest = &wrpRequest{
 					WRPMessage:      wrpMsg,
 					AuthHeaderValue: r.Header.Get(authHeaderKey),
 				}
 			}
-		}
 	}
 	return
 }
