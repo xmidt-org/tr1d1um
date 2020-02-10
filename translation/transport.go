@@ -19,8 +19,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/webpa-common/basculechecks"
+<<<<<<< HEAD
 
 	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+=======
+	
+	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+	
+>>>>>>> code changes transport.go
 )
 
 const (
