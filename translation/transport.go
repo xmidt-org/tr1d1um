@@ -17,6 +17,10 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 
 	"github.com/gorilla/mux"
+	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/webpa-common/basculechecks"
+	// "github.com/xmidt-org/wrp-go"
+
 )
 
 const (
@@ -65,24 +69,71 @@ func ConfigHandler(c *Options) {
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
-/* Request Decoding */
+const (
+	PartnerIdHeader               = "X-Xmidt-Partner-Id"
+)
+// getPartnerIDs returns the array that represents the partner-ids that were
+// passed in as headers.  This function handles multiple duplicate headers.
+func getPartnerIDs(h http.Header) []string {
+	headers, ok := h[PartnerIdHeader]
+	if !ok {
+		return nil
+	}
 
+	var partners []string
+
+	for _, value := range headers {
+		fields := strings.Split(value, ",")
+		for i := 0; i < len(fields); i++ {
+			fields[i] = strings.TrimSpace(fields[i])
+		}
+		partners = append(partners, fields...)
+	}
+
+	return partners
+}
+
+
+/* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
 		payload []byte
 		wrpMsg  *wrp.Message
 	)
-
 	if payload, err = requestPayload(r); err == nil {
 		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
-		if wrpMsg, err = wrap(payload, tid, mux.Vars(r)); err == nil {
-			decodedRequest = &wrpRequest{
-				WRPMessage:      wrpMsg,
-				AuthHeaderValue: r.Header.Get(authHeaderKey),
+		auth, ok := bascule.FromContext(ctx)
+		tokenType := auth.Token.Type()
+		if tokenType == "jwt" {
+			partnerIDs, ok := auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
+			if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
+				decodedRequest = &wrpRequest{
+					WRPMessage:      wrpMsg,
+					AuthHeaderValue: r.Header.Get(authHeaderKey),
+				}
+			}
+			//if no partner ids
+			if !ok {
+				getPartners := getPartnerIDs(r.Header)
+				if wrpMsg, err = wrap(payload, tid, mux.Vars(r), getPartners); err == nil {
+					decodedRequest = &wrpRequest{
+						WRPMessage:      wrpMsg,
+						AuthHeaderValue: r.Header.Get(authHeaderKey),
+					}
+				}
+			}
+		}
+		//if no token or not jwt type
+		if !ok || tokenType != "jwt" {
+			getPartners := getPartnerIDs(r.Header)
+			if wrpMsg, err = wrap(payload, tid, mux.Vars(r), getPartners); err == nil {
+				decodedRequest = &wrpRequest{
+					WRPMessage:      wrpMsg,
+					AuthHeaderValue: r.Header.Get(authHeaderKey),
+				}
 			}
 		}
 	}
-
 	return
 }
 
