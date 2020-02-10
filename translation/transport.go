@@ -19,8 +19,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/webpa-common/basculechecks"
-	// "github.com/xmidt-org/wrp-go"
-
+	
+	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+	
 )
 
 const (
@@ -69,13 +70,10 @@ func ConfigHandler(c *Options) {
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
-const (
-	PartnerIdHeader               = "X-Xmidt-Partner-Id"
-)
 // getPartnerIDs returns the array that represents the partner-ids that were
 // passed in as headers.  This function handles multiple duplicate headers.
 func getPartnerIDs(h http.Header) []string {
-	headers, ok := h[PartnerIdHeader]
+	headers, ok := h[wrphttp.PartnerIdHeader]
 	if !ok {
 		return nil
 	}
@@ -93,6 +91,28 @@ func getPartnerIDs(h http.Header) []string {
 	return partners
 }
 
+// getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
+func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
+	auth, ok := bascule.FromContext(ctx)
+	//if no token
+	if !ok {
+		return getPartnerIDs(r.Header)
+	}
+	tokenType := auth.Token.Type()
+	//if not jwt type
+	if tokenType != "jwt" {
+		return getPartnerIDs(r.Header)
+	}
+	if tokenType == "jwt" {
+		_, ok = auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
+		//if no partner ids
+		if !ok {
+			return getPartnerIDs(r.Header)
+		}
+	}
+	return nil
+}
+
 
 /* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
@@ -102,24 +122,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 	)
 	if payload, err = requestPayload(r); err == nil {
 		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
-		var partnerIDs []string
-		auth, ok := bascule.FromContext(ctx)
-		//if no token
-		if !ok {
-			partnerIDs = getPartnerIDs(r.Header)
-		}
-		tokenType := auth.Token.Type()
-		//if not jwt type
-		if tokenType != "jwt" {
-			partnerIDs = getPartnerIDs(r.Header)
-		}
-		if tokenType == "jwt" {
-			partnerIDs, ok = auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
-			//if no partner ids
-			if !ok {
-				partnerIDs = getPartnerIDs(r.Header)
-			}
-		}
+		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
 		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
