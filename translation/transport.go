@@ -121,11 +121,11 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 			}
 		}
 		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
-				decodedRequest = &wrpRequest{
-					WRPMessage:      wrpMsg,
-					AuthHeaderValue: r.Header.Get(authHeaderKey),
-				}
+			decodedRequest = &wrpRequest{
+				WRPMessage:      wrpMsg,
+				AuthHeaderValue: r.Header.Get(authHeaderKey),
 			}
+		}
 	}
 	return
 }
