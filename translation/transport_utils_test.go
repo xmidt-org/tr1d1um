@@ -162,7 +162,7 @@ func TestWrapInWRP(t *testing.T) {
 		assert.EqualValues(device.ErrorInvalidDeviceName, e)
 	})
 
-	t.Run("GivenTID", func(t *testing.T) {
+	t.Run("GivenParameters", func(t *testing.T) {
 		assert := assert.New(t)
 
 		w, e := wrap([]byte{'t'}, "t0", map[string]string{"deviceid": "mac:112233445566", "service": "s0"},nil)

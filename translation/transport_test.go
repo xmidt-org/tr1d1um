@@ -54,16 +54,16 @@ func TestDecodeRequest(t *testing.T) {
 }
 
 
-func TestForParameters(t *testing.T) {
+func TestDecodeRequestPartnerIDs(t *testing.T) {
 	tests := []struct {
 		name 					string
-		token 					string
+		token_type 				string
 		attrMap					map[string]interface{}
 		expectedPartnerIDs 		[]string
 	}{
 		{
 			name: "all_success",
-			token: "jwt",
+			token_type: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
 					"allowedPartners": []string{"partner0", "partner1"},
@@ -73,21 +73,21 @@ func TestForParameters(t *testing.T) {
 
 		{
 			name: "non_jwt",
-			token: "sss",
+			token_type: "sss",
 			attrMap: map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
 			name: "no_partnerIDs",
-			token: "sss",
+			token_type: "sss",
 			attrMap: map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
 			name: "no_token",
-			token: "",
+			token_type: "",
 			attrMap: map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
@@ -98,7 +98,7 @@ func TestForParameters(t *testing.T) {
 			assert := assert.New(t)
 			attrs := bascule.NewAttributesFromMap(test.attrMap)
 			auth := bascule.Authentication{
-				Token: bascule.NewToken(test.token, "client0", attrs),
+				Token: bascule.NewToken(test.token_type, "client0", attrs),
 			}
 			ctx := bascule.WithAuthentication(ctxTID, auth)
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
