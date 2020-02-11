@@ -14,7 +14,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+
+	"github.com/xmidt-org/bascule"
+
 )
+
+
+
 
 //ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "test-tid")
@@ -43,9 +50,71 @@ func TestDecodeRequest(t *testing.T) {
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
-
 	})
 }
+
+
+func TestDecodeRequestPartnerIDs(t *testing.T) {
+	tests := []struct {
+		name 					string
+		token 					string
+		attrMap					map[string]interface{}
+		expectedPartnerIDs 		[]string
+	}{
+		{
+			name: "all_success",
+			token: "jwt",
+			attrMap: map[string]interface{}{
+				"allowedResources": map[string]interface{}{
+					"allowedPartners": []string{"partner0", "partner1"},
+				}},
+			expectedPartnerIDs: []string{"partner0", "partner1"},
+		},
+
+		{
+			name: "non_jwt",
+			token: "sss",
+			attrMap: map[string]interface{}{},
+			expectedPartnerIDs: []string{"partner0", "partner1"},
+		},
+
+		{
+			name: "no_partnerIDs",
+			token: "sss",
+			attrMap: map[string]interface{}{},
+			expectedPartnerIDs: []string{"partner0", "partner1"},
+		},
+
+		{
+			name: "no_token",
+			token: "",
+			attrMap: map[string]interface{}{},
+			expectedPartnerIDs: []string{"partner0", "partner1"},
+		},
+	}
+	
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert := assert.New(t)
+			attrs := bascule.NewAttributesFromMap(test.attrMap)
+			auth := bascule.Authentication{
+				Token: bascule.NewToken(test.token, "client0", attrs),
+			}
+			ctx := bascule.WithAuthentication(ctxTID, auth)
+			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+			// adding partnerIDs to Header
+			r.Header.Set(wrphttp.PartnerIdHeader , "partner0")
+			r.Header.Add(wrphttp.PartnerIdHeader , "partner1")
+
+			wrpMsg, e := decodeRequest(ctx, r)
+			assert.Nil(e)
+			realWRP, _ := wrpMsg.(*wrpRequest)
+			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
+		})
+	}
+}
+
 func TestRequestPayload(t *testing.T) {
 	t.Run("Get", func(t *testing.T) {
 		assert := assert.New(t)

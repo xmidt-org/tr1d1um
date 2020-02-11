@@ -87,7 +87,7 @@ func getPartnerIDs(h http.Header) []string {
 		}
 		partners = append(partners, fields...)
 	}
-
+	
 	return partners
 }
 
@@ -103,16 +103,13 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	if tokenType != "jwt" {
 		return getPartnerIDs(r.Header)
 	}
-	if tokenType == "jwt" {
-		_, ok = auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
-		//if no partner ids
-		if !ok {
-			return getPartnerIDs(r.Header)
-		}
+	partnerIDs, ok := auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
+	//if no partner ids
+	if !ok {
+		return getPartnerIDs(r.Header)
 	}
-	return nil
+	return partnerIDs
 }
-
 
 /* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
