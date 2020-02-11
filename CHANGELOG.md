@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
- - moving partnerID to tr1d1um
+ - moving partnerIDs to tr1d1um
 
 ## [v0.2.0]
  - bumped bascule, webpa-common, and wrp-go
