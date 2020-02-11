@@ -54,7 +54,7 @@ func TestDecodeRequest(t *testing.T) {
 }
 
 
-func TestDecodeRequestPartnerIDs(t *testing.T) {
+func TestForParameters(t *testing.T) {
 	tests := []struct {
 		name 					string
 		token 					string
@@ -110,6 +110,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
+			assert.NotEmpty(realWRP.WRPMessage.PartnerIDs)
 			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
 		})
 	}
