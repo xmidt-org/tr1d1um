@@ -80,7 +80,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 
 		{
 			name: "no_partnerIDs",
-			token_type: "sss",
+			token_type: "jwt",
 			attrMap: map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
