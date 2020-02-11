@@ -66,9 +66,9 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			token_type: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
-					"allowedPartners": []string{"partner0", "partner1"},
+					"allowedPartners": []string{"partnerA", "partnerB"},
 				}},
-			expectedPartnerIDs: []string{"partner0", "partner1"},
+			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
 
 		{
@@ -81,7 +81,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		{
 			name: "no_partnerIDs",
 			token_type: "jwt",
-			attrMap: map[string]interface{}{},
+			attrMap: nil,
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
@@ -100,13 +100,21 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			auth := bascule.Authentication{
 				Token: bascule.NewToken(test.token_type, "client0", attrs),
 			}
-			ctx := bascule.WithAuthentication(ctxTID, auth)
+
+			var ctx context.Context
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+
 			// adding partnerIDs to Header
 			r.Header.Set(wrphttp.PartnerIdHeader , "partner0")
 			r.Header.Add(wrphttp.PartnerIdHeader , "partner1")
 
+			if (test.token_type == "") {
+				ctx = ctxTID
+			} else {
+				ctx = bascule.WithAuthentication(ctxTID, auth)
+			}
+			
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
