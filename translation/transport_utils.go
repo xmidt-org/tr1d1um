@@ -102,7 +102,7 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []stri
 			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), service),
 			TransactionUUID: tid,
 			Source:          service,
-			PartnerIDs:		 partnerIDs,
+			PartnerIDs:      partnerIDs,
 		}
 	}
 	return

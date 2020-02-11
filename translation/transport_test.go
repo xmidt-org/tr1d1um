@@ -17,11 +17,7 @@ import (
 	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
 
 	"github.com/xmidt-org/bascule"
-
 )
-
-
-
 
 //ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "test-tid")
@@ -53,16 +49,15 @@ func TestDecodeRequest(t *testing.T) {
 	})
 }
 
-
 func TestDecodeRequestPartnerIDs(t *testing.T) {
 	tests := []struct {
-		name 					string
-		token_type 				string
-		attrMap					map[string]interface{}
-		expectedPartnerIDs 		[]string
+		name               string
+		token_type         string
+		attrMap            map[string]interface{}
+		expectedPartnerIDs []string
 	}{
 		{
-			name: "all_success",
+			name:       "all_success",
 			token_type: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
@@ -72,27 +67,27 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		},
 
 		{
-			name: "non_jwt",
-			token_type: "sss",
-			attrMap: map[string]interface{}{},
+			name:               "non_jwt",
+			token_type:         "sss",
+			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
-			name: "no_partnerIDs",
-			token_type: "jwt",
-			attrMap: nil,
+			name:               "no_partnerIDs",
+			token_type:         "jwt",
+			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
-			name: "no_token",
-			token_type: "",
-			attrMap: map[string]interface{}{},
+			name:               "no_token",
+			token_type:         "",
+			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 	}
-	
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
@@ -106,15 +101,15 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
 			// adding partnerIDs to Header
-			r.Header.Set(wrphttp.PartnerIdHeader , "partner0")
-			r.Header.Add(wrphttp.PartnerIdHeader , "partner1")
+			r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
+			r.Header.Add(wrphttp.PartnerIdHeader, "partner1")
 
-			if (test.token_type == "") {
+			if test.token_type == "" {
 				ctx = ctxTID
 			} else {
 				ctx = bascule.WithAuthentication(ctxTID, auth)
 			}
-			
+
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)

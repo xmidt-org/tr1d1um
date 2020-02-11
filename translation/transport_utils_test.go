@@ -165,7 +165,7 @@ func TestWrapInWRP(t *testing.T) {
 	t.Run("GivenParameters", func(t *testing.T) {
 		assert := assert.New(t)
 
-		w, e := wrap([]byte{'t'}, "t0", map[string]string{"deviceid": "mac:112233445566", "service": "s0"},nil)
+		w, e := wrap([]byte{'t'}, "t0", map[string]string{"deviceid": "mac:112233445566", "service": "s0"}, nil)
 
 		assert.Nil(e)
 		assert.EqualValues(wrp.SimpleRequestResponseMessageType, w.Type)

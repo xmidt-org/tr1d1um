@@ -19,9 +19,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/webpa-common/basculechecks"
-	
+
 	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
-	
 )
 
 const (
@@ -87,7 +86,6 @@ func getPartnerIDs(h http.Header) []string {
 		}
 		partners = append(partners, fields...)
 	}
-	
 	return partners
 }
 
