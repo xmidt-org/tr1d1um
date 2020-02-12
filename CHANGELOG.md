@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
  - moving partnerIDs to tr1d1um
+ - changed WRP message source
 
 ## [v0.2.1]
  - moving partnerIDs to tr1d1um

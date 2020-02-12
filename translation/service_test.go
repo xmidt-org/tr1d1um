@@ -24,7 +24,7 @@ func TestSendWRP(t *testing.T) {
 
 	var expected = wrp.MustEncode(wrp.Message{
 		Type:   wrp.SimpleRequestResponseMessageType,
-		Source: "local/test",
+		Source: "local",
 	}, wrp.Msgpack)
 
 	var argMatcher = func(r *http.Request) bool {

@@ -2,7 +2,7 @@ package translation
 
 import (
 	"bytes"
-	"fmt"
+
 	"net/http"
 
 	"github.com/xmidt-org/tr1d1um/common"
@@ -51,7 +51,7 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *common
 	var payload []byte
 
 	// fill in the rest of the source property
-	wrpMsg.Source = fmt.Sprintf("%s/%s", w.WRPSource, wrpMsg.Source)
+	wrpMsg.Source = w.WRPSource
 
 	if err = wrp.NewEncoderBytes(&payload, wrp.Msgpack).Encode(wrpMsg); err == nil {
 		var req *http.Request
