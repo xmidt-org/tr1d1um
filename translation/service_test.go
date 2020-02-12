@@ -18,13 +18,13 @@ func TestSendWRP(t *testing.T) {
 
 	s := NewService(&ServiceOptions{
 		XmidtWrpURL:       "http://localhost/wrp",
-		WRPSource:         "local",
+		WRPSource:         "dns:tr1d1um-xyz-example.com",
 		Tr1d1umTransactor: m,
 	})
 
 	var expected = wrp.MustEncode(wrp.Message{
 		Type:   wrp.SimpleRequestResponseMessageType,
-		Source: "local",
+		Source: "dns:tr1d1um-xyz-example.com",
 	}, wrp.Msgpack)
 
 	var argMatcher = func(r *http.Request) bool {
@@ -43,8 +43,7 @@ func TestSendWRP(t *testing.T) {
 	m.On("Transact", mock.MatchedBy(argMatcher)).Return(nil, nil)
 	_, e := s.SendWRP(
 		&wrp.Message{
-			Type:   wrp.SimpleRequestResponseMessageType,
-			Source: "test",
+			Type: wrp.SimpleRequestResponseMessageType,
 		}, "token")
 
 	assert.Nil(e)
