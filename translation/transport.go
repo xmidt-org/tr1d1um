@@ -17,6 +17,10 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 
 	"github.com/gorilla/mux"
+	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/webpa-common/basculechecks"
+
+	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
 )
 
 const (
@@ -65,24 +69,62 @@ func ConfigHandler(c *Options) {
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
-/* Request Decoding */
+// getPartnerIDs returns the array that represents the partner-ids that were
+// passed in as headers.  This function handles multiple duplicate headers.
+func getPartnerIDs(h http.Header) []string {
+	headers, ok := h[wrphttp.PartnerIdHeader]
+	if !ok {
+		return nil
+	}
 
+	var partners []string
+
+	for _, value := range headers {
+		fields := strings.Split(value, ",")
+		for i := 0; i < len(fields); i++ {
+			fields[i] = strings.TrimSpace(fields[i])
+		}
+		partners = append(partners, fields...)
+	}
+	return partners
+}
+
+// getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
+func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
+	auth, ok := bascule.FromContext(ctx)
+	//if no token
+	if !ok {
+		return getPartnerIDs(r.Header)
+	}
+	tokenType := auth.Token.Type()
+	//if not jwt type
+	if tokenType != "jwt" {
+		return getPartnerIDs(r.Header)
+	}
+	partnerIDs, ok := auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
+	//if no partner ids
+	if !ok {
+		return getPartnerIDs(r.Header)
+	}
+	return partnerIDs
+}
+
+/* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
 		payload []byte
 		wrpMsg  *wrp.Message
 	)
-
 	if payload, err = requestPayload(r); err == nil {
 		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
-		if wrpMsg, err = wrap(payload, tid, mux.Vars(r)); err == nil {
+		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
+		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
 				AuthHeaderValue: r.Header.Get(authHeaderKey),
 			}
 		}
 	}
-
 	return
 }
 
