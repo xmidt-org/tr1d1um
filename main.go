@@ -360,7 +360,11 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	}
 	logging.Debug(logger).Log(logging.MessageKey(), "Created list of allowed basic auths", "allowed", basicAllowed, "config", basicAuth)
 
-	options := []basculehttp.COption{basculehttp.WithCLogger(GetLogger), basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse)}
+	options := []basculehttp.COption{
+		basculehttp.WithCLogger(GetLogger),
+		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
+	}
 	if len(basicAllowed) > 0 {
 		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
 	}
