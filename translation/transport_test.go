@@ -110,7 +110,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 				ctx = bascule.WithAuthentication(ctxTID, auth)
 			}
 
-			if test.token_type == "" {
+			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
 				ctx = bascule.WithAuthentication(ctxTID, auth)
