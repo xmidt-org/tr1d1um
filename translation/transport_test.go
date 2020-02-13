@@ -52,13 +52,13 @@ func TestDecodeRequest(t *testing.T) {
 func TestDecodeRequestPartnerIDs(t *testing.T) {
 	tests := []struct {
 		name               string
-		token_type         string
+		tokenType          string
 		attrMap            map[string]interface{}
 		expectedPartnerIDs []string
 	}{
 		{
-			name:       "all_success",
-			token_type: "jwt",
+			name:      "all_success",
+			tokenType: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
 					"allowedPartners": []string{"partnerA", "partnerB"},
@@ -68,21 +68,21 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 
 		{
 			name:               "non_jwt",
-			token_type:         "sss",
+			tokenType:          "sss",
 			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
 			name:               "no_partnerIDs",
-			token_type:         "jwt",
+			tokenType:          "jwt",
 			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
 
 		{
 			name:               "no_token",
-			token_type:         "",
+			tokenType:          "",
 			attrMap:            map[string]interface{}{},
 			expectedPartnerIDs: []string{"partner0", "partner1"},
 		},
@@ -93,7 +93,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			assert := assert.New(t)
 			attrs := bascule.NewAttributesFromMap(test.attrMap)
 			auth := bascule.Authentication{
-				Token: bascule.NewToken(test.token_type, "client0", attrs),
+				Token: bascule.NewToken(test.tokenType, "client0", attrs),
 			}
 
 			var ctx context.Context
@@ -104,7 +104,13 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
 			r.Header.Add(wrphttp.PartnerIdHeader, "partner1")
 
-			if test.token_type == "" {
+			if test.tokenType == "" {
+				ctx = ctxTID
+			} else {
+				ctx = bascule.WithAuthentication(ctxTID, auth)
+			}
+
+			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
 				ctx = bascule.WithAuthentication(ctxTID, auth)

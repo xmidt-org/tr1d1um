@@ -171,7 +171,6 @@ func TestWrapInWRP(t *testing.T) {
 		assert.EqualValues(wrp.SimpleRequestResponseMessageType, w.Type)
 		assert.EqualValues([]byte{'t'}, w.Payload)
 		assert.EqualValues("mac:112233445566/s0", w.Destination)
-		assert.EqualValues("s0", w.Source)
 		assert.EqualValues("t0", w.TransactionUUID)
 	})
 }
