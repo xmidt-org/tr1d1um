@@ -111,6 +111,10 @@ log:
   # (Optional) defaults to false
   json: true
 
+  # reducedLoggingResponseCodes allows disabling verbose transaction logs for 
+  # benign responses from the target server given HTTP status codes.
+  # (Optional)
+  # reducedLoggingResponseCodes: [200, 504]
 
 ##############################################################################
 # Webhooks Related configuration 

@@ -20,9 +20,10 @@ type Options struct {
 	S Service
 
 	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
-	APIRouter    *mux.Router
-	Authenticate *alice.Chain
-	Log          kitlog.Logger
+	APIRouter                   *mux.Router
+	Authenticate                *alice.Chain
+	Log                         kitlog.Logger
+	ReducedLoggingResponseCodes []int
 }
 
 //ConfigHandler sets up the server that powers the stat service
@@ -31,7 +32,7 @@ func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture(c.Log)),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
-		kithttp.ServerFinalizer(common.TransactionLogging(c.Log)),
+		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
 	statHandler := kithttp.NewServer(
