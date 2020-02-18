@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -16,42 +16,66 @@ import (
 	"github.com/xmidt-org/webpa-common/logging"
 )
 
+type transactionRequest struct {
+	Address string `json:"address,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Query   string `json:"query,omitempty"`
+	Method  string `json:"method,omitempty"`
+}
+
+func (re *transactionRequest) MarshalJSON() ([]byte, error) {
+	return json.Marshal(re)
+}
+
+type transactionResponse struct {
+	Code    int         `json:"code,omitempty"`
+	Headers interface{} `json:"headers,omitempty"`
+}
+
+func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rs)
+}
+
 //HeaderWPATID is the header key for the WebPA transaction UUID
 const HeaderWPATID = "X-WebPA-Transaction-Id"
 
 //TransactionLogging is used by the different Tr1d1um services to
 //keep track of incoming requests and their corresponding responses
-func TransactionLogging(logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
-		if transactionInfoLogger, ok := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
-			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger)
+		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
+		transactionInfoLogger, ok := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
 
-			latency, err := extractRequestArrivalTime(r.Context())
-
-			if err != nil {
-				tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-				logging.Error(logger).Log(logging.ErrorKey(), err, "tid", tid)
-			}
-
-			transactionInfoLogger.Log("latency", latency,
-				"responseCode", code,
-				"responseHeaders", ctx.Value(kithttp.ContextKeyResponseHeaders))
+		if !ok {
+			errorLogger.Log(logging.MessageKey(), "transaction logger not found in context", "tid", tid)
+			return
 		}
-	}
-}
 
-func extractRequestArrivalTime(ctx context.Context) (latency string, err error) {
-	//For a request R, lantency includes time from points A to B where:
-	//A: as soon as R is authorized
-	//B: as soon as Tr1d1um is done sending the response for R
-	latency = "N/A"
-	if requestArrivalTime, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time); ok {
-		latency = time.Since(requestArrivalTime).String()
-	} else {
-		err = errors.New("Request arrival time was not capture in go-kit context")
-	}
+		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
-	return
+		if ok {
+			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
+		} else {
+			errorLogger.Log(logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid)
+		}
+
+		includeHeaders := true
+		response := transactionResponse{Code: code}
+
+		for _, responseCode := range reducedLoggingResponseCodes {
+			if responseCode == code {
+				includeHeaders = false
+				break
+			}
+		}
+
+		if includeHeaders {
+			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
+		}
+
+		transactionInfoLogger.Log("response", response)
+	}
 }
 
 //ForwardHeadersByPrefix copies headers h where the source and target are 'from' and 'to' respectively such that key(h) has p as prefix
@@ -110,11 +134,13 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		}
 
 		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger,
-			logging.MessageKey(), "Bookkeeping response",
-			"requestAddress", r.RemoteAddr,
-			"requestURLPath", r.URL.Path,
-			"requestURLQuery", r.URL.RawQuery,
-			"requestMethod", r.Method,
+			logging.MessageKey(), "record",
+			"request", transactionRequest{
+				Address: r.RemoteAddr,
+				Path:    r.URL.Path,
+				Query:   r.URL.RawQuery,
+				Method:  r.Method,
+			},
 			"tid", tid,
 			"satClientID", satClientID,
 		)

@@ -62,15 +62,16 @@ const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "api/v2"
 
-	translationServicesKey = "supportedServices"
-	targetURLKey           = "targetURL"
-	netDialerTimeoutKey    = "netDialerTimeout"
-	clientTimeoutKey       = "clientTimeout"
-	reqTimeoutKey          = "respWaitTimeout"
-	reqRetryIntervalKey    = "requestRetryInterval"
-	reqMaxRetriesKey       = "requestMaxRetries"
-	WRPSourcekey           = "WRPSource"
-	hooksSchemeKey         = "hooksScheme"
+	translationServicesKey            = "supportedServices"
+	targetURLKey                      = "targetURL"
+	netDialerTimeoutKey               = "netDialerTimeout"
+	clientTimeoutKey                  = "clientTimeout"
+	reqTimeoutKey                     = "respWaitTimeout"
+	reqRetryIntervalKey               = "requestRetryInterval"
+	reqMaxRetriesKey                  = "requestMaxRetries"
+	WRPSourcekey                      = "WRPSource"
+	hooksSchemeKey                    = "hooksScheme"
+	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
 )
 
 var (
@@ -191,12 +192,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
 	})
 
+	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
+
 	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
 	stat.ConfigHandler(&stat.Options{
-		S:            ss,
-		APIRouter:    APIRouter,
-		Authenticate: authenticate,
-		Log:          logger,
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
 
 	//
@@ -222,11 +226,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	translation.ConfigHandler(&translation.Options{
-		S:             ts,
-		APIRouter:     APIRouter,
-		Authenticate:  authenticate,
-		Log:           logger,
-		ValidServices: v.GetStringSlice(translationServicesKey),
+		S:                           ts,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         logger,
+		ValidServices:               v.GetStringSlice(translationServicesKey),
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
 
 	var (
