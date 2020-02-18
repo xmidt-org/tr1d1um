@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
- - changed WRP message source
+
+## [v0.3.0]
+ - add feature to disable verbose transaction logger [#145](https://github.com/xmidt-org/tr1d1um/pull/145)
+ - changed WRP message source [#144](https://github.com/xmidt-org/tr1d1um/pull/144)
 
 ## [v0.2.1]
  - moving partnerIDs to tr1d1um
@@ -31,7 +34,8 @@ Switching to new build process
 ### Added
 - Initial creation
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.2.1...v0.3.0
 [v0.2.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.1.5...v0.2.0
 [v0.1.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.1.4...v0.1.5
