@@ -29,6 +29,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"time"
 
@@ -337,6 +338,7 @@ type CapabilityConfig struct {
 	Type            string
 	Prefix          string
 	AcceptAllMethod string
+	EndpointBuckets []string
 }
 
 //authenticationHandler configures the authorization requirements for requests to reach the main handler
@@ -402,7 +404,16 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	var capabilityCheck CapabilityConfig
 	v.UnmarshalKey("capabilityCheck", &capabilityCheck)
 	if capabilityCheck.Type == "enforce" || capabilityCheck.Type == "monitor" {
-		checker, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
+		var endpoints []*regexp.Regexp
+		for _, e := range capabilityCheck.EndpointBuckets {
+			r, err := regexp.Compile(e)
+			if err != nil {
+				logging.Warn(logger).Log(logging.MessageKey(), "failed to compile regular expression", "regex", e, logging.ErrorKey(), err.Error())
+				continue
+			}
+			endpoints = append(endpoints, r)
+		}
+		checker, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod, endpoints)
 		if err != nil {
 			return nil, emperror.With(err, "failed to create capability check")
 		}

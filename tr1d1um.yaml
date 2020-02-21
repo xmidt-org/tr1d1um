@@ -217,9 +217,19 @@ jwtValidator:
 # is approved for all methods.
 # (Optional)
 # capabilityCheck:
+#   # type provides the mode for capability checking.
 #   type: "enforce"
+#   # prefix provides the regex to match the capability before the endpoint.
 #   prefix: "prefix Here"
+#   # acceptAllMethod provides a way to have a capability that allows all 
+#   # methods for a specific endpoint.
 #   acceptAllMethod: "all"
+#   # endpointBuckets provides regular expressions to use against the request 
+#   # endpoint in order to group requests for a metric label.
+#   endpointBuckets:
+#     - "hook"
+#     - "device/.*/stat"
+#     - "device/.*/config"
 
 
 ##############################################################################

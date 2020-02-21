@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.3.0
 	github.com/xmidt-org/bascule v0.8.0
-	github.com/xmidt-org/webpa-common v1.6.2
+	github.com/xmidt-org/webpa-common v1.6.4-0.20200220220923-eeffef672ff3
 	github.com/xmidt-org/wrp-go v1.3.3
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6 // indirect
