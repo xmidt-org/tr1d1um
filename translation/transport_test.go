@@ -275,6 +275,15 @@ func TestRequestAddPayload(t *testing.T) {
 		assert.EqualValues(ErrMissingRow, e)
 	})
 
+	t.Run("RowInvalidProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid row"))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrInvalidRow, e)
+	})
+
 	t.Run("IdealPath", func(t *testing.T) {
 		assert := assert.New(t)
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(`{"row": "r0"}`))
@@ -311,6 +320,15 @@ func TestRequestReplacePayload(t *testing.T) {
 
 		assert.Nil(p)
 		assert.EqualValues(ErrMissingRows, e)
+	})
+
+	t.Run("RowsInvalidProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestReplacePayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid rows"))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrInvalidRows, e)
 	})
 
 	t.Run("IdealPath", func(t *testing.T) {
