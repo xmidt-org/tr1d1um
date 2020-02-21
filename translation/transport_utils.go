@@ -172,11 +172,9 @@ func getParamNames(params []setParam) (paramNames []string) {
 }
 
 func contains(i string, elements []string) bool {
-	if elements != nil {
-		for _, e := range elements {
-			if e == i {
-				return true
-			}
+	for _, e := range elements {
+		if e == i {
+			return true
 		}
 	}
 	return false
