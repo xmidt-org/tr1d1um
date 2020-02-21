@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/webpa-common/device"
 	"github.com/xmidt-org/wrp-go/wrp"
 )
@@ -159,7 +160,7 @@ func TestWrapInWRP(t *testing.T) {
 		w, e := wrap([]byte(""), "", nil, nil)
 
 		assert.Nil(w)
-		assert.EqualValues(device.ErrorInvalidDeviceName, e)
+		assert.EqualValues(common.NewBadRequestError(device.ErrorInvalidDeviceName), e)
 	})
 
 	t.Run("GivenParameters", func(t *testing.T) {

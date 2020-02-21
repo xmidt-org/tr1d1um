@@ -90,21 +90,19 @@ func getCommandForParams(params []setParam) (command string) {
 /* Other transport-level helper functions */
 
 //wrp merges different values from a WDMP request into a WRP message
-func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (m *wrp.Message, err error) {
-	var canonicalDeviceID device.ID
-
-	if canonicalDeviceID, err = device.ParseID(pathVars["deviceid"]); err == nil {
-		service := pathVars["service"]
-
-		m = &wrp.Message{
-			Type:            wrp.SimpleRequestResponseMessageType,
-			Payload:         WDMP,
-			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), service),
-			TransactionUUID: tid,
-			PartnerIDs:      partnerIDs,
-		}
+func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (*wrp.Message, error) {
+	canonicalDeviceID, err := device.ParseID(pathVars["deviceid"])
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
 	}
-	return
+
+	return &wrp.Message{
+		Type:            wrp.SimpleRequestResponseMessageType,
+		Payload:         WDMP,
+		Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), pathVars["service"]),
+		TransactionUUID: tid,
+		PartnerIDs:      partnerIDs,
+	}, nil
 }
 
 func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
@@ -118,17 +116,25 @@ func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestF
 	}
 }
 
-func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (wdmp *setWDMP, err error) {
-	wdmp = new(setWDMP)
-	if err = json.Unmarshal(encodedWDMP, wdmp); err == nil || len(encodedWDMP) == 0 { //len(data) == 0 case is for TEST_SET
-		if err = deduceSET(wdmp, newCID, oldCID, syncCMC); err == nil {
-			if !isValidSetWDMP(wdmp) {
-				err = ErrInvalidSetWDMP
-			}
-		}
+func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, error) {
+	wdmp := new(setWDMP)
+
+	err := json.Unmarshal(encodedWDMP, wdmp)
+
+	if err != nil && len(encodedWDMP) > 0 { //len(encodedWDMP) == 0 is ok as it is used for TEST_SET
+		return nil, common.NewBadRequestError(fmt.Errorf("Invalid WDMP structure. %s", err.Error()))
 	}
 
-	return
+	err = deduceSET(wdmp, newCID, oldCID, syncCMC)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isValidSetWDMP(wdmp) {
+		return nil, ErrInvalidSetWDMP
+	}
+
+	return wdmp, nil
 }
 
 func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
