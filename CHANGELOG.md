@@ -5,9 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- fix a bug in which tr1d1um was returning 500 for user error requests [#146](https://github.com/xmidt-org/tr1d1um/pull/146)
 
 ## [v0.4.0]
+- fix a bug in which tr1d1um was returning 500 for user error requests [#146](https://github.com/xmidt-org/tr1d1um/pull/146)
 - added endpoint regex configuration for capabilityCheck metric [#147](https://github.com/xmidt-org/tr1d1um/pull/147)
 
 ## [v0.3.0]
