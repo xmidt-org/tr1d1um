@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.4.0]
+- added endpoint regex configuration for capabilityCheck metric [#147](https://github.com/xmidt-org/tr1d1um/pull/147)
+
 ## [v0.3.0]
  - add feature to disable verbose transaction logger [#145](https://github.com/xmidt-org/tr1d1um/pull/145)
  - changed WRP message source [#144](https://github.com/xmidt-org/tr1d1um/pull/144)
@@ -34,7 +37,8 @@ Switching to new build process
 ### Added
 - Initial creation
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.4.0...HEAD
+[v0.4.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.2.1...v0.3.0
 [v0.2.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.1.5...v0.2.0
