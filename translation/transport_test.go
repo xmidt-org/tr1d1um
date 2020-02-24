@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/wrp"
 	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
 
@@ -140,6 +141,17 @@ func TestRequestPayload(t *testing.T) {
 		assert.EqualValues(ErrInvalidSetWDMP, e)
 	})
 
+	t.Run("SetWithBody", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+		r := httptest.NewRequest(http.MethodPatch, "http://localhost", bytes.NewBufferString("invalidWDMP"))
+		_, e := requestPayload(r)
+		err, ok := e.(common.CodedError)
+		require.True(ok)
+		assert.Contains(e.Error(), "Invalid WDMP structure")
+		assert.EqualValues(http.StatusBadRequest, err.StatusCode())
+	})
+
 	t.Run("Del", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodDelete, "http://localhost", nil)
@@ -263,6 +275,15 @@ func TestRequestAddPayload(t *testing.T) {
 		assert.EqualValues(ErrMissingRow, e)
 	})
 
+	t.Run("RowInvalidProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid row"))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrInvalidRow, e)
+	})
+
 	t.Run("IdealPath", func(t *testing.T) {
 		assert := assert.New(t)
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(`{"row": "r0"}`))
@@ -299,6 +320,15 @@ func TestRequestReplacePayload(t *testing.T) {
 
 		assert.Nil(p)
 		assert.EqualValues(ErrMissingRows, e)
+	})
+
+	t.Run("RowsInvalidProvided", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestReplacePayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid rows"))
+
+		assert.Nil(p)
+		assert.EqualValues(ErrInvalidRows, e)
 	})
 
 	t.Run("IdealPath", func(t *testing.T) {

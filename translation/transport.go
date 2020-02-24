@@ -230,7 +230,7 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 }
 
 func requestGetPayload(names, attributes string) ([]byte, error) {
-	if names == "" {
+	if len(names) < 1 {
 		return nil, ErrEmptyNames
 	}
 
@@ -249,52 +249,59 @@ func requestGetPayload(names, attributes string) ([]byte, error) {
 func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err error) {
 	var wdmp = &addRowWDMP{Command: CommandAddRow}
 
-	if table, ok := m["parameter"]; ok {
-		wdmp.Table = table
-	} else {
+	table := m["parameter"]
+
+	if len(table) < 1 {
 		return nil, ErrMissingTable
 	}
 
-	var payload []byte
-	if payload, err = ioutil.ReadAll(input); err == nil {
-		if len(payload) == 0 {
-			return nil, ErrMissingRow
-		}
+	wdmp.Table = table
 
-		if err = json.Unmarshal(payload, &wdmp.Row); err == nil {
-			return json.Marshal(wdmp)
-		}
+	payload, err := ioutil.ReadAll(input)
+
+	if len(payload) < 1 {
+		return nil, ErrMissingRow
 	}
 
-	return
+	err = json.Unmarshal(payload, &wdmp.Row)
+	if err != nil {
+		return nil, ErrInvalidRow
+	}
+	return json.Marshal(wdmp)
 }
 
-func requestReplacePayload(m map[string]string, input io.Reader) (p []byte, err error) {
+func requestReplacePayload(m map[string]string, input io.Reader) ([]byte, error) {
 	var wdmp = &replaceRowsWDMP{Command: CommandReplaceRows}
 
-	if table, ok := m["parameter"]; ok {
-		wdmp.Table = table
-	} else {
+	table := strings.Trim(m["parameter"], " ")
+	if len(table) == 0 {
 		return nil, ErrMissingTable
 	}
 
-	var payload []byte
-	if payload, err = ioutil.ReadAll(input); err == nil {
-		if len(payload) == 0 {
-			return nil, ErrMissingRows
-		}
+	wdmp.Table = table
 
-		if err = json.Unmarshal(payload, &wdmp.Rows); err == nil {
-			return json.Marshal(wdmp)
-		}
+	payload, err := ioutil.ReadAll(input)
+
+	if err != nil {
+		return nil, err
 	}
 
-	return
+	if len(payload) < 1 {
+		return nil, ErrMissingRows
+	}
+
+	err = json.Unmarshal(payload, &wdmp.Rows)
+	if err != nil {
+		return nil, ErrInvalidRows
+	}
+
+	return json.Marshal(wdmp)
 }
 
 func requestDeletePayload(m map[string]string) ([]byte, error) {
-	if row, ok := m["parameter"]; ok {
-		return json.Marshal(&deleteRowDMP{Command: CommandDeleteRow, Row: row})
+	row := m["parameter"]
+	if len(row) < 1 {
+		return nil, ErrMissingRow
 	}
-	return nil, ErrMissingRow
+	return json.Marshal(&deleteRowDMP{Command: CommandDeleteRow, Row: row})
 }

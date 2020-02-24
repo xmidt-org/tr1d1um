@@ -19,7 +19,9 @@ var (
 	//Add/Delete command  errors
 	ErrMissingTable = common.NewBadRequestError(errors.New("table property is required"))
 	ErrMissingRow   = common.NewBadRequestError(errors.New("row property is required"))
+	ErrInvalidRow   = common.NewBadRequestError(errors.New("row property is invalid"))
 
 	//Replace command error
 	ErrMissingRows = common.NewBadRequestError(errors.New("rows property is required"))
+	ErrInvalidRows = common.NewBadRequestError(errors.New("rows property is invalid"))
 )
