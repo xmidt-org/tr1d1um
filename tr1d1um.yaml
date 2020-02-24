@@ -227,9 +227,10 @@ jwtValidator:
 #   # endpointBuckets provides regular expressions to use against the request 
 #   # endpoint in order to group requests for a metric label.
 #   endpointBuckets:
-#     - "hook"
-#     - "device/.*/stat"
-#     - "device/.*/config"
+#     - "hook\\b"
+#     - "hooks\\b"
+#     - "device/.*/stat\\b"
+#     - "device/.*/config\\b"
 
 
 ##############################################################################

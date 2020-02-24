@@ -408,7 +408,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		for _, e := range capabilityCheck.EndpointBuckets {
 			r, err := regexp.Compile(e)
 			if err != nil {
-				logging.Warn(logger).Log(logging.MessageKey(), "failed to compile regular expression", "regex", e, logging.ErrorKey(), err.Error())
+				logging.Error(logger).Log(logging.MessageKey(), "failed to compile regular expression", "regex", e, logging.ErrorKey(), err.Error())
 				continue
 			}
 			endpoints = append(endpoints, r)
