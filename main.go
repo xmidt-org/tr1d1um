@@ -232,7 +232,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	ss := stat.NewService(statServiceOptions)
 	ts := translation.NewService(translationOptions)
 
-	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
 		APIRouter:                   APIRouter,
