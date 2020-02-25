@@ -225,7 +225,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		} else {
 			translationOptions.Acquirer = acquirer
 			statServiceOptions.Acquirer = acquirer
-			infoLogger.Log("Outbound request authentication value acquirer enabled")
+			infoLogger.Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
 		}
 	}
 
@@ -299,7 +299,7 @@ type timeoutConfigs struct {
 
 func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 	var options authAcquirerConfig
-	err := v.UnmarshalKey(authAcquirerKey, options)
+	err := v.UnmarshalKey(authAcquirerKey, &options)
 
 	if err != nil {
 		return nil, err
