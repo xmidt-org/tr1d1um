@@ -1,6 +1,7 @@
 package stat
 
 import (
+	"github.com/xmidt-org/bascule/acquire"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,7 @@ type Service interface {
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		Tr1d1umTransactor: o.Tr1d1umTransactor,
+		Acquirer:          o.Acquirer,
 		XmidtStatURL:      o.XmidtStatURL,
 	}
 }
@@ -24,6 +26,8 @@ func NewService(o *ServiceOptions) Service {
 type ServiceOptions struct {
 	//Base Endpoint URL for device stats from XMiDT API
 	XmidtStatURL string
+
+	acquire.Acquirer
 
 	//Tr1d1umTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about
@@ -35,17 +39,28 @@ type service struct {
 	//request to the XMiDT API and return only data we care about
 	common.Tr1d1umTransactor
 
+	acquire.Acquirer
+
 	XmidtStatURL string
 }
 
 //RequestStat contacts the XMiDT cluster for device statistics
-func (s *service) RequestStat(authHeaderValue, deviceID string) (result *common.XmidtResponse, err error) {
-	var r *http.Request
+func (s *service) RequestStat(authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
+	r, err := http.NewRequest(http.MethodGet, strings.Replace(s.XmidtStatURL, "${device}", deviceID, 1), nil)
 
-	if r, err = http.NewRequest(http.MethodGet, strings.Replace(s.XmidtStatURL, "${device}", deviceID, 1), nil); err == nil {
-		r.Header.Add("Authorization", authHeaderValue)
-
-		result, err = s.Tr1d1umTransactor.Transact(r)
+	if err != nil {
+		return nil, err
 	}
-	return
+
+	var authValue = authHeaderValue
+
+	if s.Acquirer != nil {
+		authValue, err = s.Acquirer.Acquire()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	r.Header.Set("Authorization", authValue)
+	return s.Tr1d1umTransactor.Transact(r)
 }

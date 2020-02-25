@@ -5,6 +5,7 @@ import (
 
 	"net/http"
 
+	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/tr1d1um/common"
 
 	"github.com/xmidt-org/wrp-go/wrp"
@@ -24,6 +25,9 @@ type ServiceOptions struct {
 	//WRPSource is currently the prefix of "Source" field in outgoing WRP Messages
 	WRPSource string
 
+	//Acquirer provides a mechanism to build auth headers for outbound requests
+	acquire.Acquirer
+
 	//Tr1d1umTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about
 	common.Tr1d1umTransactor
@@ -35,11 +39,14 @@ func NewService(o *ServiceOptions) Service {
 		XmidtWrpURL:       o.XmidtWrpURL,
 		WRPSource:         o.WRPSource,
 		Tr1d1umTransactor: o.Tr1d1umTransactor,
+		Acquirer:          o.Acquirer,
 	}
 }
 
 type service struct {
 	common.Tr1d1umTransactor
+
+	acquire.Acquirer
 
 	XmidtWrpURL string
 
@@ -47,21 +54,34 @@ type service struct {
 }
 
 //SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any
-func (w *service) SendWRP(wrpMsg *wrp.Message, authValue string) (result *common.XmidtResponse, err error) {
-	var payload []byte
-
-	// fill in the rest of the source property
+func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.XmidtResponse, error) {
 	wrpMsg.Source = w.WRPSource
 
-	if err = wrp.NewEncoderBytes(&payload, wrp.Msgpack).Encode(wrpMsg); err == nil {
-		var req *http.Request
-		if req, err = http.NewRequest(http.MethodPost, w.XmidtWrpURL, bytes.NewBuffer(payload)); err == nil {
+	var payload []byte
 
-			req.Header.Add("Content-Type", wrp.Msgpack.ContentType())
-			req.Header.Add("Authorization", authValue)
+	err := wrp.NewEncoderBytes(&payload, wrp.Msgpack).Encode(wrpMsg)
 
-			result, err = w.Tr1d1umTransactor.Transact(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequest(http.MethodPost, w.XmidtWrpURL, bytes.NewBuffer(payload))
+
+	if err != nil {
+		return nil, err
+	}
+
+	var authValue = authHeaderValue
+
+	if w.Acquirer != nil {
+		authValue, err = w.Acquirer.Acquire()
+		if err != nil {
+			return nil, err
 		}
 	}
-	return
+
+	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
+	r.Header.Set("Authorization", authValue)
+
+	return w.Tr1d1umTransactor.Transact(r)
 }

@@ -45,6 +45,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/webpa-common/basculechecks"
@@ -73,6 +74,7 @@ const (
 	WRPSourcekey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
 	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
+	authAcquirerKey                   = "authAcquirer"
 )
 
 var (
@@ -176,9 +178,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	//
-	// Stat Service
+	// Stat Service configs
 	//
-	ss := stat.NewService(&stat.ServiceOptions{
+	statServiceOptions := &stat.ServiceOptions{
 		Tr1d1umTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
 				Do: xhttp.RetryTransactor(
@@ -191,24 +193,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 				RequestTimeout: tConfigs.rTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
-	})
-
-	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
-
-	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
+	}
 
 	//
-	// WRP Service
+	// WRP Service configs
 	//
-
-	ts := translation.NewService(&translation.ServiceOptions{
+	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
 
 		WRPSource: v.GetString(WRPSourcekey),
@@ -224,6 +214,31 @@ func tr1d1um(arguments []string) (exitCode int) {
 					},
 					newClient(v, tConfigs).Do),
 			}),
+	}
+
+	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
+
+	if v.IsSet(authAcquirerKey) {
+		acquirer, err := createAuthAcquirer(v)
+		if err != nil {
+			errorLogger.Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+		} else {
+			translationOptions.Acquirer = acquirer
+			statServiceOptions.Acquirer = acquirer
+			infoLogger.Log("Outbound request authentication value acquirer enabled")
+		}
+	}
+
+	ss := stat.NewService(statServiceOptions)
+	ts := translation.NewService(translationOptions)
+
+	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
 
 	translation.ConfigHandler(&translation.Options{
@@ -282,6 +297,25 @@ type timeoutConfigs struct {
 	dTimeout time.Duration
 }
 
+func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
+	var options authAcquirerConfig
+	err := v.UnmarshalKey(authAcquirerKey, options)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if options.JWT.AuthURL != "" && options.JWT.Buffer != 0 && options.JWT.Timeout != 0 {
+		return acquire.NewRemoteBearerTokenAcquirer(options.JWT)
+	}
+
+	if options.Basic != "" {
+		return acquire.NewFixedAuthAcquirer(options.Basic)
+	}
+
+	return nil, errors.New("auth acquirer not configured properly")
+}
+
 func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
 	var c, r, d time.Duration
 	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
@@ -332,6 +366,11 @@ type JWTValidator struct {
 	// Leeway is used to set the amount of time buffer should be given to JWT
 	// time values, such as nbf
 	Leeway bascule.Leeway
+}
+
+type authAcquirerConfig struct {
+	JWT   acquire.RemoteBearerTokenAcquirerOptions
+	Basic string
 }
 
 type CapabilityConfig struct {
