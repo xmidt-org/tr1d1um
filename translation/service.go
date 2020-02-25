@@ -71,17 +71,15 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.
 		return nil, err
 	}
 
-	var authValue = authHeaderValue
-
 	if w.Acquirer != nil {
-		authValue, err = w.Acquirer.Acquire()
+		authHeaderValue, err = w.Acquirer.Acquire()
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
-	r.Header.Set("Authorization", authValue)
+	r.Header.Set("Authorization", authHeaderValue)
 
 	return w.Tr1d1umTransactor.Transact(r)
 }

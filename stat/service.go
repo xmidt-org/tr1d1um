@@ -52,15 +52,13 @@ func (s *service) RequestStat(authHeaderValue, deviceID string) (*common.XmidtRe
 		return nil, err
 	}
 
-	var authValue = authHeaderValue
-
 	if s.Acquirer != nil {
-		authValue, err = s.Acquirer.Acquire()
+		authHeaderValue, err = s.Acquirer.Acquire()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	r.Header.Set("Authorization", authValue)
+	r.Header.Set("Authorization", authHeaderValue)
 	return s.Tr1d1umTransactor.Transact(r)
 }
