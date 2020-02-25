@@ -20,7 +20,7 @@ import (
 	"github.com/xmidt-org/bascule"
 )
 
-//ctxTID is a context with a defined value for a TID
+// ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "test-tid")
 
 func TestDecodeRequest(t *testing.T) {

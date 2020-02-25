@@ -8,12 +8,12 @@ import (
 	"github.com/xmidt-org/tr1d1um/common"
 )
 
-//Service defines the behavior of the device statistics Tr1d1um Service.
+// Service defines the behavior of the device statistics Tr1d1um Service.
 type Service interface {
 	RequestStat(authHeaderValue, deviceID string) (*common.XmidtResponse, error)
 }
 
-//NewService constructs a new stat service instance given some options.
+// NewService constructs a new stat service instance given some options.
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		transactor:   o.HTTPTransactor,
@@ -22,7 +22,7 @@ func NewService(o *ServiceOptions) Service {
 	}
 }
 
-//ServiceOptions defines the options needed to build a new stat service.
+// ServiceOptions defines the options needed to build a new stat service.
 type ServiceOptions struct {
 	//Base Endpoint URL for device stats from the XMiDT API.
 	//It's expected to have the "${device}" substring to perform device ID substitution.
@@ -46,7 +46,7 @@ type service struct {
 	xmidtStatURL string
 }
 
-//RequestStat contacts the XMiDT cluster for device statistics.
+// RequestStat contacts the XMiDT cluster for device statistics.
 func (s *service) RequestStat(authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
 	r, err := http.NewRequest(http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 

@@ -59,7 +59,7 @@ import (
 	"github.com/xmidt-org/webpa-common/xmetrics"
 )
 
-//convenient global values
+// convenient global values
 const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "api/v2"
@@ -285,7 +285,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-//timeoutConfigs holds parsable config values for HTTP transactions
+// timeoutConfigs holds parsable config values for HTTP transactions
 type timeoutConfigs struct {
 	//HTTP client timeout
 	cTimeout time.Duration
@@ -358,7 +358,7 @@ func GetLogger(ctx context.Context) bascule.Logger {
 	return logger
 }
 
-//JWTValidator provides a convenient way to define jwt validator through config files
+// JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory `json:"keys"`
@@ -380,7 +380,7 @@ type CapabilityConfig struct {
 	EndpointBuckets []string
 }
 
-//authenticationHandler configures the authorization requirements for requests to reach the main handler
+// authenticationHandler configures the authorization requirements for requests to reach the main handler
 func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")

@@ -11,13 +11,13 @@ import (
 	"github.com/xmidt-org/wrp-go/wrp"
 )
 
-//Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
-//which is compatible with the XMiDT API.
+// Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
+// which is compatible with the XMiDT API.
 type Service interface {
 	SendWRP(*wrp.Message, string) (*common.XmidtResponse, error)
 }
 
-//ServiceOptions defines the options needed to build a new translation WRP service.
+// ServiceOptions defines the options needed to build a new translation WRP service.
 type ServiceOptions struct {
 	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages.
 	XmidtWrpURL string
@@ -33,7 +33,7 @@ type ServiceOptions struct {
 	common.Tr1d1umTransactor
 }
 
-//NewService constructs a new translation service instance given some options.
+// NewService constructs a new translation service instance given some options.
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		xmidtWrpURL:  o.XmidtWrpURL,
@@ -53,7 +53,7 @@ type service struct {
 	wrpSource string
 }
 
-//SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
+// SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
 func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.XmidtResponse, error) {
 	wrpMsg.Source = w.wrpSource
 
