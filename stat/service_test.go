@@ -45,13 +45,13 @@ func TestRequestStat(t *testing.T) {
 			var a *mockAcquirer
 
 			options := &ServiceOptions{
-				XmidtStatURL:      "http://localhost/stat/${device}",
-				Tr1d1umTransactor: m,
+				XmidtStatURL:   "http://localhost/stat/${device}",
+				HTTPTransactor: m,
 			}
 
 			if testCase.EnableAcquirer {
 				a = new(mockAcquirer)
-				options.Acquirer = a
+				options.AuthAcquirer = a
 
 				var err error = testCase.AcquirerReturnError
 				a.On("Acquire").Return(testCase.AcquirerReturnString, err)

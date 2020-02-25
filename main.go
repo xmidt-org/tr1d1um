@@ -181,7 +181,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{
-		Tr1d1umTransactor: common.NewTr1d1umTransactor(
+		HTTPTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
@@ -223,8 +223,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		if err != nil {
 			errorLogger.Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
 		} else {
-			translationOptions.Acquirer = acquirer
-			statServiceOptions.Acquirer = acquirer
+			translationOptions.AuthAcquirer = acquirer
+			statServiceOptions.AuthAcquirer = acquirer
 			infoLogger.Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
 		}
 	}

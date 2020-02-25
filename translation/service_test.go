@@ -58,7 +58,7 @@ func TestSendWRP(t *testing.T) {
 
 			if testCase.EnableAcquirer {
 				a = new(mockAcquirer)
-				options.Acquirer = a
+				options.AuthAcquirer = a
 
 				var err error = testCase.AcquirerReturnError
 				a.On("Acquire").Return(testCase.AcquirerReturnString, err)

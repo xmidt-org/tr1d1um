@@ -12,50 +12,50 @@ import (
 )
 
 //Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
-//which is compatible with the XMiDT API
+//which is compatible with the XMiDT API.
 type Service interface {
 	SendWRP(*wrp.Message, string) (*common.XmidtResponse, error)
 }
 
-//ServiceOptions defines the options needed to build a new translation WRP service
+//ServiceOptions defines the options needed to build a new translation WRP service.
 type ServiceOptions struct {
-	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages
+	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages.
 	XmidtWrpURL string
 
-	//WRPSource is currently the prefix of "Source" field in outgoing WRP Messages
+	//WRPSource is the value set on the WRPSource field of all WRP messages created by Tr1d1um.
 	WRPSource string
 
-	//Acquirer provides a mechanism to build auth headers for outbound requests
-	acquire.Acquirer
+	//Acquirer provides a mechanism to build auth headers for outbound requests.
+	AuthAcquirer acquire.Acquirer
 
 	//Tr1d1umTransactor is the component that's responsible to make the HTTP
-	//request to the XMiDT API and return only data we care about
+	//request to the XMiDT API and return only data we care about.
 	common.Tr1d1umTransactor
 }
 
-//NewService constructs a new translation service instance given some options
+//NewService constructs a new translation service instance given some options.
 func NewService(o *ServiceOptions) Service {
 	return &service{
-		XmidtWrpURL:       o.XmidtWrpURL,
-		WRPSource:         o.WRPSource,
-		Tr1d1umTransactor: o.Tr1d1umTransactor,
-		Acquirer:          o.Acquirer,
+		xmidtWrpURL:  o.XmidtWrpURL,
+		wrpSource:    o.WRPSource,
+		transactor:   o.Tr1d1umTransactor,
+		authAcquirer: o.AuthAcquirer,
 	}
 }
 
 type service struct {
-	common.Tr1d1umTransactor
+	transactor common.Tr1d1umTransactor
 
-	acquire.Acquirer
+	authAcquirer acquire.Acquirer
 
-	XmidtWrpURL string
+	xmidtWrpURL string
 
-	WRPSource string
+	wrpSource string
 }
 
-//SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any
+//SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
 func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.XmidtResponse, error) {
-	wrpMsg.Source = w.WRPSource
+	wrpMsg.Source = w.wrpSource
 
 	var payload []byte
 
@@ -65,14 +65,14 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.
 		return nil, err
 	}
 
-	r, err := http.NewRequest(http.MethodPost, w.XmidtWrpURL, bytes.NewBuffer(payload))
+	r, err := http.NewRequest(http.MethodPost, w.xmidtWrpURL, bytes.NewBuffer(payload))
 
 	if err != nil {
 		return nil, err
 	}
 
-	if w.Acquirer != nil {
-		authHeaderValue, err = w.Acquirer.Acquire()
+	if w.authAcquirer != nil {
+		authHeaderValue, err = w.authAcquirer.Acquire()
 		if err != nil {
 			return nil, err
 		}
@@ -81,5 +81,5 @@ func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string) (*common.
 	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
 	r.Header.Set("Authorization", authHeaderValue)
 
-	return w.Tr1d1umTransactor.Transact(r)
+	return w.transactor.Transact(r)
 }
