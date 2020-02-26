@@ -15,7 +15,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-//Options wraps the properties needed to set up the stat server
+// Options wraps the properties needed to set up the stat server
 type Options struct {
 	S Service
 
@@ -26,8 +26,8 @@ type Options struct {
 	ReducedLoggingResponseCodes []int
 }
 
-//ConfigHandler sets up the server that powers the stat service
-//That is, it configures the mux paths to access the service
+// ConfigHandler sets up the server that powers the stat service
+// That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture(c.Log)),
@@ -76,10 +76,10 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	})
 }
 
-//encodeResponse simply forwards the response Tr1d1um got from the XMiDT API
-//TODO: What about if XMiDT cluster reports 500. There would be ambiguity
-//about which machine is actually having the error (Tr1d1um or the Xmidt API)
-//do we care to make that distinction?
+// encodeResponse simply forwards the response Tr1d1um got from the XMiDT API
+// TODO: What about if XMiDT cluster reports 500. There would be ambiguity
+// about which machine is actually having the error (Tr1d1um or the Xmidt API)
+// do we care to make that distinction?
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*common.XmidtResponse)
 

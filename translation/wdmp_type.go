@@ -1,6 +1,6 @@
 package translation
 
-//All the supported commands, WebPA Headers and misc
+// All the supported commands, WebPA Headers and misc
 const (
 	CommandGet         = "GET"
 	CommandGetAttrs    = "GET_ATTRIBUTES"
@@ -42,10 +42,10 @@ type addRowWDMP struct {
 	Row     map[string]string `json:"row"`
 }
 
-//indexRow facilitates data transfer from json data of the form {index1: {key:val}, index2: {key:val}, ... }
+// indexRow facilitates data transfer from json data of the form {index1: {key:val}, index2: {key:val}, ... }
 type indexRow map[string]map[string]string
 
-//replaceRowsWDMP serves as container for data used for the REPLACE_ROWS command
+// replaceRowsWDMP serves as container for data used for the REPLACE_ROWS command
 type replaceRowsWDMP struct {
 	Command string   `json:"command"`
 	Table   string   `json:"table"`

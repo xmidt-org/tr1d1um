@@ -11,7 +11,7 @@ import (
 	"github.com/xmidt-org/webpa-common/xmetrics"
 )
 
-//Options describes the parameters needed to configure the webhook endpoints
+// Options describes the parameters needed to configure the webhook endpoints
 type Options struct {
 
 	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
@@ -32,7 +32,7 @@ type Options struct {
 	Scheme       string
 }
 
-//ConfigHandler configures a given handler with webhook endpoints
+// ConfigHandler configures a given handler with webhook endpoints
 func ConfigHandler(o *Options) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
 

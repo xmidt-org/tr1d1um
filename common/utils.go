@@ -36,11 +36,11 @@ func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rs)
 }
 
-//HeaderWPATID is the header key for the WebPA transaction UUID
+// HeaderWPATID is the header key for the WebPA transaction UUID
 const HeaderWPATID = "X-WebPA-Transaction-Id"
 
-//TransactionLogging is used by the different Tr1d1um services to
-//keep track of incoming requests and their corresponding responses
+// TransactionLogging is used by the different Tr1d1um services to
+// keep track of incoming requests and their corresponding responses
 func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
@@ -78,7 +78,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 	}
 }
 
-//ForwardHeadersByPrefix copies headers h where the source and target are 'from' and 'to' respectively such that key(h) has p as prefix
+// ForwardHeadersByPrefix copies headers h where the source and target are 'from' and 'to' respectively such that key(h) has p as prefix
 func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 	for headerKey, headerValues := range from {
 		if strings.HasPrefix(headerKey, p) {
@@ -89,8 +89,8 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 	}
 }
 
-//ErrorLogEncoder decorates the errorEncoder in such a way that
-//errors are logged with their corresponding unique request identifier
+// ErrorLogEncoder decorates the errorEncoder in such a way that
+// errors are logged with their corresponding unique request identifier
 func ErrorLogEncoder(logger kitlog.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	var errorLogger = logging.Error(logger)
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
@@ -99,9 +99,9 @@ func ErrorLogEncoder(logger kitlog.Logger, ee kithttp.ErrorEncoder) kithttp.Erro
 	}
 }
 
-//Welcome is an Alice-style constructor that defines necessary request
-//context values assumed to exist by the delegate. These values should
-//be those expected to be used both in and outside the gokit server flow
+// Welcome is an Alice-style constructor that defines necessary request
+// context values assumed to exist by the delegate. These values should
+// be those expected to be used both in and outside the gokit server flow
 func Welcome(delegate http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -111,9 +111,9 @@ func Welcome(delegate http.Handler) http.Handler {
 		})
 }
 
-//Capture (for lack of a better name) captures context values of interest
-//from the incoming request. Unlike Welcome, values captured here are
-//intended to be used only throughout the gokit server flow: (request decoding, business logic,  response encoding)
+// Capture (for lack of a better name) captures context values of interest
+// from the incoming request. Unlike Welcome, values captured here are
+// intended to be used only throughout the gokit server flow: (request decoding, business logic,  response encoding)
 func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 	var transactionInfoLogger = logging.Info(logger)
 
@@ -149,8 +149,8 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 	}
 }
 
-//genTID generates a 16-byte long string
-//it returns "N/A" in the extreme case the random string could not be generated
+// genTID generates a 16-byte long string
+// it returns "N/A" in the extreme case the random string could not be generated
 func genTID() (tid string) {
 	buf := make([]byte, 16)
 	tid = "N/A"

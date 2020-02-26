@@ -45,6 +45,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/webpa-common/basculechecks"
@@ -58,7 +59,7 @@ import (
 	"github.com/xmidt-org/webpa-common/xmetrics"
 )
 
-//convenient global values
+// convenient global values
 const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "api/v2"
@@ -73,6 +74,7 @@ const (
 	WRPSourcekey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
 	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
+	authAcquirerKey                   = "authAcquirer"
 )
 
 var (
@@ -176,10 +178,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	//
-	// Stat Service
+	// Stat Service configs
 	//
-	ss := stat.NewService(&stat.ServiceOptions{
-		Tr1d1umTransactor: common.NewTr1d1umTransactor(
+	statServiceOptions := &stat.ServiceOptions{
+		HTTPTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
@@ -191,24 +193,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 				RequestTimeout: tConfigs.rTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
-	})
-
-	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
-
-	//Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes)
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
+	}
 
 	//
-	// WRP Service
+	// WRP Service configs
 	//
-
-	ts := translation.NewService(&translation.ServiceOptions{
+	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
 
 		WRPSource: v.GetString(WRPSourcekey),
@@ -224,6 +214,31 @@ func tr1d1um(arguments []string) (exitCode int) {
 					},
 					newClient(v, tConfigs).Do),
 			}),
+	}
+
+	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
+
+	if v.IsSet(authAcquirerKey) {
+		acquirer, err := createAuthAcquirer(v)
+		if err != nil {
+			errorLogger.Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+		} else {
+			translationOptions.AuthAcquirer = acquirer
+			statServiceOptions.AuthAcquirer = acquirer
+			infoLogger.Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
+		}
+	}
+
+	ss := stat.NewService(statServiceOptions)
+	ts := translation.NewService(translationOptions)
+
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
 
 	translation.ConfigHandler(&translation.Options{
@@ -270,7 +285,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-//timeoutConfigs holds parsable config values for HTTP transactions
+// timeoutConfigs holds parsable config values for HTTP transactions
 type timeoutConfigs struct {
 	//HTTP client timeout
 	cTimeout time.Duration
@@ -280,6 +295,25 @@ type timeoutConfigs struct {
 
 	//net dialer timeout
 	dTimeout time.Duration
+}
+
+func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
+	var options authAcquirerConfig
+	err := v.UnmarshalKey(authAcquirerKey, &options)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if options.JWT.AuthURL != "" && options.JWT.Buffer != 0 && options.JWT.Timeout != 0 {
+		return acquire.NewRemoteBearerTokenAcquirer(options.JWT)
+	}
+
+	if options.Basic != "" {
+		return acquire.NewFixedAuthAcquirer(options.Basic)
+	}
+
+	return nil, errors.New("auth acquirer not configured properly")
 }
 
 func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
@@ -324,7 +358,7 @@ func GetLogger(ctx context.Context) bascule.Logger {
 	return logger
 }
 
-//JWTValidator provides a convenient way to define jwt validator through config files
+// JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
 	Keys key.ResolverFactory `json:"keys"`
@@ -334,6 +368,11 @@ type JWTValidator struct {
 	Leeway bascule.Leeway
 }
 
+type authAcquirerConfig struct {
+	JWT   acquire.RemoteBearerTokenAcquirerOptions
+	Basic string
+}
+
 type CapabilityConfig struct {
 	Type            string
 	Prefix          string
@@ -341,7 +380,7 @@ type CapabilityConfig struct {
 	EndpointBuckets []string
 }
 
-//authenticationHandler configures the authorization requirements for requests to reach the main handler
+// authenticationHandler configures the authorization requirements for requests to reach the main handler
 func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")

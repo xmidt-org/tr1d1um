@@ -268,3 +268,25 @@ requestRetryInterval: "2s"
 # requestMaxRetries is the max number of times an HTTP request is retried against XMiDT in 
 # case of ephemeral errors
 requestMaxRetries: 2
+
+# authAcquirer enables configuring the JWT or Basic auth header value factory for outgoing
+# requests to XMiDT. If both types are configured, JWT will be preferred.
+# (Optional)
+authAcquirer:
+  JWT: 
+    # requestHeaders are added to the request for the token.
+    # (Optional)
+    # requestHeaders:
+    #   "": ""
+
+    # authURL is the URL to access for the token.
+    authURL: ""
+
+    # timeout is how long the request to get the token will take before 
+    # timing out.
+    timeout: "1m"
+
+    # buffer is the length of time before a token expires to get a new token.
+    buffer: "2m"  
+    
+  Basic: "" # Must be of form: 'Basic xyz=='

@@ -35,7 +35,7 @@ type xmidtResponse struct {
 	Code             int
 }
 
-//Options wraps the properties needed to set up the translation server
+// Options wraps the properties needed to set up the translation server
 type Options struct {
 	S Service
 
@@ -48,7 +48,7 @@ type Options struct {
 	ReducedLoggingResponseCodes []int
 }
 
-//ConfigHandler sets up the server that powers the translation service
+// ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture(c.Log), captureWDMPParameters),

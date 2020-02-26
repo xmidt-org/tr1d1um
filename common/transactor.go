@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-//XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
-//the XMiDT API
+// XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
+// the XMiDT API
 type XmidtResponse struct {
 
 	//Code is the HTTP Status code received from the transaction
@@ -21,15 +21,15 @@ type XmidtResponse struct {
 	Body []byte
 }
 
-//Tr1d1umTransactor performs a typical HTTP request but
-//enforces some logic onto the HTTP transaction such as
-//context-based timeout and header filtering
-//this is a common utility for the stat and config tr1d1um services
+// Tr1d1umTransactor performs a typical HTTP request but
+// enforces some logic onto the HTTP transaction such as
+// context-based timeout and header filtering
+// this is a common utility for the stat and config tr1d1um services
 type Tr1d1umTransactor interface {
 	Transact(*http.Request) (*XmidtResponse, error)
 }
 
-//Tr1d1umTransactorOptions include parameters needed to configure the transactor
+// Tr1d1umTransactorOptions include parameters needed to configure the transactor
 type Tr1d1umTransactorOptions struct {
 	//RequestTimeout is the deadline duration for the HTTP transaction to be completed
 	RequestTimeout time.Duration
