@@ -13,7 +13,7 @@ var (
 	ErrUnsupportedMethod = common.NewBadRequestError(errors.New("unsupported method. Could not decode request payload"))
 
 	//Set command errors
-	ErrInvalidSetWDMP = common.NewBadRequestError(errors.New("invalid XPC SET message"))
+	ErrInvalidSetWDMP = common.NewBadRequestError(errors.New("invalid SET message"))
 	ErrNewCIDRequired = common.NewBadRequestError(errors.New("newCid is required for TEST_AND_SET"))
 
 	//Add/Delete command  errors

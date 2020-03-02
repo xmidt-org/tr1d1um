@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - add optional config for tr1d1um to use its own authentication tokens (basic and jwt supported) [#148](https://github.com/xmidt-org/tr1d1um/pull/148)
+- remove mention of XPC team in error message [#150](https://github.com/xmidt-org/tr1d1um/pull/150)
 
 ## [v0.4.0]
 - fix a bug in which tr1d1um was returning 500 for user error requests [#146](https://github.com/xmidt-org/tr1d1um/pull/146)
