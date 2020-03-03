@@ -8,14 +8,12 @@ DOCKER_ORG   := xmidt
 PROGVER = $(shell git describe --tags `git rev-list --tags --max-count=1` | tail -1 | sed 's/v\(.*\)/\1/')
 BUILDTIME = $(shell date -u '+%Y-%m-%d %H:%M:%S')
 GITCOMMIT = $(shell git rev-parse --short HEAD)
+GOFLAGS = -a -installsuffix cgo -ldflags "-w -s -X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)" -o $(APP)
 
-.PHONY: go-mod-vendor
-go-mod-vendor:
-	GO111MODULE=on $(GO) mod vendor
 
 .PHONY: build
-build: go-mod-vendor
-	$(GO) build -o $(APP) -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
+build:
+	CGO_ENABLED=0 $(GO) build $(GOFLAGS)
 
 .PHONY: version
 version:
@@ -59,7 +57,7 @@ local-docker:
 		--build-arg VERSION=$(PROGVER)+local \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile.local -t $(DOCKER_ORG)/$(APP):local .
+		-f ./deploy/Dockerfile -t $(DOCKER_ORG)/$(APP):local .
 
 .PHONY: style
 style:
