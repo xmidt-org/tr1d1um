@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.13-alpine as builder
+FROM docker.io/library/golang:1.14-alpine as builder
 
 MAINTAINER Jack Murdock <jack_murdock@comcast.com>
 
