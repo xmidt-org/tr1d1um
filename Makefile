@@ -34,11 +34,11 @@ update-version:
 
 
 .PHONY: install
-install: go-mod-vendor
+install:
 	$(GO) install -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
 
 .PHONY: release-artifacts
-release-artifacts: go-mod-vendor
+release-artifacts: 
 	mkdir -p ./.ignore
 	GOOS=darwin GOARCH=amd64 $(GO) build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
 	GOOS=linux  GOARCH=amd64 $(GO) build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
@@ -64,7 +64,7 @@ style:
 	! $(GOFMT) -d $$(find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
 .PHONY: test
-test: go-mod-vendor
+test: 
 	GO111MODULE=on $(GO) test -v -race  -coverprofile=cover.out ./...
 
 .PHONY: test-cover
