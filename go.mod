@@ -1,6 +1,6 @@
 module github.com/xmidt-org/tr1d1um
 
-go 1.12
+go 1.14
 
 require (
 	github.com/aws/aws-sdk-go v1.23.11 // indirect

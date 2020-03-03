@@ -218,7 +218,6 @@ github.com/xmidt-org/webpa-common v1.7.0 h1:0FB/SQIePQigZ2DDMWSjRml2FxPLZJPrcq1s
 github.com/xmidt-org/webpa-common v1.7.0/go.mod h1:PV4+42cjvL2hCj17Jb+Rnik9DszDG/DjHz8IT8e52ww=
 github.com/xmidt-org/wrp-go v1.3.3 h1:WvODdrtxPwHEUqwfwHpu+kNUfBzLBfAIdrKCQjoCblc=
 github.com/xmidt-org/wrp-go v1.3.3/go.mod h1:VOKYeeVWc2cyYmGWJksqUCV/lGzReRl0EP74y3mcWp0=
-github.com/xmidt-org/wrp-go v1.3.4 h1:7kj+1VXRNNEI7G0Z3z7C58QpIXrWzTw/eI79FdAhyPA=
 github.com/xmidt-org/wrp-go/v2 v2.0.0 h1:5qWc3uZDQNxjunUqK9HMrWZcdCaTtUVCtR+SSYWSK6I=
 github.com/xmidt-org/wrp-go/v2 v2.0.0/go.mod h1:v0HK0go/7OSVDvKbnXsUn6c+M987p0yyxWEs8/Fmf60=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
