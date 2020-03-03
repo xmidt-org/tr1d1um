@@ -58,6 +58,7 @@ jobs:
         skip_cleanup: true
     - stage: docker-release
       name: "Make Docker Release"
+      if: branch != master
       script: skip
       deploy:
         - provider: script
