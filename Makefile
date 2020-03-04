@@ -8,14 +8,12 @@ DOCKER_ORG   := xmidt
 PROGVER = $(shell git describe --tags `git rev-list --tags --max-count=1` | tail -1 | sed 's/v\(.*\)/\1/')
 BUILDTIME = $(shell date -u '+%Y-%m-%d %H:%M:%S')
 GITCOMMIT = $(shell git rev-parse --short HEAD)
+GOFLAGS = -a -installsuffix cgo -ldflags "-w -s -X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)" -o $(APP)
 
-.PHONY: go-mod-vendor
-go-mod-vendor:
-	GO111MODULE=on $(GO) mod vendor
 
 .PHONY: build
-build: go-mod-vendor
-	$(GO) build -o $(APP) -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
+build:
+	CGO_ENABLED=0 $(GO) build $(GOFLAGS)
 
 .PHONY: version
 version:
@@ -36,11 +34,11 @@ update-version:
 
 
 .PHONY: install
-install: go-mod-vendor
+install:
 	$(GO) install -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
 
 .PHONY: release-artifacts
-release-artifacts: go-mod-vendor
+release-artifacts: 
 	mkdir -p ./.ignore
 	GOOS=darwin GOARCH=amd64 $(GO) build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
 	GOOS=linux  GOARCH=amd64 $(GO) build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(PROGVER)"
@@ -59,14 +57,14 @@ local-docker:
 		--build-arg VERSION=$(PROGVER)+local \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
 		--build-arg BUILDTIME='$(BUILDTIME)' \
-		-f ./deploy/Dockerfile.local -t $(DOCKER_ORG)/$(APP):local .
+		-f ./deploy/Dockerfile -t $(DOCKER_ORG)/$(APP):local .
 
 .PHONY: style
 style:
 	! $(GOFMT) -d $$(find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
 .PHONY: test
-test: go-mod-vendor
+test: 
 	GO111MODULE=on $(GO) test -v -race  -coverprofile=cover.out ./...
 
 .PHONY: test-cover
