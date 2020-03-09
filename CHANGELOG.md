@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- add docker entrypoint [154](https://github.com/xmidt-org/tr1d1um/pull/154)
 
 ## [v0.5.0]
 - add optional config for tr1d1um to use its own authentication tokens (basic and jwt supported) [#148](https://github.com/xmidt-org/tr1d1um/pull/148)
