@@ -115,6 +115,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
+
+
 	var (
 		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
 		authenticate            *alice.Chain
