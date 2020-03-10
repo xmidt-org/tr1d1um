@@ -165,7 +165,7 @@ aws:
   #AWS secret key
   secretKey: (( grab $AWS_SECRET_KEY || "" ))
 
-  env: (( grab $AWS_WEBHOOK_ENC || "local-dev" ))
+  env: (( grab $AWS_WEBHOOK_ENV || "local-dev" ))
 
   sns:
     # awsEndpoint is the AWS endpoint
