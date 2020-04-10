@@ -270,6 +270,9 @@ requestRetryInterval: "2s"
 # case of ephemeral errors
 requestMaxRetries: 2
 
+#authtoken used to make spruce work better for authAcquirer
+authToken: (( grab $AUTH_TOKEN || "dXNlcjpwYXNz" ))
+
 # authAcquirer enables configuring the JWT or Basic auth header value factory for outgoing
 # requests to XMiDT. If both types are configured, JWT will be preferred.
 # (Optional)
@@ -290,4 +293,4 @@ authAcquirer:
     # buffer is the length of time before a token expires to get a new token.
     buffer: "2m"
 
-  Basic: "Basic dXNlcjpwYXNz"
+  Basic:  (( concat "Basic " authToken ))
