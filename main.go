@@ -39,6 +39,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -251,8 +252,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	var (
-		_, tr1d1umServer, _ = webPA.Prepare(logger, nil, metricsRegistry, r)
-		signals             = make(chan os.Signal, 1)
+		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, r)
+		signals                = make(chan os.Signal, 10)
 	)
 
 	//
@@ -276,9 +277,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 	}
 
-	signal.Notify(signals)
-	s := server.SignalWait(infoLogger, signals, os.Kill, os.Interrupt)
-	errorLogger.Log(logging.MessageKey(), "exiting due to signal", "signal", s)
+	signal.Notify(signals, os.Kill, os.Interrupt)
+	for exit := false; !exit; {
+		select {
+		case s := <-signals:
+			logger.Log(level.Key(), level.ErrorValue(), logging.MessageKey(), "exiting due to signal", "signal", s)
+			exit = true
+		case <-done:
+			logger.Log(level.Key(), level.ErrorValue(), logging.MessageKey(), "one or more servers exited")
+			exit = true
+		}
+	}
+
 	close(shutdown)
 	waitGroup.Wait()
 
