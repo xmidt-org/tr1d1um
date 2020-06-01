@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"net/http"
 	"net/url"
 	"time"
 
@@ -36,8 +37,8 @@ type Options struct {
 func ConfigHandler(o *Options) {
 	hooksRegistry, hooksHandler := o.HooksFactory.NewRegistryAndHandler(o.M)
 
-	o.APIRouter.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry))
-	o.APIRouter.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry))
+	o.APIRouter.Handle("/hook", o.Authenticate.ThenFunc(hooksRegistry.UpdateRegistry)).Methods(http.MethodPost)
+	o.APIRouter.Handle("/hooks", o.Authenticate.ThenFunc(hooksRegistry.GetRegistry)).Methods(http.MethodGet)
 
 	selfURL := &url.URL{
 		Scheme: o.Scheme,
