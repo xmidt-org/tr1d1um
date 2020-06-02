@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- specify allowed methods for webhook endpoints [#163](https://github.com/xmidt-org/tr1d1um/pull/163)
+- revert to default http mux routeNotFound handler for consistency [#163](https://github.com/xmidt-org/tr1d1um/pull/163)
+
 ### Added
 - add docker entrypoint [154](https://github.com/xmidt-org/tr1d1um/pull/154)
 
