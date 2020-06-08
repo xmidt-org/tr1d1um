@@ -83,7 +83,10 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*common.XmidtResponse)
 
-	w.Header().Set("Content-Type", "application/json")
+	if resp.Code == http.StatusOK {
+		w.Header().Set("Content-Type", "application/json")
+	}
+
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
