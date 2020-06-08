@@ -85,6 +85,8 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 	if resp.Code == http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
+	} else {
+		w.Header().Del("Content-Type")
 	}
 
 	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
