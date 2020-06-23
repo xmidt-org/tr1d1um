@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/xmidt-org/argus/chrysom"
 	"io"
 	"net"
 	"net/http"
@@ -148,30 +149,19 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	// Webhooks (if not configured, handler for webhooks is not set up)
 	//
-	var snsFactory *webhook.Factory
+	var webhookStoreConfig chrysom.ClientConfig
 
-	if v.GetBool("webhooksEnabled") {
-		snsFactory, err = webhook.NewFactory(v)
+	if err := v.UnmarshalKey("webhookStore", &webhookStoreConfig); err == nil {
 
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating new webHook factory: %s\n", err.Error())
-			return 1
-		}
-
-	}
-
-	if snsFactory != nil {
 		hooks.ConfigHandler(&hooks.Options{
-			APIRouter:    APIRouter,
-			RootRouter:   r,
-			SoAProvider:  v.GetString("soa.provider"),
-			Authenticate: authenticate,
-			M:            metricsRegistry,
-			Host:         v.GetString("fqdn") + v.GetString("primary.address"),
-			HooksFactory: snsFactory,
-			Log:          logger,
-			Scheme:       v.GetString(hooksSchemeKey),
+			APIRouter:          APIRouter,
+			Authenticate:       authenticate,
+			Log:                logger,
+			WebhookStoreConfig: webhookStoreConfig,
 		})
+
+	} else {
+		infoLogger.Log(logging.MessageKey(), "webhookStore disabled")
 	}
 
 	//
@@ -293,13 +283,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 // timeoutConfigs holds parsable config values for HTTP transactions
 type timeoutConfigs struct {
-	//HTTP client timeout
+	// HTTP client timeout
 	cTimeout time.Duration
 
-	//HTTP request timeout
+	// HTTP request timeout
 	rTimeout time.Duration
 
-	//net dialer timeout
+	// net dialer timeout
 	dTimeout time.Duration
 }
 
