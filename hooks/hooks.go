@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"encoding/json"
-	"fmt"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -72,7 +71,11 @@ func NewRegistry(config RegistryConfig) (*Registry, error) {
 func jsonResponse(rw http.ResponseWriter, code int, msg string) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(code)
-	rw.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, msg)))
+	type responseMessage struct {
+		msg string `json:"message"`
+	}
+	data, _ := json.Marshal(&responseMessage{msg: msg})
+	rw.Write(data)
 }
 
 // update is an api call to processes a listener registration for adding and updating

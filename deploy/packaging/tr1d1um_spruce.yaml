@@ -119,67 +119,41 @@ log:
 ##############################################################################
 # Webhooks Related configuration
 ##############################################################################
+# webhookStore provides configuration for storing and obtaining webhook
+# information using argus.
+webhookStore:
 
-# webhooksEnabled indicates whether or not the webhooks server should be started
-# It is disabled for local testing
-webhooksEnabled: false
+  # bucket to store and retrieve webhooks.
+  bucket: (( grab $AUTH_HEADER || "webhooks-caduceus" ))
 
-# The unique fully-qualified-domain-name of the server.  The webhooks library uses it
-# to know which host to use to confirm this service is ready to receive events
-# (Optional if not running webhooks)
-fqdn: (( grab $FQDN || $HOSTNAME || "tr1d1um" ))
+  # address it the the location to talk to argus.
+  address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
 
-# start contains configuration for the logic by which Tr1d1um can
-# fetch the current WebPA webhooks without having to wait for SNS
-# It does so by pinging the rest of the cluter at the specified apiPath
-# More details at https://godoc.org/github.com/xmidt-org/webpa-common/webhook#StartConfig
-start:
-  # duration is the max amount of time allowed to wait for webhooks data to be retrieved
-  duration: "20s"
+  # pullInterval is how often to call argus to update the webhook structure.
+  pullInterval: "0s"
 
-  # path used to query the existing webhooks
-  apiPath: http://localhost:6100/hooks
-
-########################################
-# Webhooks DNS readiness Configuration
-########################################
-
-# WaitForDns is the duration the webhooks library will wait for this server's DNS record to be
-# propagated. This waiting logic is important so AWS SNS webhook confirmations are not missed
-waitForDns: "30s"
-
-#soa stands for Start of Authority and it's a type of record in a DNS
-soa:
-  # provider is the SOA provider used to verify DNS record readiness of this service
-  provider: "example-123.awsdns-00.com:17"
-
-########################################
-# Webhooks AWS SNS Configuration
-########################################
-
-# aws provides the AWS SNS configurations the webhooks library needs
-aws:
-  #AWS access key
-  accessKey: (( grab $AWS_ACCESS_KEY || "" ))
-
-  #AWS secret key
-  secretKey: (( grab $AWS_SECRET_KEY || "" ))
-
-  env: (( grab $AWS_WEBHOOK_ENV || "local-dev" ))
-
-  sns:
-    # awsEndpoint is the AWS endpoint
-    # this must be left out in produ
-    awsEndpoint: (( grab $AWS_ENDPOINT || "http://goaws:4100" ))
-
-    #region is the AWS SNS region
-    region: (( grab $AWS_REGION || "us-east-1" ))
-
-    # topicArn describes the SNS topic this server needs to subscribe to
-    topicArn: (( grab $AWS_SNS_ARN || "arn:aws:sns:us-east-1:000000000000:xmidt-local-caduceus"))
-
-    #urlPath is the URL path SNS will use to confirm a subscription with this server
-    urlPath: "/api/v2/aws/sns"
+  # auth the authentication method for argus.
+  auth:
+    # basic configures basic authentication for argus.
+    # Must be of form: 'Basic xyz=='
+    basic: (( concat "Basic " authToken ))
+#
+#    # jwt configures jwt style authentication for argus.
+#    JWT:
+#      # requestHeaders are added to the request for the token.
+#      # (Optional)
+#      # requestHeaders:
+#      #   "": ""
+#
+#      # authURL is the URL to access for the token.
+#      authURL: ""
+#
+#      # timeout is how long the request to get the token will take before
+#      # timing out.
+#      timeout: "1m"
+#
+#      # buffer is the length of time before a token expires to get a new token.
+#      buffer: "2m"
 
 
 ##############################################################################

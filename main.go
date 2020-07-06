@@ -252,17 +252,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 4
 	}
 
-	if snsFactory != nil {
-		// wait for DNS to propagate before subscribing to SNS
-		if err = snsFactory.DnsReady(); err == nil {
-			infoLogger.Log(logging.MessageKey(), "server is ready to take on subscription confirmations")
-			snsFactory.PrepareAndStart()
-		} else {
-			errorLogger.Log(logging.MessageKey(), "Server was not ready within a time constraint. SNS confirmation could not happen",
-				logging.ErrorKey(), err)
-		}
-	}
-
 	signal.Notify(signals, os.Kill, os.Interrupt)
 	for exit := false; !exit; {
 		select {
