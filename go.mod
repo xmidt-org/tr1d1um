@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/xmidt-org/argus v0.3.3
 	github.com/xmidt-org/bascule v0.8.1
-	github.com/xmidt-org/webpa-common v1.10.2-0.20200611231934-64a391cb4d8d
+	github.com/xmidt-org/webpa-common v1.10.2
 	github.com/xmidt-org/wrp-go v1.3.3
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 // indirect

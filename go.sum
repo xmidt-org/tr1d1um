@@ -266,8 +266,6 @@ github.com/ugorji/go v1.1.7/go.mod h1:kZn38zHttfInRq0xu/PH0az30d+z6vm202qpg1oXVM
 github.com/ugorji/go/codec v1.1.7 h1:2SvQaVZ1ouYrrKKwoSk2pzd4A9evlKJb9oTL+OaLUSs=
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
-github.com/xmidt-org/argus v0.3.0 h1:3P22/9vKN+VXTnPIr3wPJvfTDBhf+K82ZS9mYYatJGE=
-github.com/xmidt-org/argus v0.3.0/go.mod h1:msivo9vrE9z5xVh8/ahJ6v/DGMIvR1DDq0+jEGTa1TA=
 github.com/xmidt-org/argus v0.3.3 h1:Tb3ORrpJgy3rlRZMS4r9Do/jwLQdpQf5gRDaY28TxGI=
 github.com/xmidt-org/argus v0.3.3/go.mod h1:msivo9vrE9z5xVh8/ahJ6v/DGMIvR1DDq0+jEGTa1TA=
 github.com/xmidt-org/bascule v0.8.0 h1:xk/c8zqqNjoSW4b4oSrUwemm786Bs5DabmX7AgUgNPw=
@@ -281,8 +279,8 @@ github.com/xmidt-org/webpa-common v1.3.1 h1:IenWLbUZwM9vtIZz5n8+/us9bv2XxAQSx8FC
 github.com/xmidt-org/webpa-common v1.3.1/go.mod h1:oCpKzOC+9h2vYHVzAU/06tDTQuBN4RZz+rhgIXptpOI=
 github.com/xmidt-org/webpa-common v1.3.2/go.mod h1:oCpKzOC+9h2vYHVzAU/06tDTQuBN4RZz+rhgIXptpOI=
 github.com/xmidt-org/webpa-common v1.10.2-0.20200604164000-f07406b4eb63/go.mod h1:Fmt3wIxBzwJY0KeRHX6RaLZx2xpKTbXCLEA3Xtd6kq8=
-github.com/xmidt-org/webpa-common v1.10.2-0.20200611231934-64a391cb4d8d h1:tUui5tDEYuF58t6RVfLMUlDUQaWAtxEPnjEArGFTa5s=
-github.com/xmidt-org/webpa-common v1.10.2-0.20200611231934-64a391cb4d8d/go.mod h1:Fmt3wIxBzwJY0KeRHX6RaLZx2xpKTbXCLEA3Xtd6kq8=
+github.com/xmidt-org/webpa-common v1.10.2 h1:XOykCu8sc6sVs8vlR4CS/dAk+Z6rVqSyUlBW+tIz+IQ=
+github.com/xmidt-org/webpa-common v1.10.2/go.mod h1:Fmt3wIxBzwJY0KeRHX6RaLZx2xpKTbXCLEA3Xtd6kq8=
 github.com/xmidt-org/wrp-go v1.3.3 h1:WvODdrtxPwHEUqwfwHpu+kNUfBzLBfAIdrKCQjoCblc=
 github.com/xmidt-org/wrp-go v1.3.3/go.mod h1:VOKYeeVWc2cyYmGWJksqUCV/lGzReRl0EP74y3mcWp0=
 github.com/xmidt-org/wrp-go/v3 v3.0.1 h1:E1FrFwWi21pFDL3c6M4ufqA4ykXWPops9BMnadChUH8=
