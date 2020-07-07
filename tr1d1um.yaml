@@ -121,12 +121,13 @@ log:
 ##############################################################################
 # webhookStore provides configuration for storing and obtaining webhook
 # information using argus.
+# Optional: if key is not supplied webhooks would be disabled.
 webhookStore:
 
   # bucket to store and retrieve webhooks.
   bucket: "webhooks-caduceus"
 
-  # address it the the location to talk to argus.
+  # address is the location to talk to argus.
   address: "http://argus:6600"
 
   # pullInterval is how often to call argus to update the webhook structure.
@@ -145,7 +146,7 @@ webhookStore:
 #      # requestHeaders:
 #      #   "": ""
 #
-#      # authURL is the URL to access for the token.
+#      # authURL is the URL to access the token.
 #      authURL: ""
 #
 #      # timeout is how long the request to get the token will take before

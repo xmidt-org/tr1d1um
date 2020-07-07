@@ -37,13 +37,8 @@ func ConfigHandler(o *Options) {
 
 }
 
-type HookStore interface {
-	chrysom.Pusher
-	chrysom.Reader
-}
-
 type Registry struct {
-	hookStore HookStore
+	hookStore chrysom.PushReader
 	config    RegistryConfig
 }
 
