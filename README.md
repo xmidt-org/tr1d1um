@@ -1,11 +1,11 @@
 # Tr1d1um
 
-[![Build Status](https://travis-ci.com/xmidt-org/tr1d1um.svg?branch=master)](https://travis-ci.com/xmidt-org/tr1d1um) 
-[![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=master)](https://codecov.io/github/xmidt-org/tr1d1um?branch=master)
+[![Build Status](https://travis-ci.com/xmidt-org/tr1d1um.svg?branch=main)](https://travis-ci.com/xmidt-org/tr1d1um) 
+[![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=main)](https://codecov.io/github/xmidt-org/tr1d1um?branch=main)
 [![Code Climate](https://codeclimate.com/github/xmidt-org/tr1d1um/badges/gpa.svg)](https://codeclimate.com/github/xmidt-org/tr1d1um)
 [![Issue Count](https://codeclimate.com/github/xmidt-org/tr1d1um/badges/issue_count.svg)](https://codeclimate.com/github/xmidt-org/tr1d1um)
 [![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/tr1d1um)](https://goreportcard.com/report/github.com/xmidt-org/tr1d1um)
-[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/tr1d1um/blob/master/LICENSE)
+[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/tr1d1um/blob/main/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/xmidt-org/tr1d1um.svg)](CHANGELOG.md)
 
 
@@ -98,7 +98,7 @@ then replace `local` in the `docker build` command.
 
 ## Deploy
 
-If you'd like to stand up `Tr1d1um` and the XMiDT cluster on Docker for local testing, refer to the [deploy README](https://github.com/xmidt-org/xmidt/tree/master/deploy/README.md).
+If you'd like to stand up `Tr1d1um` and the XMiDT cluster on Docker for local testing, refer to the [deploy README](https://github.com/xmidt-org/xmidt/tree/main/deploy/README.md).
 
 You can also run the standalone `tr1d1um` binary with the default `tr1d1um.yaml` config file:
 ```bash
