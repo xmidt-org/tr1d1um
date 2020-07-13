@@ -52,14 +52,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
  - Bumped bascule version and removed any dependencies on webpa-common secure package. 
 
 ## [v0.1.4]
-Add logging of WDMP parameters
+- Add logging of WDMP parameters.
 
 ## [v0.1.2]
-Switching to new build process
+- Switching to new build process.
 
 ## [0.1.1] - 2018-04-06
 ### Added
-- Initial creation
+- Initial creation.
 
 [Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.1...HEAD
 [v0.5.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.0...v0.5.1
