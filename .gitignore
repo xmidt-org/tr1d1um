@@ -37,6 +37,7 @@ _test
 coverage*
 vendor
 .ignore
+report.json
 
 # Architecture specific extensions/prefixes
 *.[568vq]
