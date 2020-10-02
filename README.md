@@ -61,9 +61,10 @@ make build
 
 The Makefile has the following options you may find helpful:
 * `make build`: builds the Tr1d1um binary in the tr1d1um/src/tr1d1um folder
-* `make docker`: fetches dependencies and builds a docker image for Tr1d1um
-* `make local-docker`: builds a docker image for Tr1d1um assuming dependencies
-   have been fetched
+* `make docker`: fetches all dependencies from source and builds a Tr1d1um
+   docker image
+* `make local-docker`: vendors dependencies and builds a Tr1d1um docker image
+   (recommended for local testing)
 * `make test`: runs unit tests with coverage for Tr1d1um
 * `make clean`: deletes previously-built binaries and object files
 
@@ -78,24 +79,32 @@ rpkg -C <repo location>/.config/rpkg.conf sources --outdir <repo location>'
 
 ### Docker
 
-The docker image can be built either with the Makefile or by running a docker 
+The docker image can be built either with the Makefile or by running a docker
 command.  Either option requires first getting the source code.
 
 See [Makefile](#Makefile) on specifics of how to build the image that way.
 
-For running a command, either you can run `docker build` after getting all 
-dependencies, or make the command fetch the dependencies.  If you don't want to 
-get the dependencies, run the following command:
+If you'd like to build it without make, follow these instructions based on your use case:
+
+- Local testing
 ```bash
-docker build -t tr1d1um:local -f Dockerfile.local .
+go mod vendor
+docker build -t tr1d1um:local -f deploy/Dockerfile .
 ```
-If you want to get the dependencies then build, run the following commands:
+This allows you to test local changes to a dependency. For example, you can build 
+a tr1d1um image with the changes to an upcoming changes to [webpa-common](https://github.com/xmidt-org/webpa-common) by using the [replace](https://golang.org/ref/mod#go) directive in your go.mod file like so:
+```
+replace github.com/xmidt-org/webpa-common v1.10.2 => ../webpa-common
+```
+**Note:** if you omit `go mod vendor`, your build will fail as the path `../webpa-common` does not exist on the builder container.
+
+- Building a specific version
 ```bash
-docker build -t tr1d1um:local -f Dockerfile .
+git checkout v0.5.1
+docker build -t tr1d1um:v0.5.1 -f deploy/Dockerfile .
 ```
 
-For either command, if you want the tag to be a version instead of `local`, 
-then replace `local` in the `docker build` command.
+**Additional Info:** If you'd like to stand up a XMiDT docker-compose cluster, read [this](https://github.com/xmidt-org/xmidt/blob/master/deploy/docker-compose/README.md).
 
 ## Deploy
 
