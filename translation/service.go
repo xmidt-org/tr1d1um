@@ -8,7 +8,7 @@ import (
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 // Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
