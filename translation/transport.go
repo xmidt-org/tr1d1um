@@ -8,19 +8,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xmidt-org/tr1d1um/common"
-
-	"github.com/justinas/alice"
-	"github.com/xmidt-org/wrp-go/wrp"
-
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
-
 	"github.com/gorilla/mux"
-	"github.com/xmidt-org/bascule"
-	"github.com/xmidt-org/webpa-common/basculechecks"
+	"github.com/justinas/alice"
 
-	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/webpa-common/basculechecks"
+	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 )
 
 const (
@@ -102,8 +99,12 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	if tokenType != "jwt" {
 		return getPartnerIDs(r.Header)
 	}
-	partnerIDs, ok := auth.Token.Attributes().GetStringSlice(basculechecks.PartnerKey)
+	partnerVal, ok := bascule.GetNestedAttribute(auth.Token.Attributes(), basculechecks.PartnerKeys()...)
 	//if no partner ids
+	if !ok {
+		return getPartnerIDs(r.Header)
+	}
+	partnerIDs, ok := partnerVal.([]string)
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}

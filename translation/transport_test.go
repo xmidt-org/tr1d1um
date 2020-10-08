@@ -14,8 +14,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/wrp-go/wrp"
-	"github.com/xmidt-org/wrp-go/wrp/wrphttp"
+	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 
 	"github.com/xmidt-org/bascule"
 )
@@ -92,7 +92,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-			attrs := bascule.NewAttributesFromMap(test.attrMap)
+			attrs := bascule.NewAttributes(test.attrMap)
 			auth := bascule.Authentication{
 				Token: bascule.NewToken(test.tokenType, "client0", attrs),
 			}

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed 
 - Switched SNS to argus. [#168](https://github.com/xmidt-org/tr1d1um/pull/168)
 - Update references to the main branch. [#144](https://github.com/xmidt-org/talaria/pull/144) 
+- Bumped bascule, webpa-common, and wrp-go versions. [#173](https://github.com/xmidt-org/tr1d1um/pull/173)
 
 ## [v0.5.1]
 ### Fixed

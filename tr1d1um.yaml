@@ -131,7 +131,7 @@ webhookStore:
   address: "http://argus:6600"
 
   # pullInterval is how often to call argus to update the webhook structure.
-  pullInterval: "0s"
+  pullInterval: "10s"
 
   # auth the authentication method for argus.
   auth:

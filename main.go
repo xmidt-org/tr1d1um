@@ -23,7 +23,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/xmidt-org/argus/chrysom"
 	"io"
 	"net"
 	"net/http"
@@ -33,6 +32,8 @@ import (
 	"regexp"
 	"runtime"
 	"time"
+
+	"github.com/xmidt-org/argus/chrysom"
 
 	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/hooks"
@@ -429,6 +430,10 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	v.UnmarshalKey("capabilityCheck", &capabilityCheck)
 	if capabilityCheck.Type == "enforce" || capabilityCheck.Type == "monitor" {
 		var endpoints []*regexp.Regexp
+		c, err := basculechecks.NewEndpointRegexCheck(capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
+		if err != nil {
+			return nil, emperror.With(err, "failed to create capability check")
+		}
 		for _, e := range capabilityCheck.EndpointBuckets {
 			r, err := regexp.Compile(e)
 			if err != nil {
@@ -437,11 +442,12 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 			}
 			endpoints = append(endpoints, r)
 		}
-		checker, err := basculechecks.NewCapabilityChecker(capabilityCheckMeasures, capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod, endpoints)
-		if err != nil {
-			return nil, emperror.With(err, "failed to create capability check")
+		m := basculechecks.MetricValidator{
+			C:         basculechecks.CapabilitiesValidator{Checker: c},
+			Measures:  capabilityCheckMeasures,
+			Endpoints: endpoints,
 		}
-		bearerRules = append(bearerRules, checker.CreateBasculeCheck(capabilityCheck.Type == "enforce"))
+		bearerRules = append(bearerRules, m.CreateValidator(capabilityCheck.Type == "enforce"))
 	}
 
 	authEnforcer := basculehttp.NewEnforcer(
