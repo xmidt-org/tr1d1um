@@ -119,42 +119,42 @@ log:
 ##############################################################################
 # Webhooks Related configuration 
 ##############################################################################
-# webhookStore provides configuration for storing and obtaining webhook
-# information using argus.
-# Optional: if key is not supplied webhooks would be disabled.
-webhookStore:
+# webhook provides configuration for storing and obtaining webhook
+# information using Argus.
+# Optional: if key is not supplied, webhooks would be disabled.
+webhook:
+  # watchUpdateInterval provides how often the watches get an updated 
+  # copy of the webhooks from Argus.
+  watchUpdateInterval: 5s
+  argus: 
+    # bucket to store and retrieve webhooks.
+    bucket: "webhook"
 
-  # bucket to store and retrieve webhooks.
-  bucket: "webhooks-caduceus"
+    # address is the location to talk to argus.
+    address: "http://localhost:6600"
 
-  # address is the location to talk to argus.
-  address: "http://argus:6600"
-
-  # pullInterval is how often to call argus to update the webhook structure.
-  pullInterval: "10s"
-
-  # auth the authentication method for argus.
-  auth:
-    # basic configures basic authentication for argus.
-    # Must be of form: 'Basic xyz=='
-    basic: "Basic dXNlcjpwYXNz"
-#
-#    # jwt configures jwt style authentication for argus.
-#    JWT:
-#      # requestHeaders are added to the request for the token.
-#      # (Optional)
-#      # requestHeaders:
-#      #   "": ""
-#
-#      # authURL is the URL to access the token.
-#      authURL: ""
-#
-#      # timeout is how long the request to get the token will take before
-#      # timing out.
-#      timeout: "1m"
-#
-#      # buffer is the length of time before a token expires to get a new token.
-#      buffer: "2m"
+    # auth the authentication method for argus.
+    auth:
+      # basic configures basic authentication for argus.
+      # Must be of form: 'Basic xyz=='
+      basic: "Basic dXNlcjpwYXNz"
+  #
+  #    # jwt configures jwt style authentication for argus.
+  #    JWT:
+  #      # requestHeaders are added to the request for the token.
+  #      # (Optional)
+  #      # requestHeaders:
+  #      #   "": ""
+  #
+  #      # authURL is the URL to access the token.
+  #      authURL: ""
+  #
+  #      # timeout is how long the request to get the token will take before
+  #      # timing out.
+  #      timeout: "1m"
+  #
+  #      # buffer is the length of time before a token expires to get a new token.
+  #      buffer: "2m"
 
 ##############################################################################
 # Testing Authorization Credentials
