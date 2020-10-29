@@ -123,12 +123,13 @@ log:
 # information using Argus.
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
-  # watchUpdateInterval provides how often the watches get an updated 
-  # copy of the webhooks from Argus.
-  watchUpdateInterval: 5s
   argus: 
     # bucket to store and retrieve webhooks.
     bucket: "webhook"
+
+    # pullInterval provides how often the current webhooks list gets updated 
+    # from Argus.
+    pullInterval: 5s
 
     # address is the location to talk to argus.
     address: "http://localhost:6600"

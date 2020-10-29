@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/xmidt-org/argus/chrysom"
 	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -102,7 +103,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
 		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, xwebhook.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, xwebhook.Metrics, chrysom.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 	)
 
 	// This allows us to communicate the version of the binary upon request.
@@ -159,8 +160,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 
 		webhookConfig.Argus.Logger = logger
+		webhookConfig.Argus.MetricsProvider = metricsRegistry
 
-		svc, stopWatch, err := xwebhook.Initialize(webhookConfig, metricsRegistry)
+		svc, stopWatch, err := xwebhook.Initialize(webhookConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
 			return 1
