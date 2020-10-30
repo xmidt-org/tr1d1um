@@ -1,4 +1,4 @@
-# Tr1d1um
+# tr1d1um
 
 [![Build Status](https://travis-ci.com/xmidt-org/tr1d1um.svg?branch=main)](https://travis-ci.com/xmidt-org/tr1d1um) 
 [![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=main)](https://codecov.io/github/xmidt-org/tr1d1um?branch=main)
