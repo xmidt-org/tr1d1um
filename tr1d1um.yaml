@@ -117,22 +117,24 @@ log:
   # reducedLoggingResponseCodes: [200, 504]
 
 ##############################################################################
-# Webhooks Related configuration 
+# Webhooks Related Configuration 
 ##############################################################################
 # webhook provides configuration for storing and obtaining webhook
 # information using Argus.
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
   argus: 
-    # bucket to store and retrieve webhooks.
-    bucket: "webhook"
+    # bucket is the partition name for storing webhooks.
+    bucket: "webhooks"
 
-    # pullInterval provides how often the current webhooks list gets updated 
-    # from Argus.
+    # pullInterval provides how often the current webhooks list gets refreshed.
     pullInterval: 5s
 
-    # address is the location to talk to argus.
+    # address is Argus' network location.
     address: "http://localhost:6600"
+
+    # adminToken provides internal access to webhooks stored on behalf of users. 
+    adminToken: "Hzu1WpIe7S8G"
 
     # auth the authentication method for argus.
     auth:
