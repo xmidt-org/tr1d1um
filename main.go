@@ -33,10 +33,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/argus/chrysom"
-
 	"github.com/xmidt-org/tr1d1um/common"
-	"github.com/xmidt-org/tr1d1um/hooks"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
 
@@ -56,17 +53,18 @@ import (
 	"github.com/xmidt-org/webpa-common/concurrent"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/server"
-	"github.com/xmidt-org/webpa-common/webhook"
-	"github.com/xmidt-org/webpa-common/webhook/aws"
 	"github.com/xmidt-org/webpa-common/xhttp"
 	"github.com/xmidt-org/webpa-common/xmetrics"
+	"github.com/xmidt-org/webpa-common/xwebhook"
 )
 
 // convenient global values
 const (
 	DefaultKeyID             = "current"
 	applicationName, apiBase = "tr1d1um", "api/v2"
+)
 
+const (
 	translationServicesKey            = "supportedServices"
 	targetURLKey                      = "targetURL"
 	netDialerTimeoutKey               = "netDialerTimeout"
@@ -74,10 +72,11 @@ const (
 	reqTimeoutKey                     = "respWaitTimeout"
 	reqRetryIntervalKey               = "requestRetryInterval"
 	reqMaxRetriesKey                  = "requestMaxRetries"
-	WRPSourcekey                      = "WRPSource"
+	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
 	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
+	webhookConfigKey                  = "webhook"
 )
 
 var (
@@ -95,7 +94,7 @@ var defaults = map[string]interface{}{
 	reqTimeoutKey:          "40s",
 	reqRetryIntervalKey:    "2s",
 	reqMaxRetriesKey:       2,
-	WRPSourcekey:           "dns:localhost",
+	wrpSourceKey:           "dns:localhost",
 	hooksSchemeKey:         "https",
 }
 
@@ -103,7 +102,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
 		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, webhook.Metrics, aws.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, xwebhook.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 	)
 
 	// This allows us to communicate the version of the binary upon request.
@@ -148,21 +147,36 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	//
-	// Webhooks (if not configured, handler for webhooks is not set up)
+	// Webhooks (if not configured, handlers are not set up)
 	//
-	var webhookStoreConfig chrysom.ClientConfig
+	if v.IsSet(webhookConfigKey) {
+		webhookConfig := new(xwebhook.Config)
+		err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
 
-	if err := v.UnmarshalKey("webhookStore", &webhookStoreConfig); err == nil {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to decode config for webhook service: %s\n", err.Error())
+			return 1
+		}
 
-		hooks.ConfigHandler(&hooks.Options{
-			APIRouter:          APIRouter,
-			Authenticate:       authenticate,
-			Log:                logger,
-			WebhookStoreConfig: webhookStoreConfig,
-		})
+		webhookConfig.Argus.Logger = logger
+		webhookConfig.Argus.MetricsProvider = metricsRegistry
 
+		svc, stopWatch, err := xwebhook.Initialize(webhookConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
+			return 1
+		}
+		defer stopWatch()
+
+		addWebhookHandler := xwebhook.NewAddWebhookHandler(svc)
+		getAllWebhooksHandler := xwebhook.NewGetAllWebhooksHandler(svc)
+
+		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+
+		infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
 	} else {
-		infoLogger.Log(logging.MessageKey(), "webhookStore disabled")
+		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
 	//
@@ -189,7 +203,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
 
-		WRPSource: v.GetString(WRPSourcekey),
+		WRPSource: v.GetString(wrpSourceKey),
 
 		Tr1d1umTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
