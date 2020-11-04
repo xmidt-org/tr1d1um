@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.5.2]
 ### Changed 
+- Update Argus integration. [#175](https://github.com/xmidt-org/tr1d1um/pull/175)
 - Switched SNS to argus. [#168](https://github.com/xmidt-org/tr1d1um/pull/168)
 - Update references to the main branch. [#144](https://github.com/xmidt-org/talaria/pull/144) 
 - Bumped bascule, webpa-common, and wrp-go versions. [#173](https://github.com/xmidt-org/tr1d1um/pull/173)
@@ -62,7 +65,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.2...HEAD
+[v0.5.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.1...v0.5.2
 [v0.5.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.0...v0.5.1
 [v0.5.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.4.0...v0.5.0
 [v0.4.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.3.0...v0.4.0
