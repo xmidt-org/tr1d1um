@@ -26,7 +26,7 @@ The Webpa object translator.
 %setup -q
 
 %build
-date --version
+GOPROXY=https://proxy.golang.org go build -ldflags "-linkmode=external -X 'main.BuildTime=`date -u '+%c'`' -X main.GitCommit={{{ git_short_hash }}} -X main.Version=%{version}" -o %{name} .
 
 %install
 echo rm -rf %{buildroot}
