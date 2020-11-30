@@ -52,40 +52,45 @@ func TestDecodeRequest(t *testing.T) {
 
 func TestDecodeRequestPartnerIDs(t *testing.T) {
 	tests := []struct {
-		name               string
-		tokenType          string
-		attrMap            map[string]interface{}
-		expectedPartnerIDs []string
+		name                   string
+		tokenType              string
+		attrMap                map[string]interface{}
+		addPartnerIDsInHeaders bool
+		expectedPartnerIDs     []string
 	}{
 		{
-			name:      "all_success",
+			name:      "Partners from JWT",
 			tokenType: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
-					"allowedPartners": []string{"partnerA", "partnerB"},
+					"allowedPartners": []interface{}{"partnerA", "partnerB"},
 				}},
 			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
 
 		{
-			name:               "non_jwt",
-			tokenType:          "sss",
-			attrMap:            map[string]interface{}{},
-			expectedPartnerIDs: []string{"partner0", "partner1"},
+			name:                   "Partners from headers",
+			tokenType:              "sss",
+			attrMap:                map[string]interface{}{},
+			addPartnerIDsInHeaders: true,
+			expectedPartnerIDs:     []string{"partner0", "partner1"},
 		},
 
 		{
-			name:               "no_partnerIDs",
-			tokenType:          "jwt",
-			attrMap:            map[string]interface{}{},
-			expectedPartnerIDs: []string{"partner0", "partner1"},
+			name:      "No Patner IDs",
+			tokenType: "jwt",
+			attrMap:   map[string]interface{}{},
 		},
 
 		{
-			name:               "no_token",
-			tokenType:          "",
-			attrMap:            map[string]interface{}{},
-			expectedPartnerIDs: []string{"partner0", "partner1"},
+			name:      "Wrong type for partners from JWT",
+			tokenType: "jwt",
+			attrMap: map[string]interface{}{
+				"allowedResources": map[string]interface{}{
+					"allowedPartners": map[string]string{"partner-A": "first", "partner-B": "second"},
+				}},
+			addPartnerIDsInHeaders: true,
+			expectedPartnerIDs:     []string{"partner0", "partner1"},
 		},
 	}
 
@@ -101,9 +106,10 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
-			// adding partnerIDs to Header
-			r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
-			r.Header.Add(wrphttp.PartnerIdHeader, "partner1")
+			if test.addPartnerIDsInHeaders {
+				r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
+				r.Header.Add(wrphttp.PartnerIdHeader, "partner1")
+			}
 
 			if test.tokenType == "" {
 				ctx = ctxTID
@@ -120,7 +126,6 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
-			assert.NotEmpty(realWRP.WRPMessage.PartnerIDs)
 			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
 		})
 	}
