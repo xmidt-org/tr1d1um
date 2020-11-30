@@ -6,9 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix bug in which Tr1d1um was not capturing partnerIDs correctly due to casting error. [#182](https://github.com/xmidt-org/tr1d1um/pull/182)
 
 ## [v0.5.3]
-### Fixed 
+### Fixed
 - Bug in which only mTLS was allowed as valid config for a webpa server. [#181](https://github.com/xmidt-org/tr1d1um/pull/181)
 
 ## [v0.5.2]
