@@ -12,6 +12,7 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/spf13/cast"
 
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tr1d1um/common"
@@ -104,8 +105,9 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
-	partnerIDs, ok := partnerVal.([]string)
-	if !ok {
+	partnerIDs, err := cast.ToStringSliceE(partnerVal)
+
+	if err != nil {
 		return getPartnerIDs(r.Header)
 	}
 	return partnerIDs
