@@ -124,14 +124,17 @@ log:
 webhookStore:
 
   # bucket to store and retrieve webhooks.
-  bucket: (( grab $AUTH_HEADER || "webhooks-caduceus" ))
+  bucket: (( grab $ARGUS_BUCKET || "webhooks" ))
 
   # address it the location to talk to argus.
   address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
 
   # pullInterval is how often to call argus to update the webhook structure.
-  pullInterval: "0s"
+  pullInterval:  (( grab $ARGUS_PULL_INTERVAL || "2s" ))
 
+  # adminToken provides internal access to webhooks stored on behalf of users.
+  adminToken: (( grab $ARGUS_ADMIN_TOKEN || "Hzu1WpIe7S8G" ))
+  defaultTTL: (( grab $ARGUS_DEFAULT_TTL || "300" ))
   # auth the authentication method for argus.
   auth:
     # basic configures basic authentication for argus.
@@ -213,7 +216,7 @@ jwtValidator:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster
-targetURL: (( grab  $XMIDT_CLUSTER || "http://localhost:6300" ))
+targetURL: (( grab  $XMIDT_CLUSTER || "http://scytale:6300" ))
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"

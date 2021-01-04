@@ -131,7 +131,7 @@ webhook:
     pullInterval: 5s
 
     # address is Argus' network location.
-    address: "http://localhost:6600"
+    address: "http://argus:6600"
 
     # adminToken provides internal access to webhooks stored on behalf of users. 
     adminToken: "Hzu1WpIe7S8G"
@@ -215,7 +215,7 @@ jwtValidator:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: http://localhost:6300
+targetURL: http://scytale:6300
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"

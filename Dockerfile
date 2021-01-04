@@ -26,7 +26,7 @@ FROM alpine:3.12.1
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /src/tr1d1um /src/tr1d1um.yaml /src/deploy/packaging/entrypoint.sh /go/bin/spruce /src/Dockerfile /src/NOTICE /src/LICENSE /src/CHANGELOG.md /
-COPY --from=builder /src/deploy/packaging/tr1d1um.yaml /tmp/tr1d1um.yaml
+COPY --from=builder /src/deploy/packaging/tr1d1um_spruce.yaml /tmp/tr1d1um_spruce.yaml
 
 RUN mkdir /etc/tr1d1um/ && touch /etc/tr1d1um/tr1d1um.yaml && chmod 666 /etc/tr1d1um/tr1d1um.yaml
 
