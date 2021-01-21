@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Update
+### Changed
 - Migrate to github actions, normalize analysis tools, Dockerfiles and Makefiles. [#186](https://github.com/xmidt-org/tr1d1um/pull/186)
 - Bump webpa-common version with xwebhook item ID format update. [#192](https://github.com/xmidt-org/tr1d1um/pull/192)
 
