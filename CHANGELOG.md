@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Migrate to github actions, normalize analysis tools, Dockerfiles and Makefiles. [#186](https://github.com/xmidt-org/tr1d1um/pull/186)
 - Bump webpa-common version with xwebhook item ID format update. [#192](https://github.com/xmidt-org/tr1d1um/pull/192)
+- Update webhook logic library to xmidt-org/ancla. [#194](https://github.com/xmidt-org/tr1d1um/pull/194)
 
 ### Fixed
 
