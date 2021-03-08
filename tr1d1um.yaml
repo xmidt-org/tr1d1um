@@ -124,17 +124,17 @@ log:
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
   argus: 
-    # bucket is the partition name for storing webhooks.
+    # listen is the subsection that configures the listening feature of the argus client
+    # (Optional)
+    listen:
+      # pullInterval provides how often the current webhooks list gets refreshed.
+      pullInterval: 5s
+
+    # bucket is the partition name where webhooks will be stored.
     bucket: "webhooks"
 
-    # pullInterval provides how often the current webhooks list gets refreshed.
-    pullInterval: 5s
-
     # address is Argus' network location.
-    address: "http://argus:6600"
-
-    # adminToken provides internal access to webhooks stored on behalf of users. 
-    adminToken: "Hzu1WpIe7S8G"
+    address: "http://localhost:6600"
 
     # auth the authentication method for argus.
     auth:
@@ -250,20 +250,20 @@ requestMaxRetries: 2
 # requests to XMiDT. If both types are configured, JWT will be preferred.
 # (Optional)
 authAcquirer:
-  JWT: 
-    # requestHeaders are added to the request for the token.
-    # (Optional)
-    # requestHeaders:
-    #   "": ""
+  # JWT: 
+  #   # requestHeaders are added to the request for the token.
+  #   # (Optional)
+  #   # requestHeaders:
+  #   #   "": ""
 
-    # authURL is the URL to access for the token.
-    authURL: ""
+  #   # authURL is the URL to access for the token.
+  #   authURL: ""
 
-    # timeout is how long the request to get the token will take before 
-    # timing out.
-    timeout: "1m"
+  #   # timeout is how long the request to get the token will take before 
+  #   # timing out.
+  #   timeout: "1m"
 
-    # buffer is the length of time before a token expires to get a new token.
-    buffer: "2m"  
+  #   # buffer is the length of time before a token expires to get a new token.
+  #   buffer: "2m"  
     
   Basic: "" # Must be of form: 'Basic xyz=='

@@ -44,6 +44,7 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -55,7 +56,6 @@ import (
 	"github.com/xmidt-org/webpa-common/server"
 	"github.com/xmidt-org/webpa-common/xhttp"
 	"github.com/xmidt-org/webpa-common/xmetrics"
-	"github.com/xmidt-org/webpa-common/xwebhook"
 )
 
 // convenient global values
@@ -102,7 +102,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
 		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, xwebhook.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 	)
 
 	// This allows us to communicate the version of the binary upon request.
@@ -150,7 +150,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Webhooks (if not configured, handlers are not set up)
 	//
 	if v.IsSet(webhookConfigKey) {
-		webhookConfig := new(xwebhook.Config)
+		var webhookConfig ancla.Config
 		err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
 
 		if err != nil {
@@ -158,18 +158,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 			return 1
 		}
 
-		webhookConfig.Argus.Logger = logger
-		webhookConfig.Argus.MetricsProvider = metricsRegistry
+		webhookConfig.Logger = logger
+		webhookConfig.MetricsProvider = metricsRegistry
 
-		svc, stopWatch, err := xwebhook.Initialize(webhookConfig)
+		svc, stopWatch, err := ancla.Initialize(webhookConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
 			return 1
 		}
 		defer stopWatch()
 
-		addWebhookHandler := xwebhook.NewAddWebhookHandler(svc)
-		getAllWebhooksHandler := xwebhook.NewGetAllWebhooksHandler(svc)
+		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{MetricsProvider: metricsRegistry})
+		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
 
 		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
 		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
