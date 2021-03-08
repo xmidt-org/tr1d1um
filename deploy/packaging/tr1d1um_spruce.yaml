@@ -121,42 +121,41 @@ log:
 ##############################################################################
 # webhookStore provides configuration for storing and obtaining webhook
 # information using argus.
-webhookStore:
+webhook:
+  argus:
+    listen:
+      # pullInterval is how often to call argus to update the webhook structure.
+      pullInterval:  (( grab $ARGUS_PULL_INTERVAL || "5s" ))
 
-  # bucket to store and retrieve webhooks.
-  bucket: (( grab $ARGUS_BUCKET || "webhooks" ))
+    # bucket to store and retrieve webhooks.
+    bucket: (( grab $ARGUS_BUCKET || "webhooks" ))
 
-  # address it the location to talk to argus.
-  address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
+    # address it the location to talk to argus.
+    address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
 
-  # pullInterval is how often to call argus to update the webhook structure.
-  pullInterval:  (( grab $ARGUS_PULL_INTERVAL || "2s" ))
 
-  # adminToken provides internal access to webhooks stored on behalf of users.
-  adminToken: (( grab $ARGUS_ADMIN_TOKEN || "Hzu1WpIe7S8G" ))
-  defaultTTL: (( grab $ARGUS_DEFAULT_TTL || "300" ))
-  # auth the authentication method for argus.
-  auth:
-    # basic configures basic authentication for argus.
-    # Must be of form: 'Basic xyz=='
-    basic: (( concat "Basic " authToken ))
-#
-#    # jwt configures jwt style authentication for argus.
-#    JWT:
-#      # requestHeaders are added to the request for the token.
-#      # (Optional)
-#      # requestHeaders:
-#      #   "": ""
-#
-#      # authURL is the URL to access for the token.
-#      authURL: ""
-#
-#      # timeout is how long the request to get the token will take before
-#      # timing out.
-#      timeout: "1m"
-#
-#      # buffer is the length of time before a token expires to get a new token.
-#      buffer: "2m"
+    # auth the authentication method for argus.
+    auth:
+      # basic configures basic authentication for argus.
+      # Must be of form: 'Basic xyz=='
+      basic: (( concat "Basic " authToken ))
+
+      # # jwt configures jwt style authentication for argus.
+      # jwt:
+      # # requestHeaders are added to the request for the token.
+      # # (Optional)
+      # # requestHeaders:
+      # #   "": ""
+
+      # # authURL is the URL to access for the token.
+      #   authURL: "http://themis:6501/issue"
+
+      #   # timeout is how long the request to get the token will take before
+      #   # timing out.
+      #   timeout: "1m"
+
+      #   # buffer is the length of time before a token expires to get a new token.
+      #   buffer: "2m"
 
 
 ##############################################################################
@@ -254,20 +253,20 @@ authToken: (( grab $AUTH_TOKEN || "dXNlcjpwYXNz" ))
 # requests to XMiDT. If both types are configured, JWT will be preferred.
 # (Optional)
 authAcquirer:
-  JWT:
-    # requestHeaders are added to the request for the token.
-    # (Optional)
-    # requestHeaders:
-    #   "": ""
+  # JWT:
+  #   # requestHeaders are added to the request for the token.
+  #   # (Optional)
+  #   # requestHeaders:
+  #   #   "": ""
 
-    # authURL is the URL to access for the token.
-    authURL: ""
+  #   # authURL is the URL to access for the token.
+  #   authURL: ""
 
-    # timeout is how long the request to get the token will take before
-    # timing out.
-    timeout: "1m"
+  #   # timeout is how long the request to get the token will take before
+  #   # timing out.
+  #   timeout: "1m"
 
-    # buffer is the length of time before a token expires to get a new token.
-    buffer: "2m"
+  #   # buffer is the length of time before a token expires to get a new token.
+  #   buffer: "2m"
 
   Basic:  (( concat "Basic " authToken ))
