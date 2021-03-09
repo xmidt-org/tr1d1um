@@ -267,3 +267,20 @@ authAcquirer:
   #   buffer: "2m"  
     
   Basic: "" # Must be of form: 'Basic xyz=='
+
+# traceProvider is the configuration for otel
+traceProvider:
+  # provider can be stdout, jaegar or zipkin or a custom can be provided.
+  provider: stdout
+  # skipTraceExport will works in case of stdout provider, Set skipTraceExport=true
+  # if we don't want to export the trace information in stdout.
+  skipTraceExport: true
+
+  #   # endpoint for submit the traces for jaegar or zipkin.
+  #   endpoint:
+
+  #   #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+  # spanIDHeaderName:
+  #   #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+  # traceIDHeaderName:
+

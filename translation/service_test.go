@@ -2,6 +2,7 @@ package translation
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -95,7 +96,7 @@ func TestSendWRP(t *testing.T) {
 
 			_, e := s.SendWRP(&wrp.Message{
 				Type: wrp.SimpleRequestResponseMessageType,
-			}, "pass-through-token")
+			}, "pass-through-token",context.TODO())
 
 			m.AssertExpectations(t)
 

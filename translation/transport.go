@@ -3,6 +3,7 @@ package translation
 import (
 	"context"
 	"encoding/json"
+	"github.com/xmidt-org/candlelight"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -47,11 +48,11 @@ type Options struct {
 }
 
 // ConfigHandler sets up the server that powers the translation service
-func ConfigHandler(c *Options) {
+func ConfigHandler(c *Options,headerConfig candlelight.HeaderConfig) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(common.Capture(c.Log), captureWDMPParameters),
+		kithttp.ServerBefore(common.Capture(c.Log,headerConfig), captureWDMPParameters),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
-		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
+		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log,headerConfig)),
 	}
 
 	WRPHandler := kithttp.NewServer(
