@@ -128,7 +128,7 @@ webhook:
     # (Optional)
     listen:
       # pullInterval provides how often the current webhooks list gets refreshed.
-      pullInterval: 5s
+      pullInterval: 5h
 
     # bucket is the partition name where webhooks will be stored.
     bucket: "webhooks"
@@ -268,19 +268,21 @@ authAcquirer:
     
   Basic: "" # Must be of form: 'Basic xyz=='
 
-# traceProvider is the configuration for otel
-traceProvider:
-  # provider can be stdout, jaegar or zipkin or a custom can be provided.
-  provider: stdout
-  # skipTraceExport will works in case of stdout provider, Set skipTraceExport=true
-  # if we don't want to export the trace information in stdout.
-  skipTraceExport: true
 
-  #   # endpoint for submit the traces for jaegar or zipkin.
-  #   endpoint:
+# tracing is the configuration for otel
+tracing:
+  provider:
+    # provider can be stdout, jaegar or zipkin or a custom can be provided.
+    provider: stdout
 
-  #   #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
-  # spanIDHeaderName:
-  #   #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
-  # traceIDHeaderName:
+    # skipTraceExport will works in case of stdout provider, Set skipTraceExport=true
+    # if we don't want to export the trace information in stdout.
+    skipTraceExport: true
 
+#   # endpoint for submit the traces for jaegar or zipkin.
+#    endpoint:
+#  headers:
+#    #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+#    spanIDHeaderName:
+#    #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+#    traceIDHeaderName:

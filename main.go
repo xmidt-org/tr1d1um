@@ -78,7 +78,7 @@ const (
 	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
-	traceProviderKey                  = "traceProvider"
+	tracingConfigKey                  = "tracing"
 )
 
 var (
@@ -134,23 +134,23 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
-	u := v.Sub(traceProviderKey)
+	u := v.Sub(tracingConfigKey)
 	if u == nil {
-		fmt.Fprintf(os.Stderr, "traceProvider configuration is missing.\n")
+		fmt.Fprintf(os.Stderr, "tracing configuration is missing.\n")
 		return 1
 	}
-	config := &candlelight.Config{
-		ApplicationName: applicationName,
+	tracingConfig := &candlelight.TracingConfig{
+		Provider: candlelight.Config{
+			ApplicationName: applicationName,
+		},
 	}
-	headerConfig := &candlelight.HeaderConfig{}
-	u.Unmarshal(headerConfig)
-	u.Unmarshal(config)
-	traceProvider, err := candlelight.ConfigureTracerProvider(*config)
+	u.Unmarshal(tracingConfig)
+	traceProvider, err := candlelight.ConfigureTracerProvider(tracingConfig.Provider)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
 		return 1
 	}
-	traceConfig := candlelight.TraceConfig{*headerConfig, traceProvider}
+	traceConfig := candlelight.TraceConfig{HeaderConfig: tracingConfig.Headers, TraceProvider: traceProvider}
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry, traceConfig)
 
 	if err != nil {
@@ -260,7 +260,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Authenticate:                authenticate,
 		Log:                         logger,
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	},traceConfig.HeaderConfig)
+	}, traceConfig.HeaderConfig)
 
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
@@ -269,7 +269,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Log:                         logger,
 		ValidServices:               v.GetStringSlice(translationServicesKey),
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	},traceConfig.HeaderConfig)
+	}, traceConfig.HeaderConfig)
 
 	var (
 		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, r)

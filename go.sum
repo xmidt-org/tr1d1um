@@ -374,6 +374,7 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.6/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb v1.5.1-0.20180921190457-8d679cf0c36e/go.mod h1:qZna6X/4elxqT3yI9iZYdZrWWdeFOOprn86kgg4+IzY=
+github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d h1:/WZQPMZNsjZ7IlCpsLGdQBINg5bxKQ1K1sh6awxLtkA=
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
 github.com/influxdata/influxdb1-client v0.0.0-20200515024757-02f0bf5dbca3 h1:k3/6a1Shi7GGCp9QpyYuXsMM6ncTOjCzOE9Fd6CDA+Q=
 github.com/influxdata/influxdb1-client v0.0.0-20200515024757-02f0bf5dbca3/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
@@ -687,6 +688,8 @@ github.com/xmidt-org/bascule v0.9.0 h1:CsMtwiDO4jjoOIh4pWe2U9tXA9A73CfohDsSvwzXm
 github.com/xmidt-org/bascule v0.9.0/go.mod h1:C64nSBtUTTK/f2/mCvvp/qJhav5raD0T+by68DCp/gU=
 github.com/xmidt-org/candlelight v0.0.2 h1:vTk8nIW652At7Biw1K/IvftDQDCctuTDt1MXYpYP308=
 github.com/xmidt-org/candlelight v0.0.2/go.mod h1:gtXflnkL8urTPIjG+krbA90dN4tBpyAHZO5IxuWGcCk=
+github.com/xmidt-org/candlelight v0.0.3-0.20210312201217-3f71a15ad64f h1:v91ZXNRRRzsFihnEPy59xWu/ulcVsaoQidu1xygs4tc=
+github.com/xmidt-org/candlelight v0.0.3-0.20210312201217-3f71a15ad64f/go.mod h1:gtXflnkL8urTPIjG+krbA90dN4tBpyAHZO5IxuWGcCk=
 github.com/xmidt-org/httpaux v0.1.1 h1:jqMPHfS/k6EuGSH+KIOedhnQ8Vs9x9AXGbnRiWshrso=
 github.com/xmidt-org/httpaux v0.1.1/go.mod h1:qZnH2uObGPwHnOz8HcPNlbcd3gKEvdmxbIK3rgbQhto=
 github.com/xmidt-org/themis v0.4.4 h1:KewitRxStW1xOehDBi0YyGZyRv3PjFdYUEDvQFf1Nmk=

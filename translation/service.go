@@ -16,7 +16,7 @@ import (
 // Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
 // which is compatible with the XMiDT API.
 type Service interface {
-	SendWRP(*wrp.Message, string,context.Context) (*common.XmidtResponse, error)
+	SendWRP(context.Context,*wrp.Message, string) (*common.XmidtResponse, error)
 }
 
 // ServiceOptions defines the options needed to build a new translation WRP service.
@@ -56,7 +56,7 @@ type service struct {
 }
 
 // SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
-func (w *service) SendWRP(wrpMsg *wrp.Message, authHeaderValue string,ctx context.Context) (*common.XmidtResponse, error) {
+func (w *service) SendWRP(ctx context.Context,wrpMsg *wrp.Message, authHeaderValue string) (*common.XmidtResponse, error) {
 	wrpMsg.Source = w.wrpSource
 
 	var payload []byte

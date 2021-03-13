@@ -12,7 +12,7 @@ import (
 
 // Service defines the behavior of the device statistics Tr1d1um Service.
 type Service interface {
-	RequestStat(authHeaderValue, deviceID string,ctx context.Context) (*common.XmidtResponse, error)
+	RequestStat(ctx context.Context,authHeaderValue, deviceID string) (*common.XmidtResponse, error)
 }
 
 // NewService constructs a new stat service instance given some options.
@@ -49,7 +49,7 @@ type service struct {
 }
 
 // RequestStat contacts the XMiDT cluster for device statistics.
-func (s *service) RequestStat(authHeaderValue, deviceID string,ctx context.Context) (*common.XmidtResponse, error) {
+func (s *service) RequestStat(ctx context.Context,authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
 	r, err := http.NewRequest(http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 
 	if err != nil {

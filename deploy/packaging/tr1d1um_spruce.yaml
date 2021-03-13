@@ -270,3 +270,21 @@ authAcquirer:
   #   buffer: "2m"
 
   Basic:  (( concat "Basic " authToken ))
+
+# tracing is the configuration for otel
+tracing:
+  provider:
+    # provider can be stdout, jaegar or zipkin or a custom can be provided.
+    provider: (( grab $TRACTING_PROVIDER_NAME || "stdout" ))
+
+    # skipTraceExport will works in case of stdout provider, Set skipTraceExport=true
+    # if we don't want to export the trace information in stdout.
+    skipTraceExport: true
+
+   # endpoint for submit the traces for jaegar or zipkin.
+    endpoint: (( grab $TRACTING_PROVIDER_ENDPOINT || "" ))
+#  headers:
+#    #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+#    spanIDHeaderName:
+#    #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
+#    traceIDHeaderName:

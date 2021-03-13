@@ -15,13 +15,13 @@ type MockService struct {
 	mock.Mock
 }
 
-// RequestStat provides a mock function with given fields: authHeaderValue, deviceID, ctx
-func (_m *MockService) RequestStat(authHeaderValue string, deviceID string, ctx context.Context) (*common.XmidtResponse, error) {
-	ret := _m.Called(authHeaderValue, deviceID, ctx)
+// RequestStat provides a mock function with given fields: ctx, authHeaderValue, deviceID
+func (_m *MockService) RequestStat(ctx context.Context, authHeaderValue string, deviceID string) (*common.XmidtResponse, error) {
+	ret := _m.Called(ctx, authHeaderValue, deviceID)
 
 	var r0 *common.XmidtResponse
-	if rf, ok := ret.Get(0).(func(string, string, context.Context) *common.XmidtResponse); ok {
-		r0 = rf(authHeaderValue, deviceID, ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *common.XmidtResponse); ok {
+		r0 = rf(ctx, authHeaderValue, deviceID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*common.XmidtResponse)
@@ -29,8 +29,8 @@ func (_m *MockService) RequestStat(authHeaderValue string, deviceID string, ctx 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, context.Context) error); ok {
-		r1 = rf(authHeaderValue, deviceID, ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, authHeaderValue, deviceID)
 	} else {
 		r1 = ret.Error(1)
 	}
