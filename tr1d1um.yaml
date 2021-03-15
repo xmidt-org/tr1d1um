@@ -128,7 +128,7 @@ webhook:
     # (Optional)
     listen:
       # pullInterval provides how often the current webhooks list gets refreshed.
-      pullInterval: 5h
+      pullInterval: 5s
 
     # bucket is the partition name where webhooks will be stored.
     bucket: "webhooks"
