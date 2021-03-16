@@ -690,6 +690,8 @@ github.com/xmidt-org/candlelight v0.0.2 h1:vTk8nIW652At7Biw1K/IvftDQDCctuTDt1MXY
 github.com/xmidt-org/candlelight v0.0.2/go.mod h1:gtXflnkL8urTPIjG+krbA90dN4tBpyAHZO5IxuWGcCk=
 github.com/xmidt-org/candlelight v0.0.3-0.20210312201217-3f71a15ad64f h1:v91ZXNRRRzsFihnEPy59xWu/ulcVsaoQidu1xygs4tc=
 github.com/xmidt-org/candlelight v0.0.3-0.20210312201217-3f71a15ad64f/go.mod h1:gtXflnkL8urTPIjG+krbA90dN4tBpyAHZO5IxuWGcCk=
+github.com/xmidt-org/candlelight v0.0.3-0.20210316194605-87e0ead2a9f2 h1:Noao5N8eM5bRJ7kYIeh6IvouFW+6+Pct9GO/7A6gaZA=
+github.com/xmidt-org/candlelight v0.0.3-0.20210316194605-87e0ead2a9f2/go.mod h1:gtXflnkL8urTPIjG+krbA90dN4tBpyAHZO5IxuWGcCk=
 github.com/xmidt-org/httpaux v0.1.1 h1:jqMPHfS/k6EuGSH+KIOedhnQ8Vs9x9AXGbnRiWshrso=
 github.com/xmidt-org/httpaux v0.1.1/go.mod h1:qZnH2uObGPwHnOz8HcPNlbcd3gKEvdmxbIK3rgbQhto=
 github.com/xmidt-org/themis v0.4.4 h1:KewitRxStW1xOehDBi0YyGZyRv3PjFdYUEDvQFf1Nmk=

@@ -139,18 +139,16 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintf(os.Stderr, "tracing configuration is missing.\n")
 		return 1
 	}
-	tracingConfig := &candlelight.TracingConfig{
-		Provider: candlelight.Config{
-			ApplicationName: applicationName,
-		},
+	config := &candlelight.Config{
+		ApplicationName: applicationName,
 	}
-	u.Unmarshal(tracingConfig)
-	traceProvider, err := candlelight.ConfigureTracerProvider(tracingConfig.Provider)
+	u.Unmarshal(config)
+	traceProvider, err := candlelight.ConfigureTracerProvider(*config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
 		return 1
 	}
-	traceConfig := candlelight.TraceConfig{HeaderConfig: tracingConfig.Headers, TraceProvider: traceProvider}
+	traceConfig := candlelight.TraceConfig{TraceProvider: traceProvider}
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry, traceConfig)
 
 	if err != nil {
@@ -260,7 +258,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Authenticate:                authenticate,
 		Log:                         logger,
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	}, traceConfig.HeaderConfig)
+	})
 
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
@@ -269,7 +267,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		Log:                         logger,
 		ValidServices:               v.GetStringSlice(translationServicesKey),
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	}, traceConfig.HeaderConfig)
+	})
 
 	var (
 		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, r)
@@ -361,14 +359,13 @@ func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
 	}
 }
 
-func SetLogger(logger log.Logger, headerConfig candlelight.HeaderConfig) func(delegate http.Handler) http.Handler {
-	spanIDHeaderName, traceIDHeaderName := candlelight.ExtractSpanIDAndTraceIDHeaderName(headerConfig)
+func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
 				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, spanIDHeaderName, spanId, traceIDHeaderName, traceId)))
+					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)))
 				delegate.ServeHTTP(w, ctx)
 			})
 	}
@@ -494,7 +491,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 
-	constructors := []alice.Constructor{traceConfig.TraceMiddleware, SetLogger(logger, traceConfig.HeaderConfig), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
+	constructors := []alice.Constructor{traceConfig.TraceMiddleware, SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
 	chain := alice.New(constructors...)
 	return &chain, nil

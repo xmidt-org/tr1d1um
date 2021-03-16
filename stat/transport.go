@@ -3,7 +3,6 @@ package stat
 import (
 	"context"
 	"encoding/json"
-	"github.com/xmidt-org/candlelight"
 	"net/http"
 
 	"github.com/xmidt-org/tr1d1um/common"
@@ -29,11 +28,11 @@ type Options struct {
 
 // ConfigHandler sets up the server that powers the stat service
 // That is, it configures the mux paths to access the service
-func ConfigHandler(c *Options, headerConfig candlelight.HeaderConfig) {
+func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(common.Capture(c.Log,headerConfig)),
+		kithttp.ServerBefore(common.Capture(c.Log)),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
-		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log,headerConfig)),
+		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
 	statHandler := kithttp.NewServer(
