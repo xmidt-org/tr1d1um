@@ -15,6 +15,6 @@ type wrpRequest struct {
 func makeTranslationEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		wrpReq := (request).(*wrpRequest)
-		return s.SendWRP(wrpReq.WRPMessage, wrpReq.AuthHeaderValue)
+		return s.SendWRP(ctx,wrpReq.WRPMessage, wrpReq.AuthHeaderValue)
 	}
 }

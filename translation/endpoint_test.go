@@ -15,7 +15,7 @@ func TestMakeTranslationEndpoint(t *testing.T) {
 		AuthHeaderValue: "a0",
 	}
 
-	s.On("SendWRP", r.WRPMessage, r.AuthHeaderValue).Return(nil, nil)
+	s.On("SendWRP", context.TODO(),r.WRPMessage, r.AuthHeaderValue).Return(nil, nil)
 
 	e := makeTranslationEndpoint(s)
 	e(context.TODO(), r)

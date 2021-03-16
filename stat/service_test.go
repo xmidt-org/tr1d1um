@@ -1,6 +1,7 @@
 package stat
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -70,7 +71,7 @@ func TestRequestStat(t *testing.T) {
 				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(&common.XmidtResponse{}, nil)
 			}
 
-			_, e := s.RequestStat("pass-through-token", "mac:112233445566")
+			_, e := s.RequestStat(context.TODO(),"pass-through-token", "mac:112233445566")
 
 			m.AssertExpectations(t)
 			if testCase.EnableAcquirer {

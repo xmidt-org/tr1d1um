@@ -2,6 +2,7 @@ package translation
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -93,7 +94,7 @@ func TestSendWRP(t *testing.T) {
 				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(nil, nil)
 			}
 
-			_, e := s.SendWRP(&wrp.Message{
+			_, e := s.SendWRP(context.TODO(),&wrp.Message{
 				Type: wrp.SimpleRequestResponseMessageType,
 			}, "pass-through-token")
 

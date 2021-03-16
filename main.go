@@ -49,6 +49,7 @@ import (
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/webpa-common/basculechecks"
 	"github.com/xmidt-org/webpa-common/basculemetrics"
 	"github.com/xmidt-org/webpa-common/concurrent"
@@ -77,6 +78,7 @@ const (
 	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
+	tracingConfigKey                  = "tracing"
 )
 
 var (
@@ -132,7 +134,22 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
+	u := v.Sub(tracingConfigKey)
+	if u == nil {
+		fmt.Fprintf(os.Stderr, "tracing configuration is missing.\n")
+		return 1
+	}
+	config := &candlelight.Config{
+		ApplicationName: applicationName,
+	}
+	u.Unmarshal(config)
+	traceProvider, err := candlelight.ConfigureTracerProvider(*config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
+		return 1
+	}
+	traceConfig := candlelight.TraceConfig{TraceProvider: traceProvider}
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry, traceConfig)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
@@ -346,8 +363,9 @@ func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
+				traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
 				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method)))
+					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)))
 				delegate.ServeHTTP(w, ctx)
 			})
 	}
@@ -381,7 +399,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, traceConfig candlelight.TraceConfig) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -473,7 +491,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 
-	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
+	constructors := []alice.Constructor{traceConfig.TraceMiddleware, SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
 	chain := alice.New(constructors...)
 	return &chain, nil

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/xmidt-org/candlelight"
 	"net/http"
 	"strings"
 	"time"
@@ -46,9 +47,12 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
 		transactionInfoLogger, ok := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
+		traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
+
+
 
 		if !ok {
-			errorLogger.Log(logging.MessageKey(), "transaction logger not found in context", "tid", tid)
+			errorLogger.Log(logging.MessageKey(), "transaction logger not found in context", "tid", tid,candlelight.SpanIDLogKeyName, spanId,candlelight.TraceIdLogKeyName,traceId)
 			return
 		}
 
@@ -57,7 +61,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 		if ok {
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
 		} else {
-			errorLogger.Log(logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid)
+			errorLogger.Log(logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid,candlelight.SpanIDLogKeyName, spanId,candlelight.TraceIdLogKeyName,traceId)
 		}
 
 		includeHeaders := true
@@ -116,7 +120,6 @@ func Welcome(delegate http.Handler) http.Handler {
 // intended to be used only throughout the gokit server flow: (request decoding, business logic,  response encoding)
 func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 	var transactionInfoLogger = logging.Info(logger)
-
 	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
 		var tid string
 
@@ -133,6 +136,8 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			satClientID = auth.Token.Principal()
 		}
 
+		traceId, spanId := candlelight.ExtractTraceInformation(nctx)
+
 		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger,
 			logging.MessageKey(), "record",
 			"request", transactionRequest{
@@ -143,6 +148,8 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			},
 			"tid", tid,
 			"satClientID", satClientID,
+			candlelight.SpanIDLogKeyName, spanId,
+			candlelight.TraceIdLogKeyName, traceId,
 		)
 
 		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
