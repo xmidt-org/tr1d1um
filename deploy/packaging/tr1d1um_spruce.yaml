@@ -271,18 +271,18 @@ authAcquirer:
 
   Basic:  (( concat "Basic " authToken ))
 
-# tracing is the configuration for otel
+# tracing provides configuration for OpenTelemetry
 tracing:
   provider:
-    # provider can be stdout, jaegar or zipkin or a custom can be provided.
-    provider: (( grab $TRACTING_PROVIDER_NAME || "stdout" ))
+    # provider is the provider name. Currently, stdout, jaegar and zipkin are supported.
+    provider: (( grab $TRACING_PROVIDER_NAME || "stdout" ))
 
-    # skipTraceExport will works in case of stdout provider, Set skipTraceExport=true
-    # if we don't want to export the trace information in stdout.
+    # skipTraceExport only applies when provider is stdout. Set skipTraceExport to true
+    # so that trace information is not written to stdout.
     skipTraceExport: true
 
-   # endpoint for submit the traces for jaegar or zipkin.
-    endpoint: (( grab $TRACTING_PROVIDER_ENDPOINT || "" ))
+    # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
+    endpoint: (( grab $TRACING_PROVIDER_ENDPOINT || "http://localhost:9411/api/v2/spans" ))
 #  headers:
 #    #spanIDHeaderName is used to set custom header in response and logs else defaults will be used.
 #    spanIDHeaderName:
