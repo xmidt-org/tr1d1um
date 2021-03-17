@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - Initial OpenTelemetry integration. [#197](https://github.com/xmidt-org/tr1d1um/pull/197) thanks to @Sachin4403
+- OpenTelemetry integration in webhook endpoints which was skipped in earlier PR. [#201](https://github.com/xmidt-org/tr1d1um/pull/201) thanks to @Sachin4403
 
 ## [v0.5.4]
 ### Changed
