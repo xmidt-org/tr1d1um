@@ -178,7 +178,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		webhookConfig.Logger = logger
 		webhookConfig.MetricsProvider = metricsRegistry
 
-		svc, stopWatch, err := ancla.Initialize(webhookConfig)
+		svc, stopWatch, err := ancla.Initialize(webhookConfig, GetLogger)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
 			return 1
