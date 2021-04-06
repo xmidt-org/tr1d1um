@@ -12,9 +12,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
-	github.com/xmidt-org/ancla v0.1.3-0.20210316223809-833bddb2dc0e
+	github.com/xmidt-org/ancla v0.1.3
 	github.com/xmidt-org/bascule v0.9.0
-	github.com/xmidt-org/candlelight v0.0.3-0.20210316194605-87e0ead2a9f2
-	github.com/xmidt-org/webpa-common v1.11.5-0.20210120235745-b98c7113262c
+	github.com/xmidt-org/candlelight v0.0.3
+	github.com/xmidt-org/webpa-common v1.11.6-0.20210406174721-5150386d727c
 	github.com/xmidt-org/wrp-go/v3 v3.0.1
 )

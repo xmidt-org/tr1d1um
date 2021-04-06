@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.5.5]
 - Initial OpenTelemetry integration. [#197](https://github.com/xmidt-org/tr1d1um/pull/197) thanks to @Sachin4403
 - OpenTelemetry integration in webhook endpoints which was skipped in earlier PR. [#201](https://github.com/xmidt-org/tr1d1um/pull/201) thanks to @Sachin4403
 
@@ -84,7 +86,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.5...HEAD
+[v0.5.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.4...v0.5.5
 [v0.5.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.3...v0.5.4
 [v0.5.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.2...v0.5.3
 [v0.5.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.1...v0.5.2
