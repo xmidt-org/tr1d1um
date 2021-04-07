@@ -134,23 +134,26 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
-	u := v.Sub(tracingConfigKey)
-	if u == nil {
-		fmt.Fprintf(os.Stderr, "tracing configuration is missing.\n")
-		return 1
+	var tracerConfig *candlelight.TraceConfig
+	if v.IsSet(tracingConfigKey) {
+		var traceConfig candlelight.Config
+		err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to decode tracing config: %v\n", err)
+			return 1
+		}
+		traceConfig.ApplicationName = applicationName
+		// TODO: We could modify candlelight.ConfigureTraceProvider to return
+		// the NoOp tracer when user explicitly requests for the default tracer
+		tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
+			return 1
+		}
+		tracerConfig = &candlelight.TraceConfig{TraceProvider: tracerProvider}
 	}
-	config := &candlelight.Config{
-		ApplicationName: applicationName,
-	}
-	u.Unmarshal(config)
-	traceProvider, err := candlelight.ConfigureTracerProvider(*config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
-		return 1
-	}
-	traceConfig := candlelight.TraceConfig{TraceProvider: traceProvider}
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry, traceConfig)
 
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry, tracerConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
 		return 1
@@ -359,13 +362,24 @@ func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
 	}
 }
 
-func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
+func TracerSetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
 				ctx := r.WithContext(logging.WithLogger(r.Context(),
 					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)))
+				delegate.ServeHTTP(w, ctx)
+			})
+	}
+}
+
+func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
+	return func(delegate http.Handler) http.Handler {
+		return http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				ctx := r.WithContext(logging.WithLogger(r.Context(),
+					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method)))
 				delegate.ServeHTTP(w, ctx)
 			})
 	}
@@ -399,7 +413,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, traceConfig candlelight.TraceConfig) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, traceConfig *candlelight.TraceConfig) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -490,8 +504,15 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
+	var constructors []alice.Constructor
+	if traceConfig != nil {
+		constructors = append(constructors, traceConfig.TraceMiddleware, TracerSetLogger(logger))
+	} else {
+		// when tracing is disabled, we don't want to add the tracing middleware in here
+		constructors = append(constructors, SetLogger(logger))
+	}
 
-	constructors := []alice.Constructor{traceConfig.TraceMiddleware, SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
+	constructors = append(constructors, authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
 
 	chain := alice.New(constructors...)
 	return &chain, nil
