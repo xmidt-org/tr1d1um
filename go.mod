@@ -17,4 +17,5 @@ require (
 	github.com/xmidt-org/candlelight v0.0.3
 	github.com/xmidt-org/webpa-common v1.11.6-0.20210406174721-5150386d727c
 	github.com/xmidt-org/wrp-go/v3 v3.0.1
+	go.opentelemetry.io/otel v0.16.0
 )
