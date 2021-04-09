@@ -36,6 +36,9 @@ import (
 	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -130,10 +133,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	r := mux.NewRouter()
-
-	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
-
 	var tracerConfig *candlelight.TraceConfig
 	if v.IsSet(tracingConfigKey) {
 		var traceConfig candlelight.Config
@@ -165,6 +164,22 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintf(os.Stderr, "Unable to parse timeout configuration values: %s \n", err.Error())
 		return 1
 	}
+
+	rootRouter := mux.NewRouter()
+
+	var tracePropagator propagation.TextMapPropagator
+	if tracerConfig != nil {
+		tracePropagator = propagation.TraceContext{}
+		traceMiddleware := firstNodeTraceEchoer{propagator: tracePropagator}
+
+		otelMuxOptions := []otelmux.Option{
+			otelmux.WithPropagators(tracePropagator),
+			otelmux.WithTracerProvider(tracerConfig.TraceProvider),
+		}
+		rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), traceMiddleware.EchoStartNodeTrace)
+
+	}
+	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	//
 	// Webhooks (if not configured, handlers are not set up)
@@ -199,6 +214,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
+	//TODO: add instrumentation to the HTTP clients.
 	//
 	// Stat Service configs
 	//
@@ -273,7 +289,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	var (
-		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, r)
+		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
 		signals                = make(chan os.Signal, 10)
 	)
 
@@ -303,6 +319,27 @@ func tr1d1um(arguments []string) (exitCode int) {
 	waitGroup.Wait()
 
 	return 0
+}
+
+type firstNodeTraceEchoer struct {
+	propagator propagation.TextMapPropagator
+}
+
+// EchoStartNodeTrace should be run after the middleware that starts the main span of this application.
+// Assuming this is the first node of the entire trace, the trace information is echoed through the
+// HTTP response.
+// TODO: should live in candlelight
+func (f firstNodeTraceEchoer) EchoStartNodeTrace(delegate http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := f.propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		rsc := trace.RemoteSpanContextFromContext(ctx)
+		if !rsc.IsValid() {
+			sc := trace.SpanContextFromContext(ctx)
+			w.Header().Set("X-Midt-Span-ID", sc.SpanID().String())
+			w.Header().Set("X-Midt-Trace-ID", sc.TraceID().String())
+		}
+		delegate.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // timeoutConfigs holds parsable config values for HTTP transactions
