@@ -37,8 +37,8 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -133,8 +133,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	var tracerConfig *candlelight.TraceConfig
+	var tracing *candlelight.Tracing
 	if v.IsSet(tracingConfigKey) {
+		tracing = &candlelight.Tracing{
+			Propagator: propagation.TraceContext{},
+		}
+
 		var traceConfig candlelight.Config
 		err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
 		if err != nil {
@@ -149,10 +153,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 			fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
 			return 1
 		}
-		tracerConfig = &candlelight.TraceConfig{TraceProvider: tracerProvider}
+		tracing.TracerProvider = tracerProvider
 	}
 
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry, tracerConfig)
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry, tracing)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
 		return 1
@@ -167,18 +171,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	rootRouter := mux.NewRouter()
 
-	var tracePropagator propagation.TextMapPropagator
-	if tracerConfig != nil {
-		tracePropagator = propagation.TraceContext{}
-		traceMiddleware := firstNodeTraceEchoer{propagator: tracePropagator}
-
+	if tracing != nil {
 		otelMuxOptions := []otelmux.Option{
-			otelmux.WithPropagators(tracePropagator),
-			otelmux.WithTracerProvider(tracerConfig.TraceProvider),
+			otelmux.WithPropagators(tracing.Propagator),
+			otelmux.WithTracerProvider(tracing.TracerProvider),
 		}
-		rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), traceMiddleware.EchoStartNodeTrace)
-
+		rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator))
 	}
+
 	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	//
@@ -214,8 +214,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
-	//TODO: add instrumentation to the HTTP clients.
-	//
+	httpClient := newHTTPClient(tConfigs, tracing)
+
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{
@@ -227,7 +227,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 						Retries:  v.GetInt(reqMaxRetriesKey),
 						Interval: v.GetDuration(reqRetryIntervalKey),
 					},
-					newClient(v, tConfigs).Do),
+					httpClient.Do),
 				RequestTimeout: tConfigs.rTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
@@ -238,9 +238,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
-
-		WRPSource: v.GetString(wrpSourceKey),
-
+		WRPSource:   v.GetString(wrpSourceKey),
 		Tr1d1umTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
 				RequestTimeout: tConfigs.rTimeout,
@@ -250,7 +248,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 						Retries:  v.GetInt(reqMaxRetriesKey),
 						Interval: v.GetDuration(reqRetryIntervalKey),
 					},
-					newClient(v, tConfigs).Do),
+					httpClient.Do),
 			}),
 	}
 
@@ -321,25 +319,23 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-type firstNodeTraceEchoer struct {
-	propagator propagation.TextMapPropagator
-}
+func newHTTPClient(tConfigs timeoutConfigs, tracing *candlelight.Tracing) *http.Client {
+	var transport http.RoundTripper = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: tConfigs.dTimeout,
+		}).Dial,
+	}
+	if tracing != nil {
+		transport = otelhttp.NewTransport(transport,
+			otelhttp.WithPropagators(tracing.Propagator),
+			otelhttp.WithTracerProvider(tracing.TracerProvider),
+		)
+	}
 
-// EchoStartNodeTrace should be run after the middleware that starts the main span of this application.
-// Assuming this is the first node of the entire trace, the trace information is echoed through the
-// HTTP response.
-// TODO: should live in candlelight
-func (f firstNodeTraceEchoer) EchoStartNodeTrace(delegate http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := f.propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-		rsc := trace.RemoteSpanContextFromContext(ctx)
-		if !rsc.IsValid() {
-			sc := trace.SpanContextFromContext(ctx)
-			w.Header().Set("X-Midt-Span-ID", sc.SpanID().String())
-			w.Header().Set("X-Midt-Trace-ID", sc.TraceID().String())
-		}
-		delegate.ServeHTTP(w, r.WithContext(ctx))
-	})
+	return &http.Client{
+		Timeout:   tConfigs.cTimeout,
+		Transport: transport,
+	}
 }
 
 // timeoutConfigs holds parsable config values for HTTP transactions
@@ -373,20 +369,24 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
-	var c, r, d time.Duration
-	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
-		if r, err = time.ParseDuration(v.GetString(reqTimeoutKey)); err == nil {
-			if d, err = time.ParseDuration(v.GetString(netDialerTimeoutKey)); err == nil {
-				t = &timeoutConfigs{
-					cTimeout: c,
-					rTimeout: r,
-					dTimeout: d,
-				}
-			}
-		}
+func newTimeoutConfigs(v *viper.Viper) (timeoutConfigs, error) {
+	c, err := time.ParseDuration(v.GetString(clientTimeoutKey))
+	if err != nil {
+		return timeoutConfigs{}, err
 	}
-	return
+	r, err := time.ParseDuration(v.GetString(reqTimeoutKey))
+	if err != nil {
+		return timeoutConfigs{}, err
+	}
+	d, err := time.ParseDuration(v.GetString(netDialerTimeoutKey))
+	if err != nil {
+		return timeoutConfigs{}, err
+	}
+	return timeoutConfigs{
+		cTimeout: c,
+		rTimeout: r,
+		dTimeout: d,
+	}, nil
 }
 
 func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
@@ -450,7 +450,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, traceConfig *candlelight.TraceConfig) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, tracing *candlelight.Tracing) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -542,10 +542,9 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 	var constructors []alice.Constructor
-	if traceConfig != nil {
-		constructors = append(constructors, traceConfig.TraceMiddleware, TracerSetLogger(logger))
+	if tracing != nil {
+		constructors = append(constructors, TracerSetLogger(logger))
 	} else {
-		// when tracing is disabled, we don't want to add the tracing middleware in here
 		constructors = append(constructors, SetLogger(logger))
 	}
 
