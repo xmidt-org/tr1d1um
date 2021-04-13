@@ -159,8 +159,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
-
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry, tracing)
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
 		return 1
@@ -431,7 +430,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, tracing candlelight.Tracing) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
