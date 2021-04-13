@@ -398,24 +398,16 @@ func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
 	}
 }
 
-func TracerSetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
-	return func(delegate http.Handler) http.Handler {
-		return http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
-				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)))
-				delegate.ServeHTTP(w, ctx)
-			})
-	}
-}
-
 func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method)))
+				kvs := []interface{}{"requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method}
+				traceId, spanId, ok := candlelight.ExtractTraceInformation(r.Context())
+				if ok {
+					kvs = append(kvs, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)
+				}
+				ctx := r.WithContext(logging.WithLogger(r.Context(), log.With(logger, kvs...)))
 				delegate.ServeHTTP(w, ctx)
 			})
 	}
@@ -540,14 +532,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
-	var constructors []alice.Constructor
-	if tracing.Enabled {
-		constructors = append(constructors, TracerSetLogger(logger))
-	} else {
-		constructors = append(constructors, SetLogger(logger))
-	}
-
-	constructors = append(constructors, authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
 	chain := alice.New(constructors...)
 	return &chain, nil
