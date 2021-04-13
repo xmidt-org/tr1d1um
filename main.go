@@ -388,16 +388,6 @@ func newTimeoutConfigs(v *viper.Viper) (timeoutConfigs, error) {
 	}, nil
 }
 
-func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
-	return &http.Client{
-		Timeout: t.cTimeout,
-		Transport: &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: t.dTimeout,
-			}).Dial},
-	}
-}
-
 func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
