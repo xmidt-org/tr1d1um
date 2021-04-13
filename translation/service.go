@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/xmidt-org/candlelight"
-	"go.opentelemetry.io/otel/propagation"
-
 	"net/http"
 
 	"github.com/xmidt-org/bascule/acquire"
@@ -84,6 +81,5 @@ func (w *service) SendWRP(ctx context.Context, wrpMsg *wrp.Message, authHeaderVa
 
 	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
 	r.Header.Set("Authorization", authHeaderValue)
-	candlelight.InjectTraceInformation(ctx, propagation.HeaderCarrier(r.Header))
 	return w.transactor.Transact(r)
 }
