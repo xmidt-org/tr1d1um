@@ -14,7 +14,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xmidt-org/ancla v0.1.4-0.20210412232347-628705f7d172
 	github.com/xmidt-org/bascule v0.9.0
-	github.com/xmidt-org/candlelight v0.0.4-0.20210413001556-79d02fc5979f
+	github.com/xmidt-org/candlelight v0.0.4-0.20210413201041-99979cf91222
 	github.com/xmidt-org/webpa-common v1.11.6-0.20210406174721-5150386d727c
 	github.com/xmidt-org/wrp-go/v3 v3.0.1
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.19.0
