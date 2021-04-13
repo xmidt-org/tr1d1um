@@ -39,6 +39,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -133,12 +134,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	var tracing *candlelight.Tracing
+	var tracing = candlelight.Tracing{
+		Enabled:        false,
+		Propagator:     propagation.TraceContext{},
+		TracerProvider: trace.NewNoopTracerProvider(),
+	}
 	if v.IsSet(tracingConfigKey) {
-		tracing = &candlelight.Tracing{
-			Propagator: propagation.TraceContext{},
-		}
-
 		var traceConfig candlelight.Config
 		err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
 		if err != nil {
@@ -146,15 +147,18 @@ func tr1d1um(arguments []string) (exitCode int) {
 			return 1
 		}
 		traceConfig.ApplicationName = applicationName
-		// TODO: We could modify candlelight.ConfigureTraceProvider to return
-		// the NoOp tracer when user explicitly requests for the default tracer
 		tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
 			return 1
 		}
+		if len(traceConfig.Provider) != 0 && traceConfig.Provider != candlelight.DefaultTracerProvider {
+			tracing.Enabled = true
+		}
 		tracing.TracerProvider = tracerProvider
 	}
+
+	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
 
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry, tracing)
 	if err != nil {
@@ -170,14 +174,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	rootRouter := mux.NewRouter()
-
-	if tracing != nil {
-		otelMuxOptions := []otelmux.Option{
-			otelmux.WithPropagators(tracing.Propagator),
-			otelmux.WithTracerProvider(tracing.TracerProvider),
-		}
-		rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator))
+	otelMuxOptions := []otelmux.Option{
+		otelmux.WithPropagators(tracing.Propagator),
+		otelmux.WithTracerProvider(tracing.TracerProvider),
 	}
+	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator))
 
 	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
@@ -319,18 +320,16 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-func newHTTPClient(tConfigs timeoutConfigs, tracing *candlelight.Tracing) *http.Client {
+func newHTTPClient(tConfigs timeoutConfigs, tracing candlelight.Tracing) *http.Client {
 	var transport http.RoundTripper = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: tConfigs.dTimeout,
 		}).Dial,
 	}
-	if tracing != nil {
-		transport = otelhttp.NewTransport(transport,
-			otelhttp.WithPropagators(tracing.Propagator),
-			otelhttp.WithTracerProvider(tracing.TracerProvider),
-		)
-	}
+	transport = otelhttp.NewTransport(transport,
+		otelhttp.WithPropagators(tracing.Propagator),
+		otelhttp.WithTracerProvider(tracing.TracerProvider),
+	)
 
 	return &http.Client{
 		Timeout:   tConfigs.cTimeout,
@@ -450,7 +449,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, tracing *candlelight.Tracing) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, tracing candlelight.Tracing) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -542,7 +541,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 	var constructors []alice.Constructor
-	if tracing != nil {
+	if tracing.Enabled {
 		constructors = append(constructors, TracerSetLogger(logger))
 	} else {
 		constructors = append(constructors, SetLogger(logger))
