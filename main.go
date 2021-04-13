@@ -195,6 +195,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 		webhookConfig.Logger = logger
 		webhookConfig.MetricsProvider = metricsRegistry
+		// TODO: it might be a good idea to make the Argus client have its own
+		// timeouts
+		webhookConfig.Argus.HTTPClient = newHTTPClient(tConfigs, tracing)
 
 		svc, stopWatch, err := ancla.Initialize(webhookConfig, GetLogger)
 		if err != nil {
