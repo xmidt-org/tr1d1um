@@ -135,6 +135,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
 	tracing, err := loadTracing(v, applicationName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
+		return 1
+	}
 	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
