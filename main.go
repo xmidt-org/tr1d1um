@@ -134,30 +134,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	var tracing = candlelight.Tracing{
-		Enabled:        false,
-		Propagator:     propagation.TraceContext{},
-		TracerProvider: trace.NewNoopTracerProvider(),
-	}
-	if v.IsSet(tracingConfigKey) {
-		var traceConfig candlelight.Config
-		err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to decode tracing config: %v\n", err)
-			return 1
-		}
-		traceConfig.ApplicationName = applicationName
-		tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
-			return 1
-		}
-		if len(traceConfig.Provider) != 0 && traceConfig.Provider != candlelight.DefaultTracerProvider {
-			tracing.Enabled = true
-		}
-		tracing.TracerProvider = tracerProvider
-	}
-
+	tracing, err := loadTracing(v, applicationName)
 	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
@@ -320,6 +297,31 @@ func tr1d1um(arguments []string) (exitCode int) {
 	waitGroup.Wait()
 
 	return 0
+}
+
+func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
+	var tracing = candlelight.Tracing{
+		Enabled:        false,
+		Propagator:     propagation.TraceContext{},
+		TracerProvider: trace.NewNoopTracerProvider(),
+	}
+	if v.IsSet(tracingConfigKey) {
+		var traceConfig candlelight.Config
+		err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
+		if err != nil {
+			return candlelight.Tracing{}, err
+		}
+		traceConfig.ApplicationName = appName
+		tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
+		if err != nil {
+			return candlelight.Tracing{}, err
+		}
+		if len(traceConfig.Provider) != 0 && traceConfig.Provider != candlelight.DefaultTracerProvider {
+			tracing.Enabled = true
+		}
+		tracing.TracerProvider = tracerProvider
+	}
+	return tracing, nil
 }
 
 func newHTTPClient(tConfigs timeoutConfigs, tracing candlelight.Tracing) *http.Client {
