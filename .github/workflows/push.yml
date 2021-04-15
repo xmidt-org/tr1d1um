@@ -32,6 +32,7 @@ jobs:
       # Run testing on the code
       - name: Run testing
         run: |
+          env
           go test -v -race -coverprofile=coverage.txt ./...
           go test -race -json ./... > report.json
           curl -s https://codecov.io/bash | bash
