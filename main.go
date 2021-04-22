@@ -415,7 +415,7 @@ func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				kvs := []interface{}{"requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method}
-				traceId, spanId, ok := candlelight.ExtractTraceInformation(r.Context())
+				traceId, spanId, ok := candlelight.ExtractTraceInfo(r.Context())
 				if ok {
 					kvs = append(kvs, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)
 				}
