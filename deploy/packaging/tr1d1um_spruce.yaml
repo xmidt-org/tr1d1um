@@ -246,7 +246,7 @@ argusClientTimeout:
 xmidtClientTimeout:
   # clientTimeout is the timeout for the requests made through this 
   # HTTP client. This timeout includes connection time, any
-	# redirects, and reading the response body.
+  # redirects, and reading the response body.
   clientTimeout: 135s
 
   # requestTimeout is the timeout imposed on requests made by this client 
