@@ -5,10 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/xmidt-org/candlelight"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/xmidt-org/candlelight"
 
 	"github.com/xmidt-org/bascule"
 
@@ -46,13 +47,12 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-		transactionInfoLogger, ok := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
-		traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
+		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
 
-
-
-		if !ok {
-			errorLogger.Log(logging.MessageKey(), "transaction logger not found in context", "tid", tid,candlelight.SpanIDLogKeyName, spanId,candlelight.TraceIdLogKeyName,traceId)
+		if !transactionLoggerOk {
+			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
+			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
+			errorLogger.Log(kvs)
 			return
 		}
 
@@ -61,7 +61,9 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 		if ok {
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
 		} else {
-			errorLogger.Log(logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid,candlelight.SpanIDLogKeyName, spanId,candlelight.TraceIdLogKeyName,traceId)
+			kvs := []interface{}{logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid}
+			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
+			errorLogger.Log(kvs)
 		}
 
 		includeHeaders := true
@@ -136,10 +138,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			satClientID = auth.Token.Principal()
 		}
 
-		traceId, spanId := candlelight.ExtractTraceInformation(nctx)
-
-		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger,
-			logging.MessageKey(), "record",
+		logKVs := []interface{}{logging.MessageKey(), "record",
 			"request", transactionRequest{
 				Address: r.RemoteAddr,
 				Path:    r.URL.Path,
@@ -148,10 +147,10 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			},
 			"tid", tid,
 			"satClientID", satClientID,
-			candlelight.SpanIDLogKeyName, spanId,
-			candlelight.TraceIdLogKeyName, traceId,
-		)
+		}
 
+		logKVs, _ = candlelight.AppendTraceInfo(ctx, logKVs)
+		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger, logKVs...)
 		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
 	}
 }

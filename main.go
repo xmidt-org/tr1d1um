@@ -36,6 +36,10 @@ import (
 	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -130,38 +134,26 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	infoLogger.Log("configurationFile", v.ConfigFileUsed())
 
-	r := mux.NewRouter()
-
-	APIRouter := r.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
-
-	u := v.Sub(tracingConfigKey)
-	if u == nil {
-		fmt.Fprintf(os.Stderr, "tracing configuration is missing.\n")
-		return 1
-	}
-	config := &candlelight.Config{
-		ApplicationName: applicationName,
-	}
-	u.Unmarshal(config)
-	traceProvider, err := candlelight.ConfigureTracerProvider(*config)
+	tracing, err := loadTracing(v, applicationName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build traceProvider: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
 		return 1
 	}
-	traceConfig := candlelight.TraceConfig{TraceProvider: traceProvider}
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry, traceConfig)
-
+	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
+	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
 		return 1
 	}
 
-	tConfigs, err := newTimeoutConfigs(v)
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse timeout configuration values: %s \n", err.Error())
-		return 1
+	rootRouter := mux.NewRouter()
+	otelMuxOptions := []otelmux.Option{
+		otelmux.WithPropagators(tracing.Propagator),
+		otelmux.WithTracerProvider(tracing.TracerProvider),
 	}
+	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator))
+
+	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	//
 	// Webhooks (if not configured, handlers are not set up)
@@ -177,6 +169,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 		webhookConfig.Logger = logger
 		webhookConfig.MetricsProvider = metricsRegistry
+		argusClientTimeout, err := newArgusClientTimeout(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
+			return 1
+		}
+		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
 
 		svc, stopWatch, err := ancla.Initialize(webhookConfig, GetLogger)
 		if err != nil {
@@ -196,7 +194,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
-	//
+	xmidtClientTimeout, err := newXmidtClientTimeout(v)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse xmidt client timeout config values: %s \n", err.Error())
+		return 1
+	}
+	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
+
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{
@@ -208,8 +212,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 						Retries:  v.GetInt(reqMaxRetriesKey),
 						Interval: v.GetDuration(reqRetryIntervalKey),
 					},
-					newClient(v, tConfigs).Do),
-				RequestTimeout: tConfigs.rTimeout,
+					xmidtHTTPClient.Do),
+				RequestTimeout: xmidtClientTimeout.RequestTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
 	}
@@ -219,19 +223,17 @@ func tr1d1um(arguments []string) (exitCode int) {
 	//
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
-
-		WRPSource: v.GetString(wrpSourceKey),
-
+		WRPSource:   v.GetString(wrpSourceKey),
 		Tr1d1umTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
-				RequestTimeout: tConfigs.rTimeout,
+				RequestTimeout: xmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
 						Logger:   logger,
 						Retries:  v.GetInt(reqMaxRetriesKey),
 						Interval: v.GetDuration(reqRetryIntervalKey),
 					},
-					newClient(v, tConfigs).Do),
+					xmidtHTTPClient.Do),
 			}),
 	}
 
@@ -270,7 +272,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	})
 
 	var (
-		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, r)
+		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
 		signals                = make(chan os.Signal, 10)
 	)
 
@@ -302,16 +304,91 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-// timeoutConfigs holds parsable config values for HTTP transactions
-type timeoutConfigs struct {
-	// HTTP client timeout
-	cTimeout time.Duration
+func newXmidtClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
+	var timeouts httpClientTimeout
+	err := v.UnmarshalKey("xmidtClientTimeout", &timeouts)
+	if err != nil {
+		return httpClientTimeout{}, err
+	}
+	if timeouts.ClientTimeout == 0 {
+		timeouts.ClientTimeout = time.Second * 135
+	}
+	if timeouts.NetDialerTimeout == 0 {
+		timeouts.NetDialerTimeout = time.Second * 5
+	}
+	if timeouts.RequestTimeout == 0 {
+		timeouts.RequestTimeout = time.Second * 129
+	}
+	return timeouts, nil
+}
 
-	// HTTP request timeout
-	rTimeout time.Duration
+func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
+	var timeouts httpClientTimeout
+	err := v.UnmarshalKey("argusClientTimeout", &timeouts)
+	if err != nil {
+		return httpClientTimeout{}, err
+	}
+	if timeouts.ClientTimeout == 0 {
+		timeouts.ClientTimeout = time.Second * 50
+	}
+	if timeouts.NetDialerTimeout == 0 {
+		timeouts.NetDialerTimeout = time.Second * 5
+	}
+	return timeouts, nil
 
-	// net dialer timeout
-	dTimeout time.Duration
+}
+
+func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
+	var tracing = candlelight.Tracing{
+		Enabled:        false,
+		Propagator:     propagation.TraceContext{},
+		TracerProvider: trace.NewNoopTracerProvider(),
+	}
+	var traceConfig candlelight.Config
+	err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
+	if err != nil {
+		return candlelight.Tracing{}, err
+	}
+	traceConfig.ApplicationName = appName
+	tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
+	if err != nil {
+		return candlelight.Tracing{}, err
+	}
+	if len(traceConfig.Provider) != 0 && traceConfig.Provider != candlelight.DefaultTracerProvider {
+		tracing.Enabled = true
+	}
+	tracing.TracerProvider = tracerProvider
+	return tracing, nil
+}
+
+func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *http.Client {
+	var transport http.RoundTripper = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: timeouts.NetDialerTimeout,
+		}).Dial,
+	}
+	transport = otelhttp.NewTransport(transport,
+		otelhttp.WithPropagators(tracing.Propagator),
+		otelhttp.WithTracerProvider(tracing.TracerProvider),
+	)
+
+	return &http.Client{
+		Timeout:   timeouts.ClientTimeout,
+		Transport: transport,
+	}
+}
+
+// httpClientTimeout contains timeouts for an HTTP client and its requests.
+type httpClientTimeout struct {
+	// ClientTimeout is HTTP Client Timeout.
+	ClientTimeout time.Duration
+
+	// RequestTimeout can be imposed as an additional timeout on the request
+	// using context cancellation.
+	RequestTimeout time.Duration
+
+	// NetDialerTimeout is the net dialer timeout
+	NetDialerTimeout time.Duration
 }
 
 func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
@@ -333,39 +410,13 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-func newTimeoutConfigs(v *viper.Viper) (t *timeoutConfigs, err error) {
-	var c, r, d time.Duration
-	if c, err = time.ParseDuration(v.GetString(clientTimeoutKey)); err == nil {
-		if r, err = time.ParseDuration(v.GetString(reqTimeoutKey)); err == nil {
-			if d, err = time.ParseDuration(v.GetString(netDialerTimeoutKey)); err == nil {
-				t = &timeoutConfigs{
-					cTimeout: c,
-					rTimeout: r,
-					dTimeout: d,
-				}
-			}
-		}
-	}
-	return
-}
-
-func newClient(v *viper.Viper, t *timeoutConfigs) *http.Client {
-	return &http.Client{
-		Timeout: t.cTimeout,
-		Transport: &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: t.dTimeout,
-			}).Dial},
-	}
-}
-
 func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				traceId, spanId := candlelight.ExtractTraceInformation(r.Context())
-				ctx := r.WithContext(logging.WithLogger(r.Context(),
-					log.With(logger, "requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)))
+				kvs := []interface{}{"requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method}
+				kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
+				ctx := r.WithContext(logging.WithLogger(r.Context(), log.With(logger, kvs...)))
 				delegate.ServeHTTP(w, ctx)
 			})
 	}
@@ -399,7 +450,7 @@ type CapabilityConfig struct {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry, traceConfig candlelight.TraceConfig) (*alice.Chain, error) {
+func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -490,8 +541,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
-
-	constructors := []alice.Constructor{traceConfig.TraceMiddleware, SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
+	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
 	chain := alice.New(constructors...)
 	return &chain, nil
