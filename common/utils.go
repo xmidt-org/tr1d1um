@@ -48,15 +48,10 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
 		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
-		traceId, spanId, traceOk := candlelight.ExtractTraceInformation(r.Context())
-		var traceLogKVs []interface{}
-		if traceOk {
-			traceLogKVs = append(traceLogKVs, candlelight.SpanIDLogKeyName, spanId, candlelight.TraceIdLogKeyName, traceId)
-		}
 
 		if !transactionLoggerOk {
 			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
-			kvs = append(kvs, traceLogKVs...)
+			kvs, _ = candlelight.AppendTraceInformation(r.Context(), kvs)
 			errorLogger.Log(kvs)
 			return
 		}
@@ -67,7 +62,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
 		} else {
 			kvs := []interface{}{logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid}
-			kvs = append(kvs, traceLogKVs...)
+			kvs, _ = candlelight.AppendTraceInformation(r.Context(), kvs)
 			errorLogger.Log(kvs)
 		}
 
@@ -143,15 +138,6 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			satClientID = auth.Token.Principal()
 		}
 
-		traceId, spanId, validTraceInfo := candlelight.ExtractTraceInformation(nctx)
-		var traceLogKVs []interface{}
-		if validTraceInfo {
-			traceLogKVs = append(traceLogKVs,
-				candlelight.SpanIDLogKeyName, spanId,
-				candlelight.TraceIdLogKeyName, traceId,
-			)
-		}
-
 		logKVs := []interface{}{logging.MessageKey(), "record",
 			"request", transactionRequest{
 				Address: r.RemoteAddr,
@@ -163,7 +149,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			"satClientID", satClientID,
 		}
 
-		logKVs = append(logKVs, traceLogKVs...)
+		logKVs, _ = candlelight.AppendTraceInformation(ctx, logKVs)
 		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger, logKVs...)
 		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
 	}
