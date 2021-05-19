@@ -66,7 +66,7 @@ func (w *service) SendWRP(ctx context.Context, wrpMsg *wrp.Message, authHeaderVa
 		return nil, err
 	}
 
-	r, err := http.NewRequest(http.MethodPost, w.xmidtWrpURL, bytes.NewBuffer(payload))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, w.xmidtWrpURL, bytes.NewBuffer(payload))
 
 	if err != nil {
 		return nil, err

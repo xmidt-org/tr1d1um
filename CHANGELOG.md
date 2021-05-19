@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Fix bug where OTEL trace context was not propagated from server to outgoing client requests [#211](https://github.com/xmidt-org/tr1d1um/pull/211)
 
 ## [v0.5.6]
 - Make OpenTelemetry tracing an optional feature. [#207](https://github.com/xmidt-org/tr1d1um/pull/207)

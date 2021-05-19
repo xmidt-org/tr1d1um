@@ -38,8 +38,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -139,7 +137,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
 		return 1
 	}
-	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", tracing.Enabled)
+	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", !tracing.IsNoop())
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
@@ -148,10 +146,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	rootRouter := mux.NewRouter()
 	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(tracing.Propagator),
-		otelmux.WithTracerProvider(tracing.TracerProvider),
+		otelmux.WithPropagators(tracing.Propagator()),
+		otelmux.WithTracerProvider(tracing.TracerProvider()),
 	}
-	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator))
+	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator()))
 
 	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
@@ -339,25 +337,18 @@ func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
 }
 
 func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
-	var tracing = candlelight.Tracing{
-		Enabled:        false,
-		Propagator:     propagation.TraceContext{},
-		TracerProvider: trace.NewNoopTracerProvider(),
-	}
 	var traceConfig candlelight.Config
 	err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
 	traceConfig.ApplicationName = appName
-	tracerProvider, err := candlelight.ConfigureTracerProvider(traceConfig)
+
+	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
-	if len(traceConfig.Provider) != 0 && traceConfig.Provider != candlelight.DefaultTracerProvider {
-		tracing.Enabled = true
-	}
-	tracing.TracerProvider = tracerProvider
+
 	return tracing, nil
 }
 
@@ -368,8 +359,8 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 		}).Dial,
 	}
 	transport = otelhttp.NewTransport(transport,
-		otelhttp.WithPropagators(tracing.Propagator),
-		otelhttp.WithTracerProvider(tracing.TracerProvider),
+		otelhttp.WithPropagators(tracing.Propagator()),
+		otelhttp.WithTracerProvider(tracing.TracerProvider()),
 	)
 
 	return &http.Client{

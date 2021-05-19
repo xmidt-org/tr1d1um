@@ -50,7 +50,7 @@ type service struct {
 
 // RequestStat contacts the XMiDT cluster for device statistics.
 func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
-	r, err := http.NewRequest(http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 
 	if err != nil {
 		return nil, err
