@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.5.7]
 - Fix bug where OTEL trace context was not propagated from server to outgoing client requests [#211](https://github.com/xmidt-org/tr1d1um/pull/211)
 
 ## [v0.5.6]
@@ -90,7 +92,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.7...HEAD
+[v0.5.7]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.6...v0.5.7
 [v0.5.6]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.5...v0.5.6
 [v0.5.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.4...v0.5.5
 [v0.5.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.3...v0.5.4
