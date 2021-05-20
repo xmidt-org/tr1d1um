@@ -49,6 +49,7 @@ import (
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
+	bchecks "github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/candlelight"
@@ -413,7 +414,7 @@ func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	}
 }
 
-func GetLogger(ctx context.Context) bascule.Logger {
+func GetLogger(ctx context.Context) log.Logger {
 	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 	return logger
 }
@@ -494,9 +495,9 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	authConstructor := basculehttp.NewConstructor(options...)
 
 	bearerRules := bascule.Validators{
-		bascule.CreateNonEmptyPrincipalCheck(),
-		bascule.CreateNonEmptyTypeCheck(),
-		bascule.CreateValidTypeCheck([]string{"jwt"}),
+		bchecks.NonEmptyPrincipal(),
+		bchecks.NonEmptyType(),
+		bchecks.ValidType([]string{"jwt"}),
 	}
 
 	// only add capability check if the configuration is set
@@ -527,7 +528,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	authEnforcer := basculehttp.NewEnforcer(
 		basculehttp.WithELogger(GetLogger),
 		basculehttp.WithRules("Basic", bascule.Validators{
-			bascule.CreateAllowAllCheck(),
+			bchecks.AllowAll(),
 		}),
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
