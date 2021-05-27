@@ -122,6 +122,12 @@ log:
 # webhookStore provides configuration for storing and obtaining webhook
 # information using argus.
 webhook:
+  # JWTParserType establishes which parser type will be used by the JWT token
+  # acquirer used by Argus. Options include 'simple' and 'raw'.
+  # Simple: parser assumes token payloads have the following structure: https://github.com/xmidt-org/bascule/blob/c011b128d6b95fa8358228535c63d1945347adaa/acquire/bearer.go#L77
+  # Raw: parser assumes all of the token payload == JWT token
+  # (Optional). Defaults to 'simple'.
+  JWTParserType: (( grab $WEBHOOK_JWT_PARSER_TYPE || "raw" ))
   argus:
     listen:
       # pullInterval is how often to call argus to update the webhook structure.
@@ -133,7 +139,6 @@ webhook:
     # address it the location to talk to argus.
     address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
 
-
     # auth the authentication method for argus.
     auth:
       # basic configures basic authentication for argus.
@@ -141,22 +146,21 @@ webhook:
       basic: (( concat "Basic " authToken ))
 
       # # jwt configures jwt style authentication for argus.
-      # jwt:
-      # # requestHeaders are added to the request for the token.
-      # # (Optional)
-      # # requestHeaders:
-      # #   "": ""
+      jwt:
+      # requestHeaders are added to the request for the token.
+      # (Optional)
+      # requestHeaders:
+      #   "": ""
 
-      # # authURL is the URL to access for the token.
-      #   authURL: "http://themis:6501/issue"
+      # authURL is the URL to access for the token.
+        authURL: (( grab $ARGUS_ACQUIRE_JWT_URL || "http://themis:6501/issue" ))
 
-      #   # timeout is how long the request to get the token will take before
-      #   # timing out.
-      #   timeout: "1m"
+        # timeout is how long the request to get the token will take before
+        # timing out.
+        timeout: (( grab $ARGUS_ACQUIRE_TIMEOUT || "1m" ))
 
-      #   # buffer is the length of time before a token expires to get a new token.
-      #   buffer: "2m"
-
+        # buffer is the length of time before a token expires to get a new token.
+        buffer: (( grab $ARGUS_ACQUIRE_BUFFER || "2m" ))
 
 ##############################################################################
 # Testing Authorization Credentials
@@ -171,7 +175,7 @@ authHeader:
 jwtValidator:
   keys:
     factory:
-      uri: "http://sample-jwt-validator-uri/{keyId}"
+      uri: "http://themis:6500/keys/docker"
     purpose: 0
     updateInterval: 604800000000000
 
