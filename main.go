@@ -19,7 +19,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -400,23 +399,6 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
-}
-
-func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
-	return func(delegate http.Handler) http.Handler {
-		return http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				kvs := []interface{}{"requestHeaders", r.Header, "requestURL", r.URL.EscapedPath(), "method", r.Method}
-				kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
-				ctx := r.WithContext(logging.WithLogger(r.Context(), log.With(logger, kvs...)))
-				delegate.ServeHTTP(w, ctx)
-			})
-	}
-}
-
-func GetLogger(ctx context.Context) log.Logger {
-	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-	return logger
 }
 
 // JWTValidator provides a convenient way to define jwt validator through config files
