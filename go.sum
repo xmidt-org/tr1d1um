@@ -705,12 +705,6 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/vmware/govmomi v0.18.0/go.mod h1:URlwyTFZX72RmxtxuaFL2Uj3fD1JTvZdx59bHWk6aFU=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
-github.com/xmidt-org/ancla v0.1.5 h1:BNSobhozE/Dh5zpSsAUFNGbib5fcOt8bL1gzX+NZwKE=
-github.com/xmidt-org/ancla v0.1.5/go.mod h1:pvplJrrXakh68CZyL4VNkI/YaCvOlXl3BK8s66hvYes=
-github.com/xmidt-org/ancla v0.1.6-0.20210527025012-1d09163ebd6b h1:uW2mXmP06Nc9DsPm6q46yewVJR9OBkvDvzwBEupKB9I=
-github.com/xmidt-org/ancla v0.1.6-0.20210527025012-1d09163ebd6b/go.mod h1:u2olwo9FAZwoYJ/N5MrnKNbchzOpdU5mya+ZJ4Wnn1I=
-github.com/xmidt-org/ancla v0.1.6-0.20210527052900-0b0dffdd6241 h1:w41QRnYTN3X2aOLsVHnct2YDCjo1pBqzj9o/cZhlxes=
-github.com/xmidt-org/ancla v0.1.6-0.20210527052900-0b0dffdd6241/go.mod h1:u2olwo9FAZwoYJ/N5MrnKNbchzOpdU5mya+ZJ4Wnn1I=
 github.com/xmidt-org/ancla v0.1.6 h1:Y+tWbZQ/JIe8W/sXUMAE/VD2pzwS9Qp11TcWQZfA358=
 github.com/xmidt-org/ancla v0.1.6/go.mod h1:u2olwo9FAZwoYJ/N5MrnKNbchzOpdU5mya+ZJ4Wnn1I=
 github.com/xmidt-org/argus v0.3.9 h1:zmKDRq5e3Gy/hPxym3U4S1aba4ehNnTYGmmsJYIClKU=
