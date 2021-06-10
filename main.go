@@ -174,7 +174,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
 
-		svc, stopWatch, err := ancla.Initialize(webhookConfig, GetLogger)
+		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
 			return 1
@@ -450,7 +450,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	logging.Debug(logger).Log(logging.MessageKey(), "Created list of allowed basic auths", "allowed", basicAllowed, "config", basicAuth)
 
 	options := []basculehttp.COption{
-		basculehttp.WithCLogger(GetLogger),
+		basculehttp.WithCLogger(getLogger),
 		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
 		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
 	}
@@ -508,14 +508,14 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	}
 
 	authEnforcer := basculehttp.NewEnforcer(
-		basculehttp.WithELogger(GetLogger),
+		basculehttp.WithELogger(getLogger),
 		basculehttp.WithRules("Basic", bascule.Validators{
 			bchecks.AllowAll(),
 		}),
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
-	constructors := []alice.Constructor{SetLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
+	constructors := []alice.Constructor{setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
 	chain := alice.New(constructors...)
 	return &chain, nil

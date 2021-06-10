@@ -22,7 +22,7 @@ func sanitizeHeaders(headers http.Header) (filtered http.Header) {
 	return
 }
 
-func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
+func setLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	return func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func SetLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 	}
 }
 
-func GetLogger(ctx context.Context) log.Logger {
+func getLogger(ctx context.Context) log.Logger {
 	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 	return logger
 }
