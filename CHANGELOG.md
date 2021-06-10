@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Keep setter and getter unexported. [#219](https://github.com/xmidt-org/tr1d1um/pull/219) 
 - Prevent Authorization header from getting logged. [#218](https://github.com/xmidt-org/tr1d1um/pull/218) 
 
 
