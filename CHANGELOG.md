@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - Keep setter and getter unexported. [#219](https://github.com/xmidt-org/tr1d1um/pull/219) 
 - Prevent Authorization header from getting logged. [#218](https://github.com/xmidt-org/tr1d1um/pull/218) 
-
+- Bumped ancla, webpa-common versions. [#222](https://github.com/xmidt-org/tr1d1um/pull/222)
 
 ## [v0.5.9]
 - Add support for acquiring Themis tokens through Ancla. [#215](https://github.com/xmidt-org/tr1d1um/pull/215)
