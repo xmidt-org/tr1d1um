@@ -7,7 +7,7 @@ import (
 
 	"github.com/xmidt-org/tr1d1um/common"
 
-	"github.com/xmidt-org/webpa-common/device"
+	"github.com/xmidt-org/webpa-common/v2/device"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
