@@ -122,6 +122,44 @@ log:
 # webhookStore provides configuration for storing and obtaining webhook
 # information using argus.
 webhook:
+  # validation provides options for validating the webhook's URL and TTL.
+  validation:
+
+    # url will check the webhook's Config.URL, FailureURL, and Config.AlternativeURLs
+    url:
+      # httpsOnly will allow only URLs with https schemes through if true
+      httpsOnly: false
+
+      # allowLoopback will disallow any canonical or IP loopback address if false
+      allowLoopback: true
+
+      # allowIP will disallow any IP addresses through if false
+      allowIP: true
+
+      # allowSpecialUseHosts, if false, will disallow URLs that contain any string in invalidHosts or any string
+      # in SpecialUseHosts in webhookValidationConfig.go 
+      allowSpecialUseHosts: true
+
+      # allowSpecialUseIPs, if false, will disallow URLs that contain any string in invalidSubnets
+      # or any string in SpecialUseIPs in webhookValidationConfig.go
+      allowSpecialUseIPs: true
+
+      # invalidHosts is a slice that contains strings of hosts that we do not want allowed in URLs
+      # if allowSpecialUseHosts is false
+      invalidHosts: []
+
+      # invalidSubnets is a slice of strings of IPs that will be disallows in URLs if allowSpecialUseIPs 
+      # is false
+      invalidSubnets: []
+
+    # ttl is the webhook's time to live.
+    ttl:
+      # max is the length of time a webhook is allowed to live.
+      max: 1m
+
+      # jitter is the amount of additional time given to the webhook's TTL to account for
+      # any variations in delivery.
+      jitter: 10s
   # JWTParserType establishes which parser type will be used by the JWT token
   # acquirer used by Argus. Options include 'simple' and 'raw'.
   # Simple: parser assumes token payloads have the following structure: https://github.com/xmidt-org/bascule/blob/c011b128d6b95fa8358228535c63d1945347adaa/acquire/bearer.go#L77
