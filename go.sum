@@ -673,6 +673,8 @@ github.com/vmware/govmomi v0.18.0/go.mod h1:URlwyTFZX72RmxtxuaFL2Uj3fD1JTvZdx59b
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xmidt-org/ancla v0.2.1 h1:Pwvkfhj636rbAdZCZHyAbmdPct1jx/hK/QOFcPUeAFM=
 github.com/xmidt-org/ancla v0.2.1/go.mod h1:ouFTJFAgisn3DpLAdtkTbOOkYyprkO9ZbXqpAmin/Gg=
+github.com/xmidt-org/ancla v0.2.2-0.20210909164415-26b889e7d9ec h1:eG6mr5GhaKG+6d94EkGpvnd+jh6aHUwWupnmVTwdO/M=
+github.com/xmidt-org/ancla v0.2.2-0.20210909164415-26b889e7d9ec/go.mod h1:ouFTJFAgisn3DpLAdtkTbOOkYyprkO9ZbXqpAmin/Gg=
 github.com/xmidt-org/argus v0.3.9/go.mod h1:mDFS44R704gl9Fif3gkfAyvnZa53SvMepmXjYWABPvk=
 github.com/xmidt-org/argus v0.3.10-0.20201105190057-402fede05764/go.mod h1:lnMCVB/i0gOlUOOd2WbzDDgzTEqP5TipzQ8xKIw+N/I=
 github.com/xmidt-org/argus v0.3.10-0.20201217204602-66f69b12c498/go.mod h1:lnMCVB/i0gOlUOOd2WbzDDgzTEqP5TipzQ8xKIw+N/I=
