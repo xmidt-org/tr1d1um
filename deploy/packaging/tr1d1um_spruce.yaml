@@ -131,7 +131,7 @@ webhook:
       httpsOnly: false
 
       # allowLoopback will disallow any canonical or IP loopback address if false
-      allowLoopback: true
+      allowLoopback: false
 
       # allowIP will disallow any IP addresses through if false
       allowIP: true
