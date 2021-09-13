@@ -141,8 +141,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowIP: true
 
-      # allowSpecialUseHosts, if false, will disallow URLs that contain any string in invalidHosts or any string
-      # in SpecialUseHosts in webhookValidationConfig.go .
+      # allowSpecialUseHosts allows URLs that include reserved domains.  Read more here: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
