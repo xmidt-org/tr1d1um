@@ -140,8 +140,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowIP: true
 
-      # allowSpecialUseHosts, if false, will disallow URLs that contain any string in invalidHosts or any string
-      # in SpecialUseHosts in webhookValidationConfig.go .
+      # allowSpecialUseHosts allows the different webhook URLs to have hosts specified by either config value invalidHosts or the SpecialUseHosts list in webhookValidationConfig.go if set to true.
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
