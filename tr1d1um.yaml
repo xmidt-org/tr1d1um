@@ -157,7 +157,7 @@ webhook:
       # (Optional). Defaults to an empty slice.
       invalidSubnets: []
 
-    # ttl is the webhook's time to live.
+    # ttl provides information for what is considered valid for time-related fields (Duration and Until) in the webhook.  A webhook set to expire too far in the future is considered invalid, while a time in the past is considered equivalent to a request to delete the webhook.  Regardless of this configuration, either Until or Duration must have a non-zero value.
     ttl:
       # max is the length of time a webhook is allowed to live.
       max: 1m
