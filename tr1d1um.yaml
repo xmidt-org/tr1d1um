@@ -149,8 +149,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true
 
-      # invalidHosts is a slice that contains strings of hosts that we do not want allowed in URLs
-      # if allowSpecialUseHosts is false.
+      # invalidHosts is a slice that contains strings that we do not want allowed in URLs, providing a way to deny certain domains or hostnames.
       # (Optional). Defaults to an empty slice.
       invalidHosts: []
 
