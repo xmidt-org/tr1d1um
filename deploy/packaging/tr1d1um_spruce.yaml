@@ -141,7 +141,7 @@ webhook:
       allowIP: true
 
       # allowSpecialUseHosts allows the different webhook URLs to have hosts specified by the config 
-      # value invalidHosts if set to true.
+      # value invalidHosts or the SpecialUseHosts list in webhookValidationConfig.go if set to true.
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
