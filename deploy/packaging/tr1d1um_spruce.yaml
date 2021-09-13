@@ -140,7 +140,8 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowIP: true
 
-      # allowSpecialUseHosts allows the different webhook URLs to have hosts specified by either config value invalidHosts or the SpecialUseHosts list in webhookValidationConfig.go if set to true.
+      # allowSpecialUseHosts allows the different webhook URLs to have hosts specified by the config 
+      # value invalidHosts if set to true.
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
@@ -167,7 +168,7 @@ webhook:
       # jitter is the amount of additional time given to the webhook's TTL to account for
       # any variations in delivery.
       jitter: 10s
-      
+
   # JWTParserType establishes which parser type will be used by the JWT token
   # acquirer used by Argus. Options include 'simple' and 'raw'.
   # Simple: parser assumes token payloads have the following structure: https://github.com/xmidt-org/bascule/blob/c011b128d6b95fa8358228535c63d1945347adaa/acquire/bearer.go#L77
