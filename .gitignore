@@ -53,6 +53,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
+cpuprofile
 
 tr1d1um
 .ignore
