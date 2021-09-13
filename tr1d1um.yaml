@@ -133,7 +133,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       httpsOnly: false
 
-      # allowLoopback will disallow any canonical or IP loopback address if false.
+      # allowLoopback will allow any canonical or IP loopback address if true.  Otherwise, loopback addresses are considered invalid.
       # (Optional). Defaults to 'false'.
       allowLoopback: true
 
