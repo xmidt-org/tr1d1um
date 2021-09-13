@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.6.0]
+- Integrated webhook validator and added documentation and configuration for it. [#224](https://github.com/xmidt-org/tr1d1um/pull/224)
 - Bump bascule version which includes a security vulnerability fix. [#223](https://github.com/xmidt-org/tr1d1um/pull/223)
 
 ## [v0.5.10]
@@ -105,7 +108,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.0...HEAD
+[v0.6.0]:https://github.com/xmidt-org/tr1d1um/compare/v0.5.10...v0.6.0
 [v0.5.10]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.9...v0.5.10
 [v0.5.9]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.8...v0.5.9
 [v0.5.8]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.7...v0.5.8

@@ -181,7 +181,19 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 		defer stopWatch()
 
-		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{MetricsProvider: metricsRegistry})
+		var webhookValidationConfig ancla.ValidatorConfig
+		err = v.UnmarshalKey(webhookConfigKey+".validation", &webhookValidationConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validation config: %s\n", err.Error())
+			return 1
+		}
+		builtValidators, err := ancla.BuildValidators(webhookValidationConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
+			return 1
+		}
+
+		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{MetricsProvider: metricsRegistry, V: builtValidators})
 		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
 
 		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
