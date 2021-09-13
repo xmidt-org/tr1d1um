@@ -153,8 +153,7 @@ webhook:
       # (Optional). Defaults to an empty slice.
       invalidHosts: []
 
-      # invalidSubnets is a slice of strings of IPs that will be disallows in URLs if allowSpecialUseIPs 
-      # is false.
+      # invalidSubnets is a list of IP subnets.  If a URL contains an IP or resolves to an IP in one of these subnets, the webhook is considered invalid.
       # (Optional). Defaults to an empty slice.
       invalidSubnets: []
 
