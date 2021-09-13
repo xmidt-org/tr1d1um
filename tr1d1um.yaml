@@ -145,8 +145,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
-      # allowSpecialUseIPs, if false, will disallow URLs that contain any string in invalidSubnets
-      # or any string in SpecialUseIPs in webhookValidationConfig.go .
+      # allowSpecialUseIPs allows URLs that contain or route to IPs that have been marked as reserved through various RFCs: rfc6761, rfc6890, rfc8190.
       # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true
 
