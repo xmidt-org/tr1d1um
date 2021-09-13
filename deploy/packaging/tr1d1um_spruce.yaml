@@ -145,8 +145,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
-      # allowSpecialUseIPs, if false, will disallow URLs that contain any string in invalidSubnets
-      # or any string in SpecialUseIPs in webhookValidationConfig.go .
+      # allowSpecialUseIPs allows the different webhook URLs to have IP hostnames that match any of the subnet masks specified by config value 'invalidSubnets' or specific IP addresses listed in SpecialUserIPs in webhookValidationConfig.go.
       # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true
 
