@@ -136,7 +136,7 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowLoopback: true
 
-      # allowIP will disallow any IP addresses through if false.
+      # allowIP allows the different webhook URLs to have IP hostnames if set to true.
       # (Optional). Defaults to 'false'.
       allowIP: true
 
