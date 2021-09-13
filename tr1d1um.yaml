@@ -124,7 +124,7 @@ log:
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
 
-  # validation provides options for validating the webhook's URL and TTL related fields.
+  # validation provides options for validating the webhook's URL and TTL related fields.  Some validation happens regardless of the configuration: URLs must be a valid URL structure, the Matcher.DeviceID values must compile into regular expressions, and the Events field must have at least one value and all values must compile into regular expressions. 
   validation:
 
     # url will check the webhook's Config.URL, FailureURL, and Config.AlternativeURLs.
