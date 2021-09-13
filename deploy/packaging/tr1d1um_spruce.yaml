@@ -146,12 +146,12 @@ webhook:
       # (Optional). Defaults to 'false'.
       allowIP: true
 
-      # allowSpecialUseHosts allows URLs that include reserved domains.  
+      # allowSpecialUseHosts allows URLs that include reserved domains if set to true.  
       # Read more here: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
-      # allowSpecialUseIPs allows URLs that contain or route to IPs that have 
+      # allowSpecialUseIPs, if set to true, allows URLs that contain or route to IPs that have 
       # been marked as reserved through various RFCs: rfc6761, rfc6890, rfc8190.
       # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true

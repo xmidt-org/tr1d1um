@@ -124,45 +124,66 @@ log:
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
 
-  # validation provides options for validating the webhook's URL and TTL related fields.  Some validation happens regardless of the configuration: URLs must be a valid URL structure, the Matcher.DeviceID values must compile into regular expressions, and the Events field must have at least one value and all values must compile into regular expressions. 
+  # validation provides options for validating the webhook's URL and TTL 
+  # related fields. Some validation happens regardless of the configuration: 
+  # URLs must be a valid URL structure, the Matcher.DeviceID values must 
+  # compile into regular expressions, and the Events field must have at 
+  # least one value and all values must compile into regular expressions. 
   validation:
 
-    # url provides options for additional validation of the webhook's Config.URL, FailureURL, and Config.AlternativeURLs fields.
+    # url provides options for additional validation of the webhook's 
+    # Config.URL, FailureURL, and Config.AlternativeURLs fields.
     url:
       # httpsOnly will allow only URLs with https schemes through if true.
       # (Optional). Defaults to 'false'.
       httpsOnly: false
 
-      # allowLoopback will allow any canonical or IP loopback address if true.  Otherwise, loopback addresses are considered invalid.
+      # allowLoopback will allow any canonical or IP loopback address if 
+      # true. Otherwise, loopback addresses are considered invalid.
       # (Optional). Defaults to 'false'.
       allowLoopback: true
 
-      # allowIP will disallow any IP addresses through if false.
+      # allowIP allows the different webhook URLs to have IP hostnames if set to true.
       # (Optional). Defaults to 'false'.
       allowIP: true
 
-      # allowSpecialUseHosts allows URLs that include reserved domains.  Read more here: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
+      # allowSpecialUseHosts allows URLs that include reserved domains if set to true.  
+      # Read more here: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
       # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
-      # allowSpecialUseIPs allows URLs that contain or route to IPs that have been marked as reserved through various RFCs: rfc6761, rfc6890, rfc8190.
+      # allowSpecialUseIPs, if set to true, allows URLs that contain or route to IPs that have 
+      # been marked as reserved through various RFCs: rfc6761, rfc6890, rfc8190.
       # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true
 
-      # invalidHosts is a slice that contains strings that we do not want allowed in URLs, providing a way to deny certain domains or hostnames.
+      # invalidHosts is a slice that contains strings that we do not want 
+      # allowed in URLs, providing a way to deny certain domains or hostnames.
       # (Optional). Defaults to an empty slice.
       invalidHosts: []
 
-      # invalidSubnets is a list of IP subnets.  If a URL contains an IP or resolves to an IP in one of these subnets, the webhook is considered invalid.
+      # invalidSubnets is a list of IP subnets.  If a URL contains an 
+      # IP or resolves to an IP in one of these subnets, the webhook is 
+      # considered invalid.
       # (Optional). Defaults to an empty slice.
       invalidSubnets: []
 
-    # ttl provides information for what is considered valid for time-related fields (Duration and Until) in the webhook.  A webhook set to expire too far in the future is considered invalid, while a time in the past is considered equivalent to a request to delete the webhook.  Regardless of this configuration, either Until or Duration must have a non-zero value.
+    # ttl provides information for what is considered valid for time-related 
+    # fields (Duration and Until) in the webhook.  A webhook set to expire 
+    # too far in the future is considered invalid, while a time in the past 
+    # is considered equivalent to a request to delete the webhook.  
+    # Regardless of this configuration, either Until or Duration must have a 
+    # non-zero value.
     ttl:
-      # max is the length of time a webhook is allowed to live.  The Duration cannot be larger than this value, and the Until value cannot be set later than the current time + max + jitter.
+      # max is the length of time a webhook is allowed to live.  The Duration 
+      # cannot be larger than this value, and the Until value cannot be set 
+      # later than the current time + max + jitter.
       max: 1m
 
-      # jitter is the buffer time added when checking that the Until value is valid.  If there is a slight clock skew between servers or some delay in the http request, jitter should help account for that when ensuring that Until is not a time too far in the future.
+      # jitter is the buffer time added when checking that the Until value is 
+      # valid.  If there is a slight clock skew between servers or some delay 
+      # in the http request, jitter should help account for that when ensuring 
+      # that Until is not a time too far in the future.
       jitter: 10s
 
   # JWTParserType establishes which parser type will be used by the JWT token
