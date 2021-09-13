@@ -124,34 +124,41 @@ log:
 # Optional: if key is not supplied, webhooks would be disabled.
 webhook:
 
-  # validation provides options for validating the webhook's URL and TTL.
+  # validation provides options for validating the webhook's URL and TTL related fields.
   validation:
 
-    # url will check the webhook's Config.URL, FailureURL, and Config.AlternativeURLs
+    # url will check the webhook's Config.URL, FailureURL, and Config.AlternativeURLs.
     url:
-      # httpsOnly will allow only URLs with https schemes through if true
+      # httpsOnly will allow only URLs with https schemes through if true.
+      # (Optional). Defaults to 'false'.
       httpsOnly: false
 
-      # allowLoopback will disallow any canonical or IP loopback address if false
+      # allowLoopback will disallow any canonical or IP loopback address if false.
+      # (Optional). Defaults to 'false'.
       allowLoopback: true
 
-      # allowIP will disallow any IP addresses through if false
+      # allowIP will disallow any IP addresses through if false.
+      # (Optional). Defaults to 'false'.
       allowIP: true
 
       # allowSpecialUseHosts, if false, will disallow URLs that contain any string in invalidHosts or any string
-      # in SpecialUseHosts in webhookValidationConfig.go 
+      # in SpecialUseHosts in webhookValidationConfig.go .
+      # (Optional). Defaults to 'false'.
       allowSpecialUseHosts: true
 
       # allowSpecialUseIPs, if false, will disallow URLs that contain any string in invalidSubnets
-      # or any string in SpecialUseIPs in webhookValidationConfig.go
+      # or any string in SpecialUseIPs in webhookValidationConfig.go .
+      # (Optional). Defaults to 'false'.
       allowSpecialUseIPs: true
 
       # invalidHosts is a slice that contains strings of hosts that we do not want allowed in URLs
-      # if allowSpecialUseHosts is false
+      # if allowSpecialUseHosts is false.
+      # (Optional). Defaults to an empty slice.
       invalidHosts: []
 
       # invalidSubnets is a slice of strings of IPs that will be disallows in URLs if allowSpecialUseIPs 
-      # is false
+      # is false.
+      # (Optional). Defaults to an empty slice.
       invalidSubnets: []
 
     # ttl is the webhook's time to live.
