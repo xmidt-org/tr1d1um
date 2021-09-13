@@ -162,8 +162,7 @@ webhook:
       # max is the length of time a webhook is allowed to live.  The Duration cannot be larger than this value, and the Until value cannot be set later than the current time + max + jitter.
       max: 1m
 
-      # jitter is the amount of additional time given to the webhook's TTL to account for
-      # any variations in delivery.
+      # jitter is the buffer time added when checking that the Until value is valid.  If there is a slight clock skew between servers or some delay in the http request, jitter should help account for that when ensuring that Until is not a time too far in the future.
       jitter: 10s
 
   # JWTParserType establishes which parser type will be used by the JWT token
