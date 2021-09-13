@@ -127,7 +127,7 @@ webhook:
   # validation provides options for validating the webhook's URL and TTL related fields.  Some validation happens regardless of the configuration: URLs must be a valid URL structure, the Matcher.DeviceID values must compile into regular expressions, and the Events field must have at least one value and all values must compile into regular expressions. 
   validation:
 
-    # url will check the webhook's Config.URL, FailureURL, and Config.AlternativeURLs.
+    # url provides options for additional validation of the webhook's Config.URL, FailureURL, and Config.AlternativeURLs fields.
     url:
       # httpsOnly will allow only URLs with https schemes through if true.
       # (Optional). Defaults to 'false'.
