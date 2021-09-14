@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.6.1]
+- Fixed the webhook endpoint to return 400 instead of 500 for webhook validation. [#225](https://github.com/xmidt-org/tr1d1um/pull/225)
+
 ## [v0.6.0]
 - Integrated webhook validator and added documentation and configuration for it. [#224](https://github.com/xmidt-org/tr1d1um/pull/224)
 - Bump bascule version which includes a security vulnerability fix. [#223](https://github.com/xmidt-org/tr1d1um/pull/223)
@@ -108,7 +111,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.1...HEAD
+[v0.6.1]:https://github.com/xmidt-org/tr1d1um/compare/v0.6.0...v0.6.1
 [v0.6.0]:https://github.com/xmidt-org/tr1d1um/compare/v0.5.10...v0.6.0
 [v0.5.10]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.9...v0.5.10
 [v0.5.9]: https://github.com/xmidt-org/tr1d1um/compare/v0.5.8...v0.5.9
