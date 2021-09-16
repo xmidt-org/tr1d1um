@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ## [v0.6.2]
-- Bumped ancla to fix http bug. []()
+- Bumped ancla to fix http bug. [#228](https://github.com/xmidt-org/tr1d1um/pull/228)
 
 ## [v0.6.1]
 - Fixed the webhook endpoint to return 400 instead of 500 for webhook validation. [#225](https://github.com/xmidt-org/tr1d1um/pull/225)
