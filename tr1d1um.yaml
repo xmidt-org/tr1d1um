@@ -131,6 +131,11 @@ webhook:
   # least one value and all values must compile into regular expressions. 
   validation:
 
+    # requirePartnerIDs, if true, will require webhooks to have partnerIDs in the request
+    # for them to be registered.
+    # Defaults to 'false'.
+    requirePartnerIDs: false
+
     # url provides options for additional validation of the webhook's 
     # Config.URL, FailureURL, and Config.AlternativeURLs fields.
     url:
