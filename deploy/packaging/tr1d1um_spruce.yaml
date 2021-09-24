@@ -125,8 +125,8 @@ webhook:
 
   # requirePartnerIDs, if true, will require webhooks to have partnerIDs in the request
   # for them to be registered.
-  # Defaults to 'false'.
-  requirePartnerIDs: false
+  # Defaults to 'true'.
+  requirePartnerIDs: true
 
   # validation provides options for validating the webhook's URL and TTL 
   # related fields. Some validation happens regardless of the configuration: 
