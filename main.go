@@ -193,18 +193,19 @@ func tr1d1um(arguments []string) (exitCode int) {
 			return 1
 		}
 
-		var webhookReqPartnerIDs bool
-		err = v.UnmarshalKey(webhookConfigKey+".requirePartnerIDs", &webhookReqPartnerIDs)
+		var webhookDisablePartnerIDs bool
+		err = v.UnmarshalKey(webhookConfigKey+".disablePartnerIDs", &webhookDisablePartnerIDs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook partnerID requirement: %s\n", err.Error())
 			return 1
 		}
 
 		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			MetricsProvider: metricsRegistry,
-			V:               builtValidators,
-			reqPartnerIDs:   webhookReqPartnerIDs,
+			MetricsProvider:   metricsRegistry,
+			V:                 builtValidators,
+			disablePartnerIDs: webhookDisablePartnerIDs,
 		})
+
 		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
 
 		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)

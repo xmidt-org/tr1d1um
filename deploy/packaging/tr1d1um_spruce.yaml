@@ -123,10 +123,10 @@ log:
 # information using argus.
 webhook:
 
-  # requirePartnerIDs, if true, will require webhooks to have partnerIDs in the request
-  # for them to be registered.
-  # Defaults to 'true'.
-  requirePartnerIDs: true
+  # disablePartnerIDs, if true, will allow webhooks to register without 
+  # checking the validity of the partnerIDs in the request
+  # Defaults to 'false'.
+  disablePartnerIDs: false
 
   # validation provides options for validating the webhook's URL and TTL 
   # related fields. Some validation happens regardless of the configuration: 
