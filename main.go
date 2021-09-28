@@ -203,7 +203,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 			MetricsProvider:   metricsRegistry,
 			V:                 builtValidators,
-			disablePartnerIDs: webhookDisablePartnerIDs,
+			DisablePartnerIDs: webhookDisablePartnerIDs,
 		})
 
 		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
