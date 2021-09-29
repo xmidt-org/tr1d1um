@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [v0.6.3]
 - Added configuration for partnerID check. [#229](https://github.com/xmidt-org/tr1d1um/pull/229)
-- Bumped webpa-common to v2. [#229](https://github.com/xmidt-org/tr1d1um/pull/229)
 - Bumped ancla to v0.3.1 [#229](https://github.com/xmidt-org/tr1d1um/pull/229)
 
 ## [v0.6.2]
