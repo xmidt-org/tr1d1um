@@ -123,6 +123,11 @@ log:
 # information using argus.
 webhook:
 
+  # disablePartnerIDs, if true, will allow webhooks to register without 
+  # checking the validity of the partnerIDs in the request
+  # Defaults to 'false'.
+  disablePartnerIDs: false
+
   # validation provides options for validating the webhook's URL and TTL 
   # related fields. Some validation happens regardless of the configuration: 
   # URLs must be a valid URL structure, the Matcher.DeviceID values must 
