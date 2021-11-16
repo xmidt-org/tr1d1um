@@ -140,7 +140,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
 			"request", transactionRequest{
-				Address: r.RemoteAddr,
+				Address: r.Host,
 				Path:    r.URL.Path,
 				Query:   r.URL.RawQuery,
 				Method:  r.Method,
