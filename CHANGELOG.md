@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Bumped ancla to v0.3.3 and changed server log source address field. [#221](https://github.com/xmidt-org/tr1d1um/issues/221)
 
 ## [v0.6.3]
 - Added configuration for partnerID check. [#229](https://github.com/xmidt-org/tr1d1um/pull/229)
