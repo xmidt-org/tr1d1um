@@ -22,8 +22,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -70,7 +70,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 		if !transactionLoggerOk {
 			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
 			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
-			errorLogger.Log(kvs)
+			errorLogger.Log(kvs...)
 			return
 		}
 
@@ -81,7 +81,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 		} else {
 			kvs := []interface{}{logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid}
 			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
-			errorLogger.Log(kvs)
+			errorLogger.Log(kvs...)
 		}
 
 		includeHeaders := true
@@ -155,12 +155,13 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		if auth, ok := bascule.FromContext(r.Context()); ok {
 			satClientID = auth.Token.Principal()
 		}
+
 		var source string
-		u, err := url.Parse(r.RemoteAddr)
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			source = r.RemoteAddr
 		} else {
-			source = u.Hostname()
+			source = host
 		}
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
