@@ -155,15 +155,17 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		if auth, ok := bascule.FromContext(r.Context()); ok {
 			satClientID = auth.Token.Principal()
 		}
-
+		var source string
 		u, err := url.Parse(r.RemoteAddr)
 		if err != nil {
-			//what should I do here?
+			source = r.RemoteAddr
+		} else {
+			source = u.Hostname()
 		}
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
 			"request", transactionRequest{
-				Address: u.Hostname(),
+				Address: source,
 				Path:    r.URL.Path,
 				Query:   r.URL.RawQuery,
 				Method:  r.Method,
