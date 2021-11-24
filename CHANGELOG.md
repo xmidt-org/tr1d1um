@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Bumped ancla to v0.3.3 and changed server log source address field. [#231](https://github.com/xmidt-org/tr1d1um/pull/231)
+- Bumped ancla to v0.3.4:
+  - Changed server log source address field. [#231](https://github.com/xmidt-org/tr1d1um/pull/231)
+  - Fixes a problem with wiring together configuration for the Duration and Until webhook validations. [#232](https://github.com/xmidt-org/tr1d1um/pull/232)
+  - Improves logging. [#232](https://github.com/xmidt-org/tr1d1um/pull/232)
 
 ## [v0.6.3]
 - Added configuration for partnerID check. [#229](https://github.com/xmidt-org/tr1d1um/pull/229)
