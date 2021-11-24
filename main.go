@@ -181,7 +181,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 		defer stopWatch()
 
-		builtValidators, err := ancla.BuildValidators(webhookConfig.WebhookValidationConfig)
+		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
 			return 1

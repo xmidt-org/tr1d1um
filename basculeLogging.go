@@ -35,6 +35,6 @@ func setLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
 }
 
 func getLogger(ctx context.Context) log.Logger {
-	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC)
 	return logger
 }
