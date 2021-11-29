@@ -122,7 +122,6 @@ log:
 # webhookStore provides configuration for storing and obtaining webhook
 # information using argus.
 webhook:
-
   # disablePartnerIDs, if true, will allow webhooks to register without 
   # checking the validity of the partnerIDs in the request
   # Defaults to 'false'.
@@ -134,7 +133,6 @@ webhook:
   # compile into regular expressions, and the Events field must have at 
   # least one value and all values must compile into regular expressions. 
   validation:
-
     # url provides options for additional validation of the webhook's 
     # Config.URL, FailureURL, and Config.AlternativeURLs fields.
     url:
@@ -182,13 +180,13 @@ webhook:
       # max is the length of time a webhook is allowed to live.  The Duration 
       # cannot be larger than this value, and the Until value cannot be set 
       # later than the current time + max + jitter.
-      max: 1m
+      max: (( grab $WEBHOOK_MAX_TTL || "1m" ))
 
       # jitter is the buffer time added when checking that the Until value is 
       # valid.  If there is a slight clock skew between servers or some delay 
       # in the http request, jitter should help account for that when ensuring 
       # that Until is not a time too far in the future.
-      jitter: 10s
+      jitter: (( grab $WEBHOOK_TTL_JITTER || "10s" ))
 
   # JWTParserType establishes which parser type will be used by the JWT token
   # acquirer used by Argus. Options include 'simple' and 'raw'.
