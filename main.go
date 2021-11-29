@@ -191,6 +191,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			MetricsProvider:   metricsRegistry,
 			V:                 builtValidators,
 			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+			GetLogger: //Find what goes here
 		})
 
 		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
