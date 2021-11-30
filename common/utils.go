@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -126,9 +127,14 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 	}
 
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
+		code := http.StatusInternalServerError
+		var sc kithttp.StatusCoder
+		if errors.As(e, &sc) {
+			code = sc.StatusCode()
+		}
 		logger := getLogger(ctx)
-		if logger != nil {
-			logger.Log("sending non-200 response", level.Key(), level.ErrorValue(), logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		if logger != nil && code != http.StatusNotFound {
+			logger.Log("sending non-200 response, non-404 response", level.Key(), level.ErrorValue(), logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
 		}
 		ee(ctx, e, w)
 	}
