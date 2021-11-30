@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - Bumped ancla to v0.3.3 and changed server log source address field. [#231](https://github.com/xmidt-org/tr1d1um/pull/231)
-- Bumped ancla to v0.3.5, bumped argus to v0.6.0, and changed webhookHandler configs to pass getLogger funch. [#233](https://github.com/xmidt-org/tr1d1um/pull/233)
+- Bumped ancla to v0.3.5, bumped argus to v0.6.0, and changed errorEncoder to pull logger from context. [#233](https://github.com/xmidt-org/tr1d1um/pull/233)
 
 ## [v0.6.4]
 - Bumped ancla to v0.3.4:
