@@ -48,7 +48,7 @@ type Options struct {
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture(c.Log)),
-		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(c.Log, encodeError)),
+		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(common.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 

@@ -52,6 +52,8 @@ type transactionResponse struct {
 	Headers interface{} `json:"headers,omitempty"`
 }
 
+type GetLoggerFunc func(context.Context) kitlog.Logger
+
 func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rs)
 }
@@ -115,10 +117,17 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(logger kitlog.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
-	var errorLogger = logging.Error(logger)
+/*pass get logger func to pull logger out and use in the func returned; basically like the other ones */
+func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
+	if getLogger == nil {
+		getLogger = func(_ context.Context) kitlog.Logger {
+			return nil
+		}
+	}
+
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
-		errorLogger.Log(logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		logger := getLogger(ctx)
+		logger.Log(logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
 		ee(ctx, e, w)
 	}
 }
@@ -190,4 +199,9 @@ func genTID() (tid string) {
 		tid = base64.RawURLEncoding.EncodeToString(buf)
 	}
 	return
+}
+
+func GetLogger(ctx context.Context) kitlog.Logger {
+	logger := kitlog.With(logging.GetLogger(ctx), "ts", kitlog.DefaultTimestampUTC)
+	return logger
 }

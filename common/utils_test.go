@@ -82,7 +82,7 @@ func TestErrorLogEncoder(t *testing.T) {
 	e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
 		assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
 	}
-	le := ErrorLogEncoder(logging.DefaultLogger(), e)
+	le := ErrorLogEncoder(GetLogger, e)
 
 	assert.NotPanics(func() {
 		//assumes TID is context
