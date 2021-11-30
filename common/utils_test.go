@@ -78,16 +78,34 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 }
 
 func TestErrorLogEncoder(t *testing.T) {
-	assert := assert.New(t)
-	e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
-		assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
+	tcs := []struct {
+		desc      string
+		getLogger GetLoggerFunc
+	}{
+		{
+			desc:      "nil getlogger",
+			getLogger: nil,
+		},
+		{
+			desc:      "valid getlogger",
+			getLogger: GetLogger,
+		},
 	}
-	le := ErrorLogEncoder(GetLogger, e)
 
-	assert.NotPanics(func() {
-		//assumes TID is context
-		le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
-	})
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
+				assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
+			}
+			le := ErrorLogEncoder(tc.getLogger, e)
+
+			assert.NotPanics(func() {
+				//assumes TID is context
+				le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+			})
+		})
+	}
 }
 
 func TestWelcome(t *testing.T) {

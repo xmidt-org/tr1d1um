@@ -32,6 +32,7 @@ import (
 	"github.com/xmidt-org/bascule"
 
 	kitlog "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
@@ -117,7 +118,6 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-/*pass get logger func to pull logger out and use in the func returned; basically like the other ones */
 func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	if getLogger == nil {
 		getLogger = func(_ context.Context) kitlog.Logger {
@@ -127,7 +127,9 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
 		logger := getLogger(ctx)
-		logger.Log(logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		if logger != nil {
+			logger.Log("sending non-200 response", level.Key(), level.ErrorValue(), logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		}
 		ee(ctx, e, w)
 	}
 }
