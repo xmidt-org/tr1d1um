@@ -289,7 +289,7 @@ jwtValidator:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: http://scytale:6300
+targetURL: http://scytale:6300/api/v3
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"

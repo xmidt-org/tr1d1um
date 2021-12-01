@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - Bumped argus to v0.6.0, bumped ancla to v0.3.5, and changed errorEncoder to pull logger from context.[#233](https://github.com/xmidt-org/tr1d1um/pull/233)
 - Updated api version in url to v3 to indicate breaking changes in response codes when an invalid auth is sent.  This change was made in an earlier release (v0.5.10). [#234](https://github.com/xmidt-org/tr1d1um/pull/234)
+- Updated target URL to not have an api base hard coded onto it.  Instead, the base should be provided as a part of the configuration value. [#234](https://github.com/xmidt-org/tr1d1um/pull/234)
 
 ## [v0.6.4]
 - Bumped ancla to v0.3.4:
