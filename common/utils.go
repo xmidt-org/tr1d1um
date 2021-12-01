@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	"github.com/xmidt-org/bascule"
 
 	kitlog "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
@@ -51,6 +53,8 @@ type transactionResponse struct {
 	Code    int         `json:"code,omitempty"`
 	Headers interface{} `json:"headers,omitempty"`
 }
+
+type GetLoggerFunc func(context.Context) kitlog.Logger
 
 func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rs)
@@ -115,10 +119,23 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(logger kitlog.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
-	var errorLogger = logging.Error(logger)
+func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
+	if getLogger == nil {
+		getLogger = func(_ context.Context) kitlog.Logger {
+			return nil
+		}
+	}
+
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
-		errorLogger.Log(logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		code := http.StatusInternalServerError
+		var sc kithttp.StatusCoder
+		if errors.As(e, &sc) {
+			code = sc.StatusCode()
+		}
+		logger := getLogger(ctx)
+		if logger != nil && code != http.StatusNotFound {
+			logger.Log("sending non-200 response, non-404 response", level.Key(), level.ErrorValue(), logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string))
+		}
 		ee(ctx, e, w)
 	}
 }
@@ -190,4 +207,9 @@ func genTID() (tid string) {
 		tid = base64.RawURLEncoding.EncodeToString(buf)
 	}
 	return
+}
+
+func GetLogger(ctx context.Context) kitlog.Logger {
+	logger := kitlog.With(logging.GetLogger(ctx), "ts", kitlog.DefaultTimestampUTC)
+	return logger
 }

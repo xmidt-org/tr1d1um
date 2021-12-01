@@ -191,9 +191,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 			MetricsProvider:   metricsRegistry,
 			V:                 builtValidators,
 			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+			GetLogger:         getLogger,
 		})
 
-		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc)
+		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+			GetLogger: getLogger,
+		})
 
 		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
 		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
