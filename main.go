@@ -64,7 +64,7 @@ import (
 // convenient global values
 const (
 	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "api/v2"
+	applicationName, apiBase = "tr1d1um", "api/v3"
 )
 
 const (
@@ -453,6 +453,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		decoded, err := base64.StdEncoding.DecodeString(a)
 		if err != nil {
 			logging.Info(logger).Log(logging.MessageKey(), "failed to decode auth header", "authHeader", a, logging.ErrorKey(), err.Error())
+			continue
 		}
 
 		i := bytes.IndexByte(decoded, ':')
