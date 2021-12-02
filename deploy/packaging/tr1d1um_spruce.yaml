@@ -93,7 +93,7 @@ log:
 
   # level is the logging level to use - INFO, DEBUG, WARN, ERROR
   # (Optional) defaults to ERROR
-  level: (( grab $LOG_LEVEL || "INFO" ))
+  level: (( grab $LOG_LEVEL || "DEBUG" ))
 
   # maxsize is the maximum log file size in MB
   # (Optional) defaults to max 100MB
@@ -285,7 +285,7 @@ jwtValidator:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster
-targetURL: (( grab  $XMIDT_CLUSTER || "http://scytale:6300" ))
+targetURL: (( grab  $XMIDT_CLUSTER || "http://scytale:6300/api/v3" ))
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"

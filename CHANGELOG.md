@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.7.0]
 - Bumped argus to v0.6.0, bumped ancla to v0.3.5, and changed errorEncoder to pull logger from context.[#233](https://github.com/xmidt-org/tr1d1um/pull/233)
+- Updated api version in url to v3 to indicate breaking changes in response codes when an invalid auth is sent.  This change was made in an earlier release (v0.5.10). [#234](https://github.com/xmidt-org/tr1d1um/pull/234)
+- Updated target URL to not have an api base hard coded onto it.  Instead, the base should be provided as a part of the configuration value. [#234](https://github.com/xmidt-org/tr1d1um/pull/234)
 
 ## [v0.6.4]
 - Bumped ancla to v0.3.4:
@@ -125,7 +129,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.0...HEAD
+[v0.7.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.4...v0.7.0
 [v0.6.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.3...v0.6.4
 [v0.6.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.2...v0.6.3
 [v0.6.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.1...v0.6.2

@@ -64,7 +64,7 @@ import (
 // convenient global values
 const (
 	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "api/v2"
+	applicationName, apiBase = "tr1d1um", "api/v3"
 )
 
 const (
@@ -227,14 +227,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 					xmidtHTTPClient.Do),
 				RequestTimeout: xmidtClientTimeout.RequestTimeout,
 			}),
-		XmidtStatURL: fmt.Sprintf("%s/%s/device/${device}/stat", v.GetString(targetURLKey), apiBase),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", v.GetString(targetURLKey)),
 	}
 
 	//
 	// WRP Service configs
 	//
 	translationOptions := &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/%s/device", v.GetString(targetURLKey), apiBase),
+		XmidtWrpURL: fmt.Sprintf("%s/device", v.GetString(targetURLKey)),
 		WRPSource:   v.GetString(wrpSourceKey),
 		Tr1d1umTransactor: common.NewTr1d1umTransactor(
 			&common.Tr1d1umTransactorOptions{
@@ -453,6 +453,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		decoded, err := base64.StdEncoding.DecodeString(a)
 		if err != nil {
 			logging.Info(logger).Log(logging.MessageKey(), "failed to decode auth header", "authHeader", a, logging.ErrorKey(), err.Error())
+			continue
 		}
 
 		i := bytes.IndexByte(decoded, ':')
