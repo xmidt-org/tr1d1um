@@ -19,10 +19,19 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	kitlog "github.com/go-kit/kit/log"
+	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/webpa-common/v2/logging"
 )
+
+// HeaderWPATID is the header key for the WebPA transaction UUID
+const HeaderWPATID = "X-WebPA-Transaction-Id"
 
 // XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
 // the XMiDT API
@@ -55,16 +64,36 @@ type Tr1d1umTransactorOptions struct {
 	Do func(*http.Request) (*http.Response, error)
 }
 
+type tr1d1umTransactor struct {
+	RequestTimeout time.Duration
+	Do             func(*http.Request) (*http.Response, error)
+}
+
+type transactionRequest struct {
+	Address string `json:"address,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Query   string `json:"query,omitempty"`
+	Method  string `json:"method,omitempty"`
+}
+
+type transactionResponse struct {
+	Code    int         `json:"code,omitempty"`
+	Headers interface{} `json:"headers,omitempty"`
+}
+
+func (re *transactionRequest) MarshalJSON() ([]byte, error) {
+	return json.Marshal(re)
+}
+
+func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rs)
+}
+
 func NewTr1d1umTransactor(o *Tr1d1umTransactorOptions) Tr1d1umTransactor {
 	return &tr1d1umTransactor{
 		Do:             o.Do,
 		RequestTimeout: o.RequestTimeout,
 	}
-}
-
-type tr1d1umTransactor struct {
-	RequestTimeout time.Duration
-	Do             func(*http.Request) (*http.Response, error)
 }
 
 func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, err error) {
@@ -90,4 +119,47 @@ func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, 
 	//Timeout, network errors, etc.
 	err = NewCodedError(err, http.StatusServiceUnavailable)
 	return
+}
+
+// TransactionLogging is used by the different Tr1d1um services to
+// keep track of incoming requests and their corresponding responses
+func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+	errorLogger := logging.Error(logger)
+	return func(ctx context.Context, code int, r *http.Request) {
+		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
+		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
+
+		if !transactionLoggerOk {
+			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
+			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
+			errorLogger.Log(kvs...)
+			return
+		}
+
+		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
+
+		if ok {
+			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
+		} else {
+			kvs := []interface{}{logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid}
+			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
+			errorLogger.Log(kvs...)
+		}
+
+		includeHeaders := true
+		response := transactionResponse{Code: code}
+
+		for _, responseCode := range reducedLoggingResponseCodes {
+			if responseCode == code {
+				includeHeaders = false
+				break
+			}
+		}
+
+		if includeHeaders {
+			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
+		}
+
+		transactionInfoLogger.Log("response", response)
+	}
 }
