@@ -93,7 +93,7 @@ log:
 
   # level is the logging level to use - INFO, DEBUG, WARN, ERROR
   # (Optional) defaults to ERROR
-  level: (( grab $LOG_LEVEL || "INFO" ))
+  level: (( grab $LOG_LEVEL || "DEBUG" ))
 
   # maxsize is the maximum log file size in MB
   # (Optional) defaults to max 100MB
