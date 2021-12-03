@@ -15,7 +15,7 @@
  *
  */
 
-package common
+package transaction
 
 import (
 	"context"

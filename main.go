@@ -32,8 +32,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/stat"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -216,8 +216,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{
-		HTTPTransactor: common.NewTr1d1umTransactor(
-			&common.Tr1d1umTransactorOptions{
+		HTTPTransactor: transaction.NewTr1d1umTransactor(
+			&transaction.Tr1d1umTransactorOptions{
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
 						Logger:   logger,
@@ -236,8 +236,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/device", v.GetString(targetURLKey)),
 		WRPSource:   v.GetString(wrpSourceKey),
-		Tr1d1umTransactor: common.NewTr1d1umTransactor(
-			&common.Tr1d1umTransactorOptions{
+		Tr1d1umTransactor: transaction.NewTr1d1umTransactor(
+			&transaction.Tr1d1umTransactorOptions{
 				RequestTimeout: xmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{

@@ -10,15 +10,15 @@ type MockTr1d1umTransactor struct {
 }
 
 // Transact provides a mock function with given fields: _a0
-func (_m *MockTr1d1umTransactor) Transact(_a0 *http.Request) (*XmidtResponse, error) {
+func (_m *MockTr1d1umTransactor) Transact(_a0 *http.Request) (*transaction.XmidtResponse, error) {
 	ret := _m.Called(_a0)
 
-	var r0 *XmidtResponse
-	if rf, ok := ret.Get(0).(func(*http.Request) *XmidtResponse); ok {
+	var r0 *transaction.XmidtResponse
+	if rf, ok := ret.Get(0).(func(*http.Request) *transaction.XmidtResponse); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*XmidtResponse)
+			r0 = ret.Get(0).(*transaction.XmidtResponse)
 		}
 	}
 

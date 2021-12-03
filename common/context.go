@@ -28,6 +28,7 @@ import (
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -60,7 +61,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
 		var tid string
 
-		if tid = r.Header.Get(HeaderWPATID); tid == "" {
+		if tid = r.Header.Get(transaction.HeaderWPATID); tid == "" {
 			tid = genTID()
 		}
 
@@ -82,7 +83,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		}
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
-			"request", transactionRequest{
+			"request", transaction.transactionRequest{
 				Address: source,
 				Path:    r.URL.Path,
 				Query:   r.URL.RawQuery,
