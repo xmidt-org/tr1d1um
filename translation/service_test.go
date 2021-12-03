@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/xmidt-org/tr1d1um/common"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,7 +46,7 @@ func TestSendWRP(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			m := new(common.MockTr1d1umTransactor)
+			m := new(MockTr1d1umTransactor)
 			var a *mockAcquirer
 
 			options := &ServiceOptions{
@@ -94,7 +92,7 @@ func TestSendWRP(t *testing.T) {
 				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(nil, nil)
 			}
 
-			_, e := s.SendWRP(context.TODO(),&wrp.Message{
+			_, e := s.SendWRP(context.TODO(), &wrp.Message{
 				Type: wrp.SimpleRequestResponseMessageType,
 			}, "pass-through-token")
 

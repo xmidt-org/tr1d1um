@@ -33,6 +33,7 @@ import (
 
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
@@ -68,7 +69,7 @@ func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(common.Capture(c.Log), captureWDMPParameters),
 		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(common.GetLogger, encodeError)),
-		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
+		kithttp.ServerFinalizer(transaction.Logging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(
@@ -173,13 +174,13 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 /* Response Encoding */
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	var resp = response.(*common.XmidtResponse)
+	var resp = response.(*transaction.XmidtResponse)
 
 	//equivalent to forwarding all headers
 	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
@@ -214,7 +215,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
 
 	if ce, ok := err.(common.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())

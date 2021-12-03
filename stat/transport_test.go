@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +111,7 @@ func TestEncodeResponse(t *testing.T) {
 		w = httptest.NewRecorder()
 		p = []byte(`{"dBytesSent": "1024"}`)
 
-		resp = &common.XmidtResponse{
+		resp = &transaction.XmidtResponse{
 			Code:             http.StatusOK,
 			ForwardedHeaders: http.Header{},
 			Body:             p,

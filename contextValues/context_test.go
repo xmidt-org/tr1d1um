@@ -15,7 +15,7 @@
  *
  */
 
-package common
+package contextValues
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -42,7 +43,7 @@ func TestCapture(t *testing.T) {
 	t.Run("GivenTID", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		r.Header.Set(HeaderWPATID, "tid01")
+		r.Header.Set(transaction.HeaderWPATID, "tid01")
 		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
 		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
 	})
@@ -61,7 +62,7 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 
 		var to, from = make(http.Header), make(http.Header)
 
-		ForwardHeadersByPrefix("H", from, to)
+		transaction.ForwardHeadersByPrefix("H", from, to)
 		assert.Empty(to)
 	})
 
@@ -73,7 +74,7 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		from.Add("Hydrogen", "5")
 		from.Add("Hydrogen", "6")
 
-		ForwardHeadersByPrefix("He", from, to)
+		transaction.ForwardHeadersByPrefix("He", from, to)
 		assert.NotEmpty(to)
 		assert.Len(to, 1)
 		assert.EqualValues("3", to.Get("Helium"))
@@ -88,7 +89,7 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		from.Add("Hydrogen", "5")
 		from.Add("Hydrogen", "6")
 
-		ForwardHeadersByPrefix("H", from, to)
+		transaction.ForwardHeadersByPrefix("H", from, to)
 		assert.NotEmpty(to)
 		assert.Len(to, 2)
 		assert.EqualValues([]string{"5", "6"}, to["Hydrogen"])
@@ -97,8 +98,8 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 	t.Run("NilCases", func(t *testing.T) {
 		var to, from = make(http.Header), make(http.Header)
 		//none of these should panic
-		ForwardHeadersByPrefix("", nil, nil)
-		ForwardHeadersByPrefix("", from, nil)
-		ForwardHeadersByPrefix("", from, to)
+		transaction.ForwardHeadersByPrefix("", nil, nil)
+		transaction.ForwardHeadersByPrefix("", from, nil)
+		transaction.ForwardHeadersByPrefix("", from, to)
 	})
 }

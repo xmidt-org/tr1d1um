@@ -15,13 +15,12 @@
  *
  */
 
-package common
+package contextValues
 
 import (
 	"context"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -62,7 +61,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		var tid string
 
 		if tid = r.Header.Get(transaction.HeaderWPATID); tid == "" {
-			tid = genTID()
+			tid = GenTID()
 		}
 
 		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
@@ -83,7 +82,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		}
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
-			"request", transaction.transactionRequest{
+			"request", transaction.TransactionRequest{
 				Address: source,
 				Path:    r.URL.Path,
 				Query:   r.URL.RawQuery,
@@ -96,17 +95,5 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		logKVs, _ = candlelight.AppendTraceInfo(ctx, logKVs)
 		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger, logKVs...)
 		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
-	}
-}
-
-// ForwardHeadersByPrefix copies headers h where the source and target are 'from'
-// and 'to' respectively such that key(h) has p as prefix
-func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
-	for headerKey, headerValues := range from {
-		if strings.HasPrefix(headerKey, p) {
-			for _, headerValue := range headerValues {
-				to.Add(headerKey, headerValue)
-			}
-		}
 	}
 }

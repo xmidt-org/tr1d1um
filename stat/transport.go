@@ -22,7 +22,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/process"
+	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/xmidt-org/webpa-common/v2/device"
 
@@ -47,9 +48,9 @@ type Options struct {
 // That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(common.Capture(c.Log)),
-		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(common.GetLogger, encodeError)),
-		kithttp.ServerFinalizer(common.TransactionLogging(c.ReducedLoggingResponseCodes, c.Log)),
+		kithttp.ServerBefore(process.Capture(c.Log)),
+		kithttp.ServerErrorEncoder(process.ErrorLogEncoder(process.GetLogger, encodeError)),
+		kithttp.ServerFinalizer(transaction.Logging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
 	statHandler := kithttp.NewServer(
@@ -59,7 +60,7 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(common.Welcome(statHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(process.Welcome(statHandler))).
 		Methods(http.MethodGet)
 }
 
@@ -71,7 +72,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 			DeviceID:        string(deviceID),
 		}
 	} else {
-		err = common.NewBadRequestError(err)
+		err = process.NewBadRequestError(err)
 	}
 
 	return
@@ -79,13 +80,13 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(process.ContextKeyRequestTID).(string))
 
-	if ce, ok := err.(common.CodedError); ok {
+	if ce, ok := err.(process.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
-		err = common.ErrTr1d1umInternal
+		err = process.ErrTr1d1umInternal
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
@@ -98,7 +99,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 // about which machine is actually having the error (Tr1d1um or the Xmidt API)
 // do we care to make that distinction?
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	resp := response.(*common.XmidtResponse)
+	resp := response.(*transaction.XmidtResponse)
 
 	if resp.Code == http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
@@ -106,8 +107,8 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		w.Header().Del("Content-Type")
 	}
 
-	w.Header().Set(common.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
-	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(process.ContextKeyRequestTID).(string))
+	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)
 	_, err = w.Write(resp.Body)

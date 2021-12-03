@@ -7,12 +7,12 @@ import (
 
 	"github.com/xmidt-org/bascule/acquire"
 
-	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // Service defines the behavior of the device statistics Tr1d1um Service.
 type Service interface {
-	RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*common.XmidtResponse, error)
+	RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error)
 }
 
 // NewService constructs a new stat service instance given some options.
@@ -37,11 +37,11 @@ type ServiceOptions struct {
 
 	//Tr1d1umTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
-	HTTPTransactor common.Tr1d1umTransactor
+	HTTPTransactor transaction.Tr1d1umTransactor
 }
 
 type service struct {
-	transactor common.Tr1d1umTransactor
+	transactor transaction.Tr1d1umTransactor
 
 	authAcquirer acquire.Acquirer
 
@@ -49,7 +49,7 @@ type service struct {
 }
 
 // RequestStat contacts the XMiDT cluster for device statistics.
-func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
+func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 
 	if err != nil {

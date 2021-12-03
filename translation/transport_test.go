@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -392,7 +393,7 @@ func TestEncodeResponse(t *testing.T) {
 	//Tr1d1um should just forward such response code and body
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		response := &common.XmidtResponse{
+		response := &transaction.XmidtResponse{
 			Code:             http.StatusServiceUnavailable,
 			Body:             []byte("t"),
 			ForwardedHeaders: http.Header{"X-test": []string{"test"}},
@@ -410,7 +411,7 @@ func TestEncodeResponse(t *testing.T) {
 	//Since this is not expected, Tr1d1um considers it an internal error case
 	t.Run("UnexpectedResponseFormat", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		response := &common.XmidtResponse{
+		response := &transaction.XmidtResponse{
 			Code: http.StatusOK,
 			Body: []byte("t"),
 		}
@@ -423,7 +424,7 @@ func TestEncodeResponse(t *testing.T) {
 	t.Run("RDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
-		response := &common.XmidtResponse{
+		response := &transaction.XmidtResponse{
 			Code: http.StatusOK,
 			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
@@ -444,7 +445,7 @@ func TestEncodeResponse(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		internalErrorResponse := []byte(`{"statusCode": 500, "message": "I, the device, suffer"}`)
 
-		response := &common.XmidtResponse{
+		response := &transaction.XmidtResponse{
 			Code: http.StatusOK,
 			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
@@ -462,7 +463,7 @@ func TestEncodeResponse(t *testing.T) {
 	t.Run("BadRDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
-		response := &common.XmidtResponse{
+		response := &transaction.XmidtResponse{
 			Code: http.StatusOK,
 			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,

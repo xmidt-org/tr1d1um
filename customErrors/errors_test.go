@@ -15,7 +15,7 @@
  *
  */
 
-package common
+package customErrors
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/tr1d1um/contextValues"
 )
 
 func TestNewCodedError(t *testing.T) {
@@ -61,13 +62,13 @@ func TestErrorLogEncoder(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert := assert.New(t)
 			e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
-				assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
+				assert.EqualValues("tid00", ctx.Value(contextValues.ContextKeyRequestTID))
 			}
 			le := ErrorLogEncoder(tc.getLogger, e)
 
 			assert.NotPanics(func() {
 				//assumes TID is context
-				le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+				le(context.WithValue(context.TODO(), contextValues.ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
 			})
 		})
 	}
@@ -75,6 +76,6 @@ func TestErrorLogEncoder(t *testing.T) {
 
 func TestGenTID(t *testing.T) {
 	assert := assert.New(t)
-	tid := genTID()
+	tid := GenTID()
 	assert.NotEmpty(tid)
 }

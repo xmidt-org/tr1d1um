@@ -22,11 +22,14 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/tr1d1um/contextValues"
+	"github.com/xmidt-org/tr1d1um/customErrors"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -69,7 +72,7 @@ type tr1d1umTransactor struct {
 	Do             func(*http.Request) (*http.Response, error)
 }
 
-type transactionRequest struct {
+type TransactionRequest struct {
 	Address string `json:"address,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Query   string `json:"query,omitempty"`
@@ -81,7 +84,7 @@ type transactionResponse struct {
 	Headers interface{} `json:"headers,omitempty"`
 }
 
-func (re *transactionRequest) MarshalJSON() ([]byte, error) {
+func (re *TransactionRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(re)
 }
 
@@ -117,17 +120,17 @@ func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, 
 	}
 
 	//Timeout, network errors, etc.
-	err = NewCodedError(err, http.StatusServiceUnavailable)
+	err = customErrors.NewCodedError(err, http.StatusServiceUnavailable)
 	return
 }
 
 // TransactionLogging is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+func Logging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
-		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
+		tid, _ := ctx.Value(contextValues.ContextKeyRequestTID).(string)
+		transactionInfoLogger, transactionLoggerOk := ctx.Value(contextValues.ContextKeyTransactionInfoLogger).(kitlog.Logger)
 
 		if !transactionLoggerOk {
 			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
@@ -136,7 +139,7 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 			return
 		}
 
-		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
+		requestArrival, ok := ctx.Value(contextValues.ContextKeyRequestArrivalTime).(time.Time)
 
 		if ok {
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
@@ -161,5 +164,17 @@ func TransactionLogging(reducedLoggingResponseCodes []int, logger kitlog.Logger)
 		}
 
 		transactionInfoLogger.Log("response", response)
+	}
+}
+
+// ForwardHeadersByPrefix copies headers h where the source and target are 'from'
+// and 'to' respectively such that key(h) has p as prefix
+func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
+	for headerKey, headerValues := range from {
+		if strings.HasPrefix(headerKey, p) {
+			for _, headerValue := range headerValues {
+				to.Add(headerKey, headerValue)
+			}
+		}
 	}
 }

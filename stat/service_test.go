@@ -6,10 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/xmidt-org/tr1d1um/common"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 func TestRequestStat(t *testing.T) {
@@ -42,7 +41,7 @@ func TestRequestStat(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.Name, func(t *testing.T) {
 			assert := assert.New(t)
-			m := new(common.MockTr1d1umTransactor)
+			m := new(MockTr1d1umTransactor)
 			var a *mockAcquirer
 
 			options := &ServiceOptions{
@@ -68,10 +67,10 @@ func TestRequestStat(t *testing.T) {
 			if testCase.AcquirerReturnError != nil {
 				m.AssertNotCalled(t, "Transact", mock.Anything)
 			} else {
-				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(&common.XmidtResponse{}, nil)
+				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(&transaction.XmidtResponse{}, nil)
 			}
 
-			_, e := s.RequestStat(context.TODO(),"pass-through-token", "mac:112233445566")
+			_, e := s.RequestStat(context.TODO(), "pass-through-token", "mac:112233445566")
 
 			m.AssertExpectations(t)
 			if testCase.EnableAcquirer {
