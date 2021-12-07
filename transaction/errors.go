@@ -15,19 +15,16 @@
  *
  */
 
-package customErrors
+package transaction
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"net/http"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/xmidt-org/tr1d1um/contextValues"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -83,22 +80,11 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 		logger := getLogger(ctx)
 		if logger != nil && code != http.StatusNotFound {
 			logger.Log("sending non-200 response, non-404 response", level.Key(), level.ErrorValue(),
-				logging.ErrorKey(), e.Error(), "tid", ctx.Value(contextValues.ContextKeyRequestTID).(string),
+				logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string),
 			)
 		}
 		ee(ctx, e, w)
 	}
-}
-
-// GenTID generates a 16-byte long string
-// it returns "N/A" in the extreme case the random string could not be generated
-func GenTID() (tid string) {
-	buf := make([]byte, 16)
-	tid = "N/A"
-	if _, err := rand.Read(buf); err == nil {
-		tid = base64.RawURLEncoding.EncodeToString(buf)
-	}
-	return
 }
 
 func GetLogger(ctx context.Context) kitlog.Logger {

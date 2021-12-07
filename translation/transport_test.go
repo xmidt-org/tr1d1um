@@ -1,3 +1,20 @@
+/**
+ * Copyright 2021 Comcast Cable Communications Management, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package translation
 
 import (
@@ -9,7 +26,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
@@ -22,7 +38,7 @@ import (
 )
 
 // ctxTID is a context with a defined value for a TID
-var ctxTID = context.WithValue(context.Background(), common.ContextKeyRequestTID, "test-tid")
+var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "test-tid")
 
 func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
@@ -152,7 +168,7 @@ func TestRequestPayload(t *testing.T) {
 		require := require.New(t)
 		r := httptest.NewRequest(http.MethodPatch, "http://localhost", bytes.NewBufferString("invalidWDMP"))
 		_, e := requestPayload(r)
-		err, ok := e.(common.CodedError)
+		err, ok := e.(transaction.CodedError)
 		require.True(ok)
 		assert.Contains(e.Error(), "Invalid WDMP structure")
 		assert.EqualValues(http.StatusBadRequest, err.StatusCode())
@@ -507,8 +523,8 @@ func TestEncodeError(t *testing.T) {
 		assert := assert.New(t)
 
 		for _, e := range []error{
-			common.NewCodedError(errors.New("some network error"), http.StatusServiceUnavailable),
-			common.NewCodedError(errors.New("deadline exceeded"), http.StatusServiceUnavailable),
+			transaction.NewCodedError(errors.New("some network error"), http.StatusServiceUnavailable),
+			transaction.NewCodedError(errors.New("deadline exceeded"), http.StatusServiceUnavailable),
 		} {
 			w := httptest.NewRecorder()
 
@@ -530,7 +546,7 @@ func TestEncodeError(t *testing.T) {
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{
-			"message": common.ErrTr1d1umInternal.Error()})
+			"message": transaction.ErrTr1d1umInternal.Error()})
 
 		assert.EqualValues(expected.String(), w.Body.String())
 	})

@@ -1,3 +1,20 @@
+/**
+ * Copyright 2021 Comcast Cable Communications Management, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package translation
 
 import (
@@ -9,7 +26,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/tr1d1um/common"
+	transaction "github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/device"
 	"github.com/xmidt-org/wrp-go/v3"
 )
@@ -160,7 +177,7 @@ func TestWrapInWRP(t *testing.T) {
 		w, e := wrap([]byte(""), "", nil, nil)
 
 		assert.Nil(w)
-		assert.EqualValues(common.NewBadRequestError(device.ErrorInvalidDeviceName), e)
+		assert.EqualValues(transaction.NewBadRequestError(device.ErrorInvalidDeviceName), e)
 	})
 
 	t.Run("GivenParameters", func(t *testing.T) {

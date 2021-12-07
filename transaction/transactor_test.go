@@ -19,6 +19,7 @@ package transaction
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/webpa-common/logging"
 )
 
 func TestTransactError(t *testing.T) {
@@ -121,5 +123,33 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		ForwardHeadersByPrefix("", nil, nil)
 		ForwardHeadersByPrefix("", from, nil)
 		ForwardHeadersByPrefix("", from, to)
+	})
+}
+
+func TestWelcome(t *testing.T) {
+	assert := assert.New(t)
+	var handler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		assert.NotNil(r.Context().Value(ContextKeyRequestArrivalTime))
+	})
+
+	decorated := Welcome(handler)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+	decorated.ServeHTTP(nil, req)
+}
+
+func TestCapture(t *testing.T) {
+	t.Run("GivenTID", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		r.Header.Set(HeaderWPATID, "tid01")
+		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
+		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
+	})
+
+	t.Run("GeneratedTID", func(t *testing.T) {
+		assert := assert.New(t)
+		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
+		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
 	})
 }

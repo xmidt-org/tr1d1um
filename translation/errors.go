@@ -20,25 +20,25 @@ package translation
 import (
 	"errors"
 
-	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // Error values definitions for the translation service
 var (
-	ErrEmptyNames        = common.NewBadRequestError(errors.New("names parameter is required"))
-	ErrInvalidService    = common.NewBadRequestError(errors.New("unsupported Service"))
-	ErrUnsupportedMethod = common.NewBadRequestError(errors.New("unsupported method. Could not decode request payload"))
+	ErrEmptyNames        = transaction.NewBadRequestError(errors.New("names parameter is required"))
+	ErrInvalidService    = transaction.NewBadRequestError(errors.New("unsupported Service"))
+	ErrUnsupportedMethod = transaction.NewBadRequestError(errors.New("unsupported method. Could not decode request payload"))
 
 	//Set command errors
-	ErrInvalidSetWDMP = common.NewBadRequestError(errors.New("invalid SET message"))
-	ErrNewCIDRequired = common.NewBadRequestError(errors.New("newCid is required for TEST_AND_SET"))
+	ErrInvalidSetWDMP = transaction.NewBadRequestError(errors.New("invalid SET message"))
+	ErrNewCIDRequired = transaction.NewBadRequestError(errors.New("newCid is required for TEST_AND_SET"))
 
 	//Add/Delete command  errors
-	ErrMissingTable = common.NewBadRequestError(errors.New("table property is required"))
-	ErrMissingRow   = common.NewBadRequestError(errors.New("row property is required"))
-	ErrInvalidRow   = common.NewBadRequestError(errors.New("row property is invalid"))
+	ErrMissingTable = transaction.NewBadRequestError(errors.New("table property is required"))
+	ErrMissingRow   = transaction.NewBadRequestError(errors.New("row property is required"))
+	ErrInvalidRow   = transaction.NewBadRequestError(errors.New("row property is invalid"))
 
 	//Replace command error
-	ErrMissingRows = common.NewBadRequestError(errors.New("rows property is required"))
-	ErrInvalidRows = common.NewBadRequestError(errors.New("rows property is invalid"))
+	ErrMissingRows = transaction.NewBadRequestError(errors.New("rows property is required"))
+	ErrInvalidRows = transaction.NewBadRequestError(errors.New("rows property is invalid"))
 )

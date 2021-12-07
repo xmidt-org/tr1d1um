@@ -19,17 +19,19 @@ package transaction
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/tr1d1um/contextValues"
-	"github.com/xmidt-org/tr1d1um/customErrors"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -120,17 +122,17 @@ func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, 
 	}
 
 	//Timeout, network errors, etc.
-	err = customErrors.NewCodedError(err, http.StatusServiceUnavailable)
+	err = NewCodedError(err, http.StatusServiceUnavailable)
 	return
 }
 
-// TransactionLogging is used by the different Tr1d1um services to
+// Logging is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
 func Logging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
-		tid, _ := ctx.Value(contextValues.ContextKeyRequestTID).(string)
-		transactionInfoLogger, transactionLoggerOk := ctx.Value(contextValues.ContextKeyTransactionInfoLogger).(kitlog.Logger)
+		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
+		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
 
 		if !transactionLoggerOk {
 			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
@@ -139,7 +141,7 @@ func Logging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.Se
 			return
 		}
 
-		requestArrival, ok := ctx.Value(contextValues.ContextKeyRequestArrivalTime).(time.Time)
+		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
 		if ok {
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
@@ -177,4 +179,73 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 			}
 		}
 	}
+}
+
+// Welcome is an Alice-style constructor that defines necessary request
+// context values assumed to exist by the delegate. These values should
+// be those expected to be used both in and outside the gokit server flow
+func Welcome(delegate http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			var ctx = r.Context()
+			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
+			delegate.ServeHTTP(w, r.WithContext(ctx))
+		})
+}
+
+// Capture (for lack of a better name) captures context values of interest
+// from the incoming request. Unlike Welcome, values captured here are
+// intended to be used only throughout the gokit server flow: (request decoding, business logic, response encoding)
+func Capture(logger kitlog.Logger) kithttp.RequestFunc {
+	var transactionInfoLogger = logging.Info(logger)
+	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
+		var tid string
+
+		if tid = r.Header.Get(HeaderWPATID); tid == "" {
+			tid = GenTID()
+		}
+
+		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
+
+		var satClientID = "N/A"
+
+		// retrieve satClientID from request context
+		if auth, ok := bascule.FromContext(r.Context()); ok {
+			satClientID = auth.Token.Principal()
+		}
+
+		var source string
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			source = r.RemoteAddr
+		} else {
+			source = host
+		}
+
+		logKVs := []interface{}{logging.MessageKey(), "record",
+			"request", TransactionRequest{
+				Address: source,
+				Path:    r.URL.Path,
+				Query:   r.URL.RawQuery,
+				Method:  r.Method,
+			},
+			"tid", tid,
+			"satClientID", satClientID,
+		}
+
+		logKVs, _ = candlelight.AppendTraceInfo(ctx, logKVs)
+		transactionInfoLogger := kitlog.WithPrefix(transactionInfoLogger, logKVs...)
+		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
+	}
+}
+
+// GenTID generates a 16-byte long string
+// it returns "N/A" in the extreme case the random string could not be generated
+func GenTID() (tid string) {
+	buf := make([]byte, 16)
+	tid = "N/A"
+	if _, err := rand.Read(buf); err == nil {
+		tid = base64.RawURLEncoding.EncodeToString(buf)
+	}
+	return
 }

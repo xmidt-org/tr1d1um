@@ -32,7 +32,6 @@ import (
 	"github.com/spf13/cast"
 
 	"github.com/xmidt-org/bascule"
-	"github.com/xmidt-org/tr1d1um/common"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
@@ -67,8 +66,8 @@ type Options struct {
 // ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(common.Capture(c.Log), captureWDMPParameters),
-		kithttp.ServerErrorEncoder(common.ErrorLogEncoder(common.GetLogger, encodeError)),
+		kithttp.ServerBefore(transaction.Capture(c.Log), captureWDMPParameters),
+		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Logging(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
@@ -79,10 +78,10 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(common.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(transaction.Welcome(WRPHandler))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(common.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(transaction.Welcome(WRPHandler))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -138,7 +137,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		wrpMsg  *wrp.Message
 	)
 	if payload, err = requestPayload(r); err == nil {
-		var tid = ctx.Value(common.ContextKeyRequestTID).(string)
+		var tid = ctx.Value(transaction.ContextKeyRequestTID).(string)
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
 		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
 			decodedRequest = &wrpRequest{
@@ -177,10 +176,10 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	var resp = response.(*transaction.XmidtResponse)
 
 	//equivalent to forwarding all headers
-	common.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
+	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
@@ -215,16 +214,16 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(common.ContextKeyRequestTID).(string))
+	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
 
-	if ce, ok := err.(common.CodedError); ok {
+	if ce, ok := err.(transaction.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
 		//the real error is logged into our system before encodeError() is called
 		//the idea behind masking it is to not send the external API consumer internal error messages
-		err = common.ErrTr1d1umInternal
+		err = transaction.ErrTr1d1umInternal
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
