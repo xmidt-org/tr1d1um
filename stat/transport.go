@@ -20,6 +20,7 @@ package stat
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/xmidt-org/tr1d1um/transaction"
@@ -80,8 +81,9 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
-
-	if ce, ok := err.(transaction.CodedError); ok {
+	var ce transaction.CodedError
+	if errors.As(err, &ce) {
+		// if ce, ok := err.(transaction.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)

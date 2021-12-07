@@ -30,7 +30,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 
@@ -165,13 +164,13 @@ func TestRequestPayload(t *testing.T) {
 
 	t.Run("SetWithBody", func(t *testing.T) {
 		assert := assert.New(t)
-		require := require.New(t)
 		r := httptest.NewRequest(http.MethodPatch, "http://localhost", bytes.NewBufferString("invalidWDMP"))
 		_, e := requestPayload(r)
-		err, ok := e.(transaction.CodedError)
-		require.True(ok)
+		var err transaction.CodedError
+		assert.True(errors.As(e, &err))
 		assert.Contains(e.Error(), "Invalid WDMP structure")
 		assert.EqualValues(http.StatusBadRequest, err.StatusCode())
+
 	})
 
 	t.Run("Del", func(t *testing.T) {

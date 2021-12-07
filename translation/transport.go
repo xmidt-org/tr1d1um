@@ -20,6 +20,7 @@ package translation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -216,7 +217,8 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
 	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
 
-	if ce, ok := err.(transaction.CodedError); ok {
+	var ce transaction.CodedError
+	if errors.As(err, &ce) {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
