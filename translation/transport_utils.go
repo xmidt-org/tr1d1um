@@ -1,3 +1,20 @@
+/**
+ * Copyright 2021 Comcast Cable Communications Management, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package translation
 
 import (
@@ -8,7 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
@@ -93,7 +110,7 @@ func getCommandForParams(params []setParam) (command string) {
 func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (*wrp.Message, error) {
 	canonicalDeviceID, err := device.ParseID(pathVars["deviceid"])
 	if err != nil {
-		return nil, common.NewBadRequestError(err)
+		return nil, transaction.NewBadRequestError(err)
 	}
 
 	return &wrp.Message{
@@ -122,7 +139,7 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 	err := json.Unmarshal(encodedWDMP, wdmp)
 
 	if err != nil && len(encodedWDMP) > 0 { //len(encodedWDMP) == 0 is ok as it is used for TEST_SET
-		return nil, common.NewBadRequestError(fmt.Errorf("Invalid WDMP structure. %s", err.Error()))
+		return nil, transaction.NewBadRequestError(fmt.Errorf("Invalid WDMP structure. %s", err.Error()))
 	}
 
 	err = deduceSET(wdmp, newCID, oldCID, syncCMC)
@@ -147,13 +164,13 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			if transactionInfoLogger, ok := ctx.Value(common.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
+			if transactionInfoLogger, ok := ctx.Value(transaction.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
 				transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger,
 					"command", wdmp.Command,
 					"parameters", getParamNames(wdmp.Parameters),
 				)
 
-				nctx = context.WithValue(ctx, common.ContextKeyTransactionInfoLogger, transactionInfoLogger)
+				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionInfoLogger, transactionInfoLogger)
 			}
 		}
 	}

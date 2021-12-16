@@ -15,19 +15,68 @@
  *
  */
 
-package common
+package transaction
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xmidt-org/webpa-common/v2/logging"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/webpa-common/v2/logging"
 )
+
+func TestTransactError(t *testing.T) {
+	assert := assert.New(t)
+
+	plainErr := errors.New("network test error")
+	expectedErr := NewCodedError(plainErr, 503)
+
+	transactor := New(&Options{
+		Do: func(_ *http.Request) (*http.Response, error) {
+			return nil, plainErr
+		},
+	})
+
+	r := httptest.NewRequest(http.MethodGet, "localhost:6003/test", nil)
+	_, e := transactor.Transact(r)
+
+	assert.EqualValues(expectedErr, e)
+}
+
+func TestTransactIdeal(t *testing.T) {
+	assert := assert.New(t)
+
+	expected := &XmidtResponse{
+		Code:             404,
+		Body:             []byte("not found"),
+		ForwardedHeaders: http.Header{"X-A": []string{"a", "b"}},
+	}
+
+	rawXmidtResponse := &http.Response{
+		StatusCode: 404,
+		Body:       ioutil.NopCloser(bytes.NewBufferString("not found")),
+		Header: http.Header{
+			"X-A": []string{"a", "b"}, //should be forwarded
+			"Y-A": []string{"c", "d"}, //should be ignored
+		},
+	}
+
+	transactor := New(&Options{
+		Do: func(_ *http.Request) (*http.Response, error) {
+			return rawXmidtResponse, nil
+		},
+	})
+
+	r := httptest.NewRequest(http.MethodGet, "localhost:6003/test", nil)
+	actual, e := transactor.Transact(r)
+	assert.Nil(e)
+	assert.EqualValues(expected, actual)
+}
 
 func TestForwardHeadersByPrefix(t *testing.T) {
 	t.Run("NoHeaders", func(t *testing.T) {
@@ -77,37 +126,6 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 	})
 }
 
-func TestErrorLogEncoder(t *testing.T) {
-	tcs := []struct {
-		desc      string
-		getLogger GetLoggerFunc
-	}{
-		{
-			desc:      "nil getlogger",
-			getLogger: nil,
-		},
-		{
-			desc:      "valid getlogger",
-			getLogger: GetLogger,
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.desc, func(t *testing.T) {
-			assert := assert.New(t)
-			e := func(ctx context.Context, _ error, _ http.ResponseWriter) {
-				assert.EqualValues("tid00", ctx.Value(ContextKeyRequestTID))
-			}
-			le := ErrorLogEncoder(tc.getLogger, e)
-
-			assert.NotPanics(func() {
-				//assumes TID is context
-				le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
-			})
-		})
-	}
-}
-
 func TestWelcome(t *testing.T) {
 	assert := assert.New(t)
 	var handler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -134,10 +152,4 @@ func TestCapture(t *testing.T) {
 		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
 		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
 	})
-}
-
-func TestGenTID(t *testing.T) {
-	assert := assert.New(t)
-	tid := genTID()
-	assert.NotEmpty(tid)
 }

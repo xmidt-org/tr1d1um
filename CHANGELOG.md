@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Renamed common folder and reallocated util.go functions. [#235](https://github.com/xmidt-org/tr1d1um/pull/235)
 
 ## [v0.7.0]
 - Bumped argus to v0.6.0, bumped ancla to v0.3.5, and changed errorEncoder to pull logger from context.[#233](https://github.com/xmidt-org/tr1d1um/pull/233)

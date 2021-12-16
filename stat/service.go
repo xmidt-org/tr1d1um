@@ -1,3 +1,20 @@
+/**
+ * Copyright 2021 Comcast Cable Communications Management, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package stat
 
 import (
@@ -7,12 +24,12 @@ import (
 
 	"github.com/xmidt-org/bascule/acquire"
 
-	"github.com/xmidt-org/tr1d1um/common"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // Service defines the behavior of the device statistics Tr1d1um Service.
 type Service interface {
-	RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*common.XmidtResponse, error)
+	RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error)
 }
 
 // NewService constructs a new stat service instance given some options.
@@ -35,13 +52,13 @@ type ServiceOptions struct {
 	//(Optional)
 	AuthAcquirer acquire.Acquirer
 
-	//Tr1d1umTransactor is the component that's responsible to make the HTTP
+	//HTTPTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
-	HTTPTransactor common.Tr1d1umTransactor
+	HTTPTransactor transaction.T
 }
 
 type service struct {
-	transactor common.Tr1d1umTransactor
+	transactor transaction.T
 
 	authAcquirer acquire.Acquirer
 
@@ -49,7 +66,7 @@ type service struct {
 }
 
 // RequestStat contacts the XMiDT cluster for device statistics.
-func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*common.XmidtResponse, error) {
+func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 
 	if err != nil {
