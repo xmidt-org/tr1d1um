@@ -50,9 +50,9 @@ func TestSendWRP(t *testing.T) {
 			var a *mockAcquirer
 
 			options := &ServiceOptions{
-				XmidtWrpURL:       "http://localhost/wrp",
-				WRPSource:         "dns:tr1d1um-xyz-example.com",
-				Tr1d1umTransactor: m,
+				XmidtWrpURL: "http://localhost/wrp",
+				WRPSource:   "dns:tr1d1um-xyz-example.com",
+				T:           m,
 			}
 
 			if testCase.EnableAcquirer {

@@ -69,7 +69,7 @@ func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerBefore(transaction.Capture(c.Log), captureWDMPParameters),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
-		kithttp.ServerFinalizer(transaction.Logging(c.ReducedLoggingResponseCodes, c.Log)),
+		kithttp.ServerFinalizer(transaction.Log(c.ReducedLoggingResponseCodes, c.Log)),
 	}
 
 	WRPHandler := kithttp.NewServer(

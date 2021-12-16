@@ -36,7 +36,7 @@ func TestTransactError(t *testing.T) {
 	plainErr := errors.New("network test error")
 	expectedErr := NewCodedError(plainErr, 503)
 
-	transactor := NewTr1d1umTransactor(&Tr1d1umTransactorOptions{
+	transactor := New(&Options{
 		Do: func(_ *http.Request) (*http.Response, error) {
 			return nil, plainErr
 		},
@@ -66,7 +66,7 @@ func TestTransactIdeal(t *testing.T) {
 		},
 	}
 
-	transactor := NewTr1d1umTransactor(&Tr1d1umTransactorOptions{
+	transactor := New(&Options{
 		Do: func(_ *http.Request) (*http.Response, error) {
 			return rawXmidtResponse, nil
 		},

@@ -52,16 +52,16 @@ type XmidtResponse struct {
 	Body []byte
 }
 
-// Tr1d1umTransactor performs a typical HTTP request but
+// T performs a typical HTTP request but
 // enforces some logic onto the HTTP transaction such as
 // context-based timeout and header filtering
 // this is a common utility for the stat and config tr1d1um services
-type Tr1d1umTransactor interface {
+type T interface {
 	Transact(*http.Request) (*XmidtResponse, error)
 }
 
-// Tr1d1umTransactorOptions include parameters needed to configure the transactor
-type Tr1d1umTransactorOptions struct {
+// Options include parameters needed to configure the transactor
+type Options struct {
 	//RequestTimeout is the deadline duration for the HTTP transaction to be completed
 	RequestTimeout time.Duration
 
@@ -69,39 +69,39 @@ type Tr1d1umTransactorOptions struct {
 	Do func(*http.Request) (*http.Response, error)
 }
 
-type tr1d1umTransactor struct {
+type transactor struct {
 	RequestTimeout time.Duration
 	Do             func(*http.Request) (*http.Response, error)
 }
 
-type TransactionRequest struct {
+type Request struct {
 	Address string `json:"address,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Query   string `json:"query,omitempty"`
 	Method  string `json:"method,omitempty"`
 }
 
-type transactionResponse struct {
+type response struct {
 	Code    int         `json:"code,omitempty"`
 	Headers interface{} `json:"headers,omitempty"`
 }
 
-func (re *TransactionRequest) MarshalJSON() ([]byte, error) {
+func (re *Request) MarshalJSON() ([]byte, error) {
 	return json.Marshal(re)
 }
 
-func (rs *transactionResponse) MarshalJSON() ([]byte, error) {
+func (rs *response) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rs)
 }
 
-func NewTr1d1umTransactor(o *Tr1d1umTransactorOptions) Tr1d1umTransactor {
-	return &tr1d1umTransactor{
+func New(o *Options) T {
+	return &transactor{
 		Do:             o.Do,
 		RequestTimeout: o.RequestTimeout,
 	}
 }
 
-func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, err error) {
+func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err error) {
 	ctx, cancel := context.WithTimeout(req.Context(), t.RequestTimeout)
 	defer cancel()
 
@@ -126,9 +126,9 @@ func (t *tr1d1umTransactor) Transact(req *http.Request) (result *XmidtResponse, 
 	return
 }
 
-// Logging is used by the different Tr1d1um services to
+// Log is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func Logging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+func Log(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
@@ -152,7 +152,7 @@ func Logging(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.Se
 		}
 
 		includeHeaders := true
-		response := transactionResponse{Code: code}
+		response := response{Code: code}
 
 		for _, responseCode := range reducedLoggingResponseCodes {
 			if responseCode == code {
@@ -223,7 +223,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 		}
 
 		logKVs := []interface{}{logging.MessageKey(), "record",
-			"request", TransactionRequest{
+			"request", Request{
 				Address: source,
 				Path:    r.URL.Path,
 				Query:   r.URL.RawQuery,

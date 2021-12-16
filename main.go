@@ -32,6 +32,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -46,7 +47,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -216,8 +216,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{
-		HTTPTransactor: transaction.NewTr1d1umTransactor(
-			&transaction.Tr1d1umTransactorOptions{
+		HTTPTransactor: transaction.New(
+			&transaction.Options{
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
 						Logger:   logger,
@@ -236,8 +236,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/device", v.GetString(targetURLKey)),
 		WRPSource:   v.GetString(wrpSourceKey),
-		Tr1d1umTransactor: transaction.NewTr1d1umTransactor(
-			&transaction.Tr1d1umTransactorOptions{
+		T: transaction.New(
+			&transaction.Options{
 				RequestTimeout: xmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor(
 					xhttp.RetryOptions{
