@@ -40,16 +40,10 @@ import (
 )
 
 const (
-	applicationName, apiBase = "tr1d1um", "/api/v2"
-	contentTypeHeaderKey     = "Content-Type"
-	authHeaderKey            = "Authorization"
+	apiBase              = "/api/v2"
+	contentTypeHeaderKey = "Content-Type"
+	authHeaderKey        = "Authorization"
 )
-
-type xmidtResponse struct {
-	Body             []byte
-	ForwardedHeaders http.Header
-	Code             int
-}
 
 // Options wraps the properties needed to set up the translation server
 type Options struct {
