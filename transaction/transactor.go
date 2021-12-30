@@ -128,7 +128,7 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 
 // Log is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func Log(reducedLoggingResponseCodes []int, logger kitlog.Logger) kithttp.ServerFinalizerFunc {
+func Log(logger kitlog.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	errorLogger := logging.Error(logger)
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
