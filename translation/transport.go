@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	apiBase              = "/api/v2"
 	contentTypeHeaderKey = "Content-Type"
 	authHeaderKey        = "Authorization"
 )
@@ -273,7 +272,7 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 
 	wdmp.Table = table
 
-	payload, err := ioutil.ReadAll(input)
+	payload, _ := ioutil.ReadAll(input)
 
 	if len(payload) < 1 {
 		return nil, ErrMissingRow
