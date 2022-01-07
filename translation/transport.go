@@ -272,7 +272,11 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 
 	wdmp.Table = table
 
-	payload, _ := ioutil.ReadAll(input)
+	payload, err := ioutil.ReadAll(input)
+
+	if err != nil {
+		return nil, ErrInvalidPayload
+	}
 
 	if len(payload) < 1 {
 		return nil, ErrMissingRow
