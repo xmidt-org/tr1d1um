@@ -40,16 +40,9 @@ import (
 )
 
 const (
-	applicationName, apiBase = "tr1d1um", "/api/v2"
-	contentTypeHeaderKey     = "Content-Type"
-	authHeaderKey            = "Authorization"
+	contentTypeHeaderKey = "Content-Type"
+	authHeaderKey        = "Authorization"
 )
-
-type xmidtResponse struct {
-	Body             []byte
-	ForwardedHeaders http.Header
-	Code             int
-}
 
 // Options wraps the properties needed to set up the translation server
 type Options struct {
@@ -280,6 +273,10 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 	wdmp.Table = table
 
 	payload, err := ioutil.ReadAll(input)
+
+	if err != nil {
+		return nil, ErrInvalidPayload
+	}
 
 	if len(payload) < 1 {
 		return nil, ErrMissingRow

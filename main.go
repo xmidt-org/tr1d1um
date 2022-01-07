@@ -201,6 +201,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
 
+	//
 	// Stat Service configs
 	//
 	statServiceOptions := &stat.ServiceOptions{

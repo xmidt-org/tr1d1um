@@ -133,12 +133,6 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 				ctx = bascule.WithAuthentication(ctxTID, auth)
 			}
 
-			if test.tokenType == "" {
-				ctx = ctxTID
-			} else {
-				ctx = bascule.WithAuthentication(ctxTID, auth)
-			}
-
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
