@@ -14,10 +14,6 @@ pkg
 -src/tr1d1um/tr1d1um.json
 +src/tr1d1um/tr1d1um.json
 +keys/*.private
-*.xml
-*.bk
-*.log
-*.iml
 
 src/tr1d1um/tr1d1um
 src/tr1d1um/debug
