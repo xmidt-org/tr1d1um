@@ -115,6 +115,7 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
+//nolint:funlen
 func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")

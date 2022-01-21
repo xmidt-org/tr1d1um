@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/xmidt-org/tr1d1um/stat"
@@ -90,6 +91,7 @@ var defaults = map[string]interface{}{
 	hooksSchemeKey:         "https",
 }
 
+//nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
 
 	var (
@@ -207,7 +209,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	statServiceOptions := &stat.ServiceOptions{
 		HTTPTransactor: transaction.New(
 			&transaction.Options{
-				Do: xhttp.RetryTransactor(
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
 						Logger:   logger,
 						Retries:  v.GetInt(reqMaxRetriesKey),
@@ -228,7 +230,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		T: transaction.New(
 			&transaction.Options{
 				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-				Do: xhttp.RetryTransactor(
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
 						Logger:   logger,
 						Retries:  v.GetInt(reqMaxRetriesKey),
@@ -287,14 +289,14 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 4
 	}
 
-	signal.Notify(signals, os.Kill, os.Interrupt)
+	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
 	for exit := false; !exit; {
 		select {
 		case s := <-signals:
-			logger.Log(level.Key(), level.ErrorValue(), logging.MessageKey(), "exiting due to signal", "signal", s)
+			level.Error(logger).Log(logging.MessageKey(), "exiting due to signal", "signal", s)
 			exit = true
 		case <-done:
-			logger.Log(level.Key(), level.ErrorValue(), logging.MessageKey(), "one or more servers exited")
+			level.Error(logger).Log(logging.MessageKey(), "one or more servers exited")
 			exit = true
 		}
 	}
