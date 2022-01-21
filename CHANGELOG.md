@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - Renamed common folder and reallocated util.go functions. [#235](https://github.com/xmidt-org/tr1d1um/pull/235)
 - Separated main.go into main.go and primaryHandler.go. [#239](https://github.com/xmidt-org/tr1d1um/pull/239)
+- Updated spec file and rpkg version macro to be able to choose when the 'v' is included in the version. [#242](https://github.com/xmidt-org/tr1d1um/pull/242)
 
 ## [v0.7.0]
 - Bumped argus to v0.6.0, bumped ancla to v0.3.5, and changed errorEncoder to pull logger from context.[#233](https://github.com/xmidt-org/tr1d1um/pull/233)
