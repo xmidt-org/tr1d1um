@@ -34,17 +34,17 @@ func setupFlagSet(fs *pflag.FlagSet) {
 	fs.BoolP("version", "v", false, "print version and exit")
 }
 
-func setup(args []string) (*viper.Viper, *zap.Logger, error) {
+func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	l, err := zap.NewDevelopment() // initial value
 	if err != nil {
-		return nil, l, fmt.Errorf("failed to create zap logger: %w", err)
+		return nil, l, nil, fmt.Errorf("failed to create zap logger: %w", err)
 	}
 
 	fs := pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 	setupFlagSet(fs)
 	err = fs.Parse(args)
 	if err != nil {
-		return nil, l, fmt.Errorf("failed to create parse args: %w", err)
+		return nil, l, fs, fmt.Errorf("failed to create parse args: %w", err)
 	}
 	if printVersion, _ := fs.GetBool("version"); printVersion {
 		printVersionInfo(os.Stdout)
@@ -63,7 +63,7 @@ func setup(args []string) (*viper.Viper, *zap.Logger, error) {
 		err = v.ReadInConfig()
 	}
 	if err != nil {
-		return v, l, fmt.Errorf("failed to read config file: %w", err)
+		return v, l, fs, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	if debug, _ := fs.GetBool("debug"); debug {
@@ -73,9 +73,9 @@ func setup(args []string) (*viper.Viper, *zap.Logger, error) {
 	var c sallust.Config
 	err = v.UnmarshalKey("logging", &c, arrange.ComposeDecodeHooks(sallust.DecodeHook))
 	if err != nil {
-		return v, l, err
+		return v, l, fs, err
 	}
 
 	l, err = c.Build()
-	return v, l, err
+	return v, l, fs, err
 }

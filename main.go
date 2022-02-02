@@ -99,9 +99,7 @@ var defaults = map[string]interface{}{
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
 
-	f := pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
-
-	v, l, err := setup(os.Args[1:])
+	v, l, f, err := setup(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -123,17 +121,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 
-	// var timeouts httpClientTimeout
-	// err := v.UnmarshalKey("xmidtClientTimeout", &timeouts)
 	app := fx.New(
 		arrange.ForViper(v),
 		fx.Supply(logger),
 		metric.ProvideMetrics(),
-		// auth.Provide("authx.inbound"),
-		// touchhttp.Provide(),
-		// touchstone.Provide(),
-		// store.ProvideHandlers(),
-		// db.Provide(),
 		fx.Provide(
 			gokitLogger,
 			arrange.UnmarshalKey("xmidtClientTimeout", httpClientTimeout{}),
