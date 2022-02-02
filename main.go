@@ -104,10 +104,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-
-	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
-
 	logger := gokitLogger(l)
+	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
 	if parseErr, done := printVersion(f, arguments); done {
@@ -123,6 +121,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	app := fx.New(
 		arrange.ForViper(v),
+		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(logger),
 		metric.ProvideMetrics(),
 		fx.Provide(
@@ -180,9 +179,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Webhooks (if not configured, handlers are not set up)
 	//
 	if v.IsSet(webhookConfigKey) {
-		res := webhookHandler(v, logger, metricsRegistry, tracing, APIRouter, authenticate, infoLogger)
-		if res != 0 {
-			return res
+		err := webhookHandler(v, logger, metricsRegistry, tracing, APIRouter, authenticate, infoLogger)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
 		}
 	} else {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
