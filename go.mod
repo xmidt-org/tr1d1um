@@ -13,10 +13,15 @@ require (
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
 	github.com/xmidt-org/ancla v0.3.5
+	github.com/xmidt-org/argus v0.6.0
+	github.com/xmidt-org/arrange v0.3.0
 	github.com/xmidt-org/bascule v0.10.2
 	github.com/xmidt-org/candlelight v0.0.5
+	github.com/xmidt-org/sallust v0.1.5
 	github.com/xmidt-org/webpa-common/v2 v2.0.1
 	github.com/xmidt-org/wrp-go/v3 v3.0.1
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.19.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.19.0
+	go.uber.org/fx v1.13.1
+	go.uber.org/zap v1.17.0
 )

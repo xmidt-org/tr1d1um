@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,19 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
+	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
@@ -212,4 +216,54 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 
 	chain := alice.New(constructors...)
 	return &chain, nil
+}
+
+func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.Registry,
+	tracing candlelight.Tracing, APIRouter *mux.Router, authenticate *alice.Chain, infoLogger log.Logger) int {
+	var webhookConfig ancla.Config
+	err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to decode config for webhook service: %s\n", err.Error())
+		return 1
+	}
+
+	webhookConfig.Logger = logger
+	webhookConfig.MetricsProvider = metricsRegistry
+	argusClientTimeout, err := newArgusClientTimeout(v)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
+		return 1
+	}
+	webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
+
+	svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
+		return 1
+	}
+	defer stopWatch()
+
+	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
+		return 1
+	}
+
+	addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+		MetricsProvider:   metricsRegistry,
+		V:                 builtValidators,
+		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		GetLogger:         getLogger,
+	})
+
+	getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+		GetLogger: getLogger,
+	})
+
+	APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+	APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+
+	infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
+	return 0
 }

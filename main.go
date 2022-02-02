@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -28,10 +28,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/xmidt-org/argus/store/db/metric"
+	"github.com/xmidt-org/arrange"
+	"github.com/xmidt-org/sallust/sallustkit"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -94,10 +99,17 @@ var defaults = map[string]interface{}{
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
 
-	var (
-		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
-	)
+	f := pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
+
+	v, l, err := setup(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+
+	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+
+	logger := gokitLogger(l)
 
 	// This allows us to communicate the version of the binary upon request.
 	if parseErr, done := printVersion(f, arguments); done {
@@ -109,6 +121,36 @@ func tr1d1um(arguments []string) (exitCode int) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
 		return 1
+	}
+
+	// var timeouts httpClientTimeout
+	// err := v.UnmarshalKey("xmidtClientTimeout", &timeouts)
+	app := fx.New(
+		arrange.ForViper(v),
+		fx.Supply(logger),
+		metric.ProvideMetrics(),
+		// auth.Provide("authx.inbound"),
+		// touchhttp.Provide(),
+		// touchstone.Provide(),
+		// store.ProvideHandlers(),
+		// db.Provide(),
+		fx.Provide(
+			gokitLogger,
+			arrange.UnmarshalKey("xmidtClientTimeout", httpClientTimeout{}),
+			arrange.UnmarshalKey("argusClientTimeout", httpClientTimeout{}),
+			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
+			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
+		),
+	)
+
+	switch err := app.Err(); {
+	case errors.Is(err, pflag.ErrHelp):
+		return
+	case err == nil:
+		app.Run()
+	default:
+		fmt.Fprintln(os.Stderr, err)
+		return 2
 	}
 
 	var (
@@ -147,51 +189,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// Webhooks (if not configured, handlers are not set up)
 	//
 	if v.IsSet(webhookConfigKey) {
-		var webhookConfig ancla.Config
-		err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to decode config for webhook service: %s\n", err.Error())
-			return 1
+		res := webhookHandler(v, logger, metricsRegistry, tracing, APIRouter, authenticate, infoLogger)
+		if res != 0 {
+			return res
 		}
-
-		webhookConfig.Logger = logger
-		webhookConfig.MetricsProvider = metricsRegistry
-		argusClientTimeout, err := newArgusClientTimeout(v)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
-			return 1
-		}
-		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
-
-		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
-			return 1
-		}
-		defer stopWatch()
-
-		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
-			return 1
-		}
-
-		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			MetricsProvider:   metricsRegistry,
-			V:                 builtValidators,
-			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-			GetLogger:         getLogger,
-		})
-
-		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-			GetLogger: getLogger,
-		})
-
-		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
-		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-
-		infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
 	} else {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
@@ -387,6 +388,12 @@ func printVersionInfo(writer io.Writer) {
 	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
 	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
 	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
+}
+
+func gokitLogger(l *zap.Logger) log.Logger {
+	return sallustkit.Logger{
+		Zap: l,
+	}
 }
 
 func main() {
