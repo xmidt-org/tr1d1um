@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"regexp"
 	"time"
 
@@ -224,30 +223,26 @@ func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.
 	err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to decode config for webhook service: %s\n", err.Error())
-		return err
+		return fmt.Errorf("failed to decode config for webhook service: %s", err)
 	}
 
 	webhookConfig.Logger = logger
 	webhookConfig.MetricsProvider = metricsRegistry
 	argusClientTimeout, err := newArgusClientTimeout(v)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
-		return err
+		return fmt.Errorf("unable to parse argus client timeout config values: %s", err)
 	}
 	webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
 
 	svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
-		return err
+		return fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
 	defer stopWatch()
 
 	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
-		return err
+		return fmt.Errorf("failed to initialize webhook validators: %s", err)
 	}
 
 	addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
