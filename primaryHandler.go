@@ -33,6 +33,7 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
@@ -44,6 +45,7 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/fx"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -261,4 +263,13 @@ func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.
 
 	infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
 	return nil
+}
+
+func provideServers() fx.Option {
+	return fx.Options(
+		arrangehttp.Server{
+			Name: "server_primary",
+			Key:  "servers.primary",
+		}.Provide(),
+	)
 }

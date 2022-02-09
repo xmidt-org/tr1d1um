@@ -28,7 +28,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xmidt-org/argus/store/db/metric"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
 	"github.com/xmidt-org/tr1d1um/stat"
@@ -123,13 +122,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ForViper(v),
 		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(logger),
-		metric.ProvideMetrics(),
 		fx.Provide(
 			gokitLogger,
 			arrange.UnmarshalKey("xmidtClientTimeout", httpClientTimeout{}),
 			arrange.UnmarshalKey("argusClientTimeout", httpClientTimeout{}),
 			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
 			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
+			provideServers,
 		),
 	)
 
@@ -188,11 +187,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
-	xmidtClientTimeout, err := newXmidtClientTimeout(v)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse xmidt client timeout config values: %s \n", err.Error())
-		return 1
-	}
+	xmidtClientTimeout := newXmidtClientTimeout(v)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Unable to parse xmidt client timeout config values: %s \n", err.Error())
+	// 	return 1
+	// }
 	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
 
 	//
@@ -299,22 +298,24 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-func newXmidtClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
-	var timeouts httpClientTimeout
-	err := v.UnmarshalKey("xmidtClientTimeout", &timeouts)
-	if err != nil {
-		return httpClientTimeout{}, err
+type xmidtClientTimeoutConfigIn struct {
+	fx.In
+	xmidtClientTimeout httpClientTimeout
+}
+
+func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) *httpClientTimeout {
+	x := in.xmidtClientTimeout
+
+	if x.ClientTimeout == 0 {
+		x.ClientTimeout = time.Second * 135
 	}
-	if timeouts.ClientTimeout == 0 {
-		timeouts.ClientTimeout = time.Second * 135
+	if x.NetDialerTimeout == 0 {
+		x.NetDialerTimeout = time.Second * 5
 	}
-	if timeouts.NetDialerTimeout == 0 {
-		timeouts.NetDialerTimeout = time.Second * 5
+	if x.RequestTimeout == 0 {
+		x.RequestTimeout = time.Second * 129
 	}
-	if timeouts.RequestTimeout == 0 {
-		timeouts.RequestTimeout = time.Second * 129
-	}
-	return timeouts, nil
+	return &x
 }
 
 func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
