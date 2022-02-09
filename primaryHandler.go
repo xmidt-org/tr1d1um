@@ -219,22 +219,26 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	return &chain, nil
 }
 
-func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.Registry,
-	tracing candlelight.Tracing, APIRouter *mux.Router, authenticate *alice.Chain, infoLogger log.Logger) error {
-	var webhookConfig ancla.Config
-	err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
+type webhookHandlerConfigIn struct {
+	fx.In
+	webhookConfigKey    ancla.Config
+	argusClientConfigIn argusClientTimeoutConfigIn
+	logger              log.Logger
+	metricsRegistry     xmetrics.Registry
+	tracing             candlelight.Tracing
+	APIRouter           *mux.Router
+	authenticate        *alice.Chain
+	infoLogger          log.Logger
+}
 
-	if err != nil {
-		return fmt.Errorf("failed to decode config for webhook service: %s", err)
-	}
+func webhookHandler(in webhookHandlerConfigIn) error {
+	webhookConfig := in.webhookConfigKey
 
-	webhookConfig.Logger = logger
-	webhookConfig.MetricsProvider = metricsRegistry
-	argusClientTimeout, err := newArgusClientTimeout(v)
-	if err != nil {
-		return fmt.Errorf("unable to parse argus client timeout config values: %s", err)
-	}
-	webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
+	webhookConfig.Logger = in.logger
+	webhookConfig.MetricsProvider = in.metricsRegistry
+	argusClientTimeout := newArgusClientTimeout(in.argusClientConfigIn)
+
+	webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.tracing)
 
 	svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
 	if err != nil {
@@ -248,7 +252,7 @@ func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.
 	}
 
 	addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		MetricsProvider:   metricsRegistry,
+		MetricsProvider:   in.metricsRegistry,
 		V:                 builtValidators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         getLogger,
@@ -258,10 +262,10 @@ func webhookHandler(v *viper.Viper, logger log.Logger, metricsRegistry xmetrics.
 		GetLogger: getLogger,
 	})
 
-	APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
-	APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+	in.APIRouter.Handle("/hook", in.authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+	in.APIRouter.Handle("/hooks", in.authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
 
-	infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
+	in.infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
 	return nil
 }
 
@@ -269,7 +273,19 @@ func provideServers() fx.Option {
 	return fx.Options(
 		arrangehttp.Server{
 			Name: "server_primary",
-			Key:  "servers.primary",
+			Key:  "primary",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_health",
+			Key:  "health",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_pprof",
+			Key:  "pprof",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_metrics",
+			Key:  "metric",
 		}.Provide(),
 	)
 }

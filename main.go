@@ -43,14 +43,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
-	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
-	"github.com/xmidt-org/webpa-common/v2/server"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 )
 
@@ -104,18 +100,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 	logger := gokitLogger(l)
-	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+	// _, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
 	if parseErr, done := printVersion(f, arguments); done {
 		// if we're done, we're exiting no matter what
 		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
 		os.Exit(0)
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
-		return 1
 	}
 
 	app := fx.New(
@@ -128,6 +119,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			arrange.UnmarshalKey("argusClientTimeout", httpClientTimeout{}),
 			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
 			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
+			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
 			provideServers,
 		),
 	)
@@ -303,50 +295,51 @@ type xmidtClientTimeoutConfigIn struct {
 	xmidtClientTimeout httpClientTimeout
 }
 
-func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) *httpClientTimeout {
-	x := in.xmidtClientTimeout
+func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) httpClientTimeout {
+	xct := in.xmidtClientTimeout
 
-	if x.ClientTimeout == 0 {
-		x.ClientTimeout = time.Second * 135
+	if xct.ClientTimeout == 0 {
+		xct.ClientTimeout = time.Second * 135
 	}
-	if x.NetDialerTimeout == 0 {
-		x.NetDialerTimeout = time.Second * 5
+	if xct.NetDialerTimeout == 0 {
+		xct.NetDialerTimeout = time.Second * 5
 	}
-	if x.RequestTimeout == 0 {
-		x.RequestTimeout = time.Second * 129
+	if xct.RequestTimeout == 0 {
+		xct.RequestTimeout = time.Second * 129
 	}
-	return &x
+	return xct
 }
 
-func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
-	var timeouts httpClientTimeout
-	err := v.UnmarshalKey("argusClientTimeout", &timeouts)
-	if err != nil {
-		return httpClientTimeout{}, err
-	}
-	if timeouts.ClientTimeout == 0 {
-		timeouts.ClientTimeout = time.Second * 50
-	}
-	if timeouts.NetDialerTimeout == 0 {
-		timeouts.NetDialerTimeout = time.Second * 5
-	}
-	return timeouts, nil
-
+type argusClientTimeoutConfigIn struct {
+	fx.In
+	argusClientTimeout httpClientTimeout
 }
 
-func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
-	var traceConfig candlelight.Config
-	err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
-	if err != nil {
-		return candlelight.Tracing{}, err
-	}
-	traceConfig.ApplicationName = appName
+func newArgusClientTimeout(in argusClientTimeoutConfigIn) httpClientTimeout {
+	act := in.argusClientTimeout
 
+	if act.ClientTimeout == 0 {
+		act.ClientTimeout = time.Second * 50
+	}
+	if act.NetDialerTimeout == 0 {
+		act.NetDialerTimeout = time.Second * 5
+	}
+	return act
+}
+
+type loadTracingConfigIn struct {
+	fx.In
+	loadTracingConfig candlelight.Config
+	appName           string
+}
+
+func loadTracing(in loadTracingConfigIn) (candlelight.Tracing, error) {
+	traceConfig := in.loadTracingConfig
+	traceConfig.ApplicationName = in.appName
 	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
-
 	return tracing, nil
 }
 
