@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -44,6 +45,7 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
 )
@@ -228,7 +230,6 @@ type webhookHandlerConfigIn struct {
 	tracing             candlelight.Tracing
 	APIRouter           *mux.Router
 	authenticate        *alice.Chain
-	infoLogger          log.Logger
 }
 
 func webhookHandler(in webhookHandlerConfigIn) error {
@@ -264,8 +265,7 @@ func webhookHandler(in webhookHandlerConfigIn) error {
 
 	in.APIRouter.Handle("/hook", in.authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
 	in.APIRouter.Handle("/hooks", in.authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-
-	in.infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
+	level.Info(in.logger).Log("Webhook service enabled")
 	return nil
 }
 
@@ -287,5 +287,30 @@ func provideServers() fx.Option {
 			Name: "server_metrics",
 			Key:  "metric",
 		}.Provide(),
+		fx.Invoke(
+			handlePrimaryEndpoint,
+		),
 	)
+}
+
+type PrimaryRouterIn struct {
+	fx.In
+	Router    *mux.Router `name:"server_primary"`
+	APIBase   string      `name:"api_base"`
+	AuthChain alice.Chain `name:"auth_chain"`
+	Tracing   candlelight.Tracing
+	Logger    log.Logger
+}
+
+func handlePrimaryEndpoint(in PrimaryRouterIn) {
+	level.Info(in.Logger).Log(logging.MessageKey(), "tracing status", "enabled", !in.Tracing.IsNoop())
+	otelMuxOptions := []otelmux.Option{
+		otelmux.WithPropagators(in.Tracing.Propagator()),
+		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
+	}
+
+	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
+		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
+	)
+
 }

@@ -33,7 +33,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -45,8 +44,11 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/webpa-common/v2/basculechecks"
+	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
+	"github.com/xmidt-org/webpa-common/v2/server"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 )
 
@@ -100,7 +102,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 	logger := gokitLogger(l)
-	// _, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
 	if parseErr, done := printVersion(f, arguments); done {
@@ -122,6 +124,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
 			provideServers,
 		),
+		fx.Invoke(
+			newArgusClientTimeout,
+			newXmidtClientTimeout,
+			loadTracing,
+		),
 	)
 
 	switch err := app.Err(); {
@@ -135,22 +142,21 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	var (
-		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
-		authenticate            *alice.Chain
+		authenticate *alice.Chain
 	)
 
 	for k, va := range defaults {
 		v.SetDefault(k, va)
 	}
 
-	infoLogger.Log("configurationFile", v.ConfigFileUsed())
+	level.Info(logger).Log("configurationFile", v.ConfigFileUsed())
 
-	tracing, err := loadTracing(v, applicationName)
+	// tracing, err := loadTracing(v)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
 		return 1
 	}
-	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", !tracing.IsNoop())
+
 	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
@@ -158,33 +164,24 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	rootRouter := mux.NewRouter()
-	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(tracing.Propagator()),
-		otelmux.WithTracerProvider(tracing.TracerProvider()),
-	}
-	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator()))
-
 	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
 
 	//
 	// Webhooks (if not configured, handlers are not set up)
 	//
 	if v.IsSet(webhookConfigKey) {
-		err := webhookHandler(v, logger, metricsRegistry, tracing, APIRouter, authenticate, infoLogger)
+		err := webhookHandler(v)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 	} else {
-		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
+		level.Info(logger).Log(logging.MessageKey(), "Webhook service disabled")
 	}
 
 	xmidtClientTimeout := newXmidtClientTimeout(v)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "Unable to parse xmidt client timeout config values: %s \n", err.Error())
-	// 	return 1
-	// }
-	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
+
+	// xmidtHTTPClient := newHTTPClient(xmidtClientTimeout)
 
 	//
 	// Stat Service configs
@@ -228,11 +225,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 	if v.IsSet(authAcquirerKey) {
 		acquirer, err := createAuthAcquirer(v)
 		if err != nil {
-			errorLogger.Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+			level.Error(logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
 		} else {
 			translationOptions.AuthAcquirer = acquirer
 			statServiceOptions.AuthAcquirer = acquirer
-			infoLogger.Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
+			level.Info(logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
 		}
 	}
 
@@ -268,7 +265,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
 
 	if err != nil {
-		errorLogger.Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
+		level.Error(logger).Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
 		return 4
 	}
 
@@ -292,11 +289,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 type xmidtClientTimeoutConfigIn struct {
 	fx.In
-	xmidtClientTimeout httpClientTimeout
+	XmidtClientTimeout httpClientTimeout
 }
 
 func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) httpClientTimeout {
-	xct := in.xmidtClientTimeout
+	xct := in.XmidtClientTimeout
 
 	if xct.ClientTimeout == 0 {
 		xct.ClientTimeout = time.Second * 135
@@ -312,11 +309,11 @@ func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) httpClientTimeout {
 
 type argusClientTimeoutConfigIn struct {
 	fx.In
-	argusClientTimeout httpClientTimeout
+	ArgusClientTimeout httpClientTimeout
 }
 
 func newArgusClientTimeout(in argusClientTimeoutConfigIn) httpClientTimeout {
-	act := in.argusClientTimeout
+	act := in.ArgusClientTimeout
 
 	if act.ClientTimeout == 0 {
 		act.ClientTimeout = time.Second * 50
@@ -329,13 +326,13 @@ func newArgusClientTimeout(in argusClientTimeoutConfigIn) httpClientTimeout {
 
 type loadTracingConfigIn struct {
 	fx.In
-	loadTracingConfig candlelight.Config
-	appName           string
+	LoadTracingConfig candlelight.Config
+	AppName           string
 }
 
 func loadTracing(in loadTracingConfigIn) (candlelight.Tracing, error) {
-	traceConfig := in.loadTracingConfig
-	traceConfig.ApplicationName = in.appName
+	traceConfig := in.LoadTracingConfig
+	traceConfig.ApplicationName = in.AppName
 	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
