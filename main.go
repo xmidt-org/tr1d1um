@@ -30,9 +30,6 @@ import (
 
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
-	"github.com/xmidt-org/tr1d1um/stat"
-	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/tr1d1um/translation"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -40,7 +37,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
@@ -49,7 +45,6 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/server"
-	"github.com/xmidt-org/webpa-common/v2/xhttp"
 )
 
 // convenient global values
@@ -117,17 +112,22 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fx.Supply(logger),
 		fx.Provide(
 			gokitLogger,
-			arrange.UnmarshalKey("xmidtClientTimeout", httpClientTimeout{}),
-			arrange.UnmarshalKey("argusClientTimeout", httpClientTimeout{}),
+			arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
+			arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
 			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
 			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
-			provideServers,
-		),
-		fx.Invoke(
-			newArgusClientTimeout,
-			newXmidtClientTimeout,
+
 			loadTracing,
+			newXmidtClientTimeout,
+			newArgusClientTimeout,
+			newHTTPClient,
+		),
+		provideServers(),
+		fx.Invoke(
+			func() {
+
+			},
 		),
 	)
 
@@ -139,28 +139,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 	default:
 		fmt.Fprintln(os.Stderr, err)
 		return 2
-	}
-
-	var (
-		authenticate *alice.Chain
-	)
-
-	for k, va := range defaults {
-		v.SetDefault(k, va)
-	}
-
-	level.Info(logger).Log("configurationFile", v.ConfigFileUsed())
-
-	// tracing, err := loadTracing(v)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
-		return 1
-	}
-
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
-		return 1
 	}
 
 	rootRouter := mux.NewRouter()
@@ -181,44 +159,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	xmidtClientTimeout := newXmidtClientTimeout(v)
 
-	// xmidtHTTPClient := newHTTPClient(xmidtClientTimeout)
-
-	//
-	// Stat Service configs
-	//
-	statServiceOptions := &stat.ServiceOptions{
-		HTTPTransactor: transaction.New(
-			&transaction.Options{
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					xmidtHTTPClient.Do),
-				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-			}),
-		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", v.GetString(targetURLKey)),
-	}
-
-	//
-	// WRP Service configs
-	//
-	translationOptions := &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/device", v.GetString(targetURLKey)),
-		WRPSource:   v.GetString(wrpSourceKey),
-		T: transaction.New(
-			&transaction.Options{
-				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					xmidtHTTPClient.Do),
-			}),
-	}
+	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
 
 	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
 
@@ -232,27 +173,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			level.Info(logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
 		}
 	}
-
-	ss := stat.NewService(statServiceOptions)
-	ts := translation.NewService(translationOptions)
-
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ValidServices:               v.GetStringSlice(translationServicesKey),
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
 
 	var (
 		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
@@ -287,12 +207,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 	return 0
 }
 
-type xmidtClientTimeoutConfigIn struct {
+type XmidtClientTimeoutConfigIn struct {
 	fx.In
 	XmidtClientTimeout httpClientTimeout
 }
 
-func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) httpClientTimeout {
+func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 	xct := in.XmidtClientTimeout
 
 	if xct.ClientTimeout == 0 {
@@ -307,12 +227,12 @@ func newXmidtClientTimeout(in xmidtClientTimeoutConfigIn) httpClientTimeout {
 	return xct
 }
 
-type argusClientTimeoutConfigIn struct {
+type ArgusClientTimeoutConfigIn struct {
 	fx.In
 	ArgusClientTimeout httpClientTimeout
 }
 
-func newArgusClientTimeout(in argusClientTimeoutConfigIn) httpClientTimeout {
+func newArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
 	act := in.ArgusClientTimeout
 
 	if act.ClientTimeout == 0 {
@@ -324,13 +244,13 @@ func newArgusClientTimeout(in argusClientTimeoutConfigIn) httpClientTimeout {
 	return act
 }
 
-type loadTracingConfigIn struct {
+type LoadTracingConfigIn struct {
 	fx.In
 	LoadTracingConfig candlelight.Config
 	AppName           string
 }
 
-func loadTracing(in loadTracingConfigIn) (candlelight.Tracing, error) {
+func loadTracing(in LoadTracingConfigIn) (candlelight.Tracing, error) {
 	traceConfig := in.LoadTracingConfig
 	traceConfig.ApplicationName = in.AppName
 	tracing, err := candlelight.New(traceConfig)

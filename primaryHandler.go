@@ -41,9 +41,13 @@ import (
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/tr1d1um/stat"
+	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/logging"
+	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -224,7 +228,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 type webhookHandlerConfigIn struct {
 	fx.In
 	webhookConfigKey    ancla.Config
-	argusClientConfigIn argusClientTimeoutConfigIn
+	argusClientConfigIn ArgusClientTimeoutConfigIn
 	logger              log.Logger
 	metricsRegistry     xmetrics.Registry
 	tracing             candlelight.Tracing
@@ -313,4 +317,84 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) {
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
+}
+
+func ProvideHandlers() fx.Option {
+	return fx.Provide(
+		webhookHandler,
+		authenticationHandler,
+	)
+}
+
+func statHandler(v viper.Viper, logger log.Logger, xmidtHTTPClient *http.Client, xmidtClientTimeout httpClientTimeout) *stat.ServiceOptions {
+	//
+	// Stat Service configs
+	//
+	statServiceOptions := &stat.ServiceOptions{
+		HTTPTransactor: transaction.New(
+			&transaction.Options{
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   logger,
+						Retries:  v.GetInt(reqMaxRetriesKey),
+						Interval: v.GetDuration(reqRetryIntervalKey),
+					},
+					xmidtHTTPClient.Do),
+				RequestTimeout: xmidtClientTimeout.RequestTimeout,
+			}),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", v.GetString(targetURLKey)),
+	}
+
+	ss := stat.NewService(statServiceOptions)
+
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
+}
+
+type ServiceConfigIn struct {
+	fx.In
+	v                  viper.Viper
+	logger             log.Logger
+	xmidtHTTPClient    *http.Client
+	xmidtClientTimeout httpClientTimeout
+	APIRouter          *mux.Router
+	authenticate       alice.Chain
+}
+
+func wrpTranslationHandler(in ServiceConfigIn) {
+	//
+	// WRP Service configs
+	//
+	translationOptions := &translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/device", in.v.GetString(targetURLKey)),
+		WRPSource:   in.v.GetString(wrpSourceKey),
+		T: transaction.New(
+			&transaction.Options{
+				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   in.logger,
+						Retries:  in.v.GetInt(reqMaxRetriesKey),
+						Interval: in.v.GetDuration(reqRetryIntervalKey),
+					},
+					in.xmidtHTTPClient.Do),
+			}),
+	}
+
+	ts := translation.NewService(translationOptions)
+
+	translation.ConfigHandler(&translation.Options{
+		S:                           ts,
+		APIRouter:                   APIRouter,
+		Authenticate:                authenticate,
+		Log:                         in.logger,
+		ValidServices:               in.v.GetStringSlice(translationServicesKey),
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
 }

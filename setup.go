@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/arrange"
@@ -36,6 +37,7 @@ func setupFlagSet(fs *pflag.FlagSet) {
 
 func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	l, err := zap.NewDevelopment() // initial value
+	logger := gokitLogger(l)
 	if err != nil {
 		return nil, l, nil, fmt.Errorf("failed to create zap logger: %w", err)
 	}
@@ -51,6 +53,10 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	}
 
 	v := viper.New()
+	for k, va := range defaults {
+		v.SetDefault(k, va)
+	}
+	level.Info(logger).Log("configurationFile", v.ConfigFileUsed())
 
 	if file, _ := fs.GetString("file"); len(file) > 0 {
 		v.SetConfigFile(file)
