@@ -117,9 +117,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			authAcquirerHandler,
 		),
 		provideServers(),
-		fx.Invoke(
-			runServers,
-		),
 	)
 
 	switch err := app.Err(); {

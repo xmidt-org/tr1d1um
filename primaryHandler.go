@@ -24,10 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
 	"regexp"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -49,7 +46,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
-	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
@@ -428,39 +424,6 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) {
 	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
-}
-
-func runServers(logger log.Logger) error {
-	var (
-		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
-		signals                = make(chan os.Signal, 10)
-	)
-
-	//
-	// Execute the runnable, which runs all the servers, and wait for a signal
-	//
-	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
-
-	if err != nil {
-		level.Error(logger).Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
-		return err
-	}
-
-	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
-	for exit := false; !exit; {
-		select {
-		case s := <-signals:
-			level.Error(logger).Log(logging.MessageKey(), "exiting due to signal", "signal", s)
-			exit = true
-		case <-done:
-			level.Error(logger).Log(logging.MessageKey(), "one or more servers exited")
-			exit = true
-		}
-	}
-
-	close(shutdown)
-	waitGroup.Wait()
-	return nil
 }
 
 func provideAPIRouter() *mux.Router {
