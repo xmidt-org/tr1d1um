@@ -23,9 +23,7 @@ import (
 	"io"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/xmidt-org/arrange"
@@ -34,17 +32,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
-	"github.com/gorilla/mux"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
-	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
-	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
-	"github.com/xmidt-org/webpa-common/v2/server"
 )
 
 // convenient global values
@@ -97,7 +89,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		return 1
 	}
 	logger := gokitLogger(l)
-	_, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
+	// _, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
 	if parseErr, done := printVersion(f, arguments); done {
@@ -122,12 +114,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 			newXmidtClientTimeout,
 			newArgusClientTimeout,
 			newHTTPClient,
+			authAcquirerHandler,
 		),
 		provideServers(),
 		fx.Invoke(
-			func() {
-
-			},
+			runServers,
 		),
 	)
 
@@ -140,69 +131,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
-
-	rootRouter := mux.NewRouter()
-	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
-
-	//
-	// Webhooks (if not configured, handlers are not set up)
-	//
-	if v.IsSet(webhookConfigKey) {
-		err := webhookHandler(v)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 1
-		}
-	} else {
-		level.Info(logger).Log(logging.MessageKey(), "Webhook service disabled")
-	}
-
-	xmidtClientTimeout := newXmidtClientTimeout(v)
-
-	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
-
-	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
-
-	if v.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(v)
-		if err != nil {
-			level.Error(logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
-		} else {
-			translationOptions.AuthAcquirer = acquirer
-			statServiceOptions.AuthAcquirer = acquirer
-			level.Info(logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
-		}
-	}
-
-	var (
-		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
-		signals                = make(chan os.Signal, 10)
-	)
-
-	//
-	// Execute the runnable, which runs all the servers, and wait for a signal
-	//
-	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
-
-	if err != nil {
-		level.Error(logger).Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
-		return 4
-	}
-
-	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
-	for exit := false; !exit; {
-		select {
-		case s := <-signals:
-			level.Error(logger).Log(logging.MessageKey(), "exiting due to signal", "signal", s)
-			exit = true
-		case <-done:
-			level.Error(logger).Log(logging.MessageKey(), "one or more servers exited")
-			exit = true
-		}
-	}
-
-	close(shutdown)
-	waitGroup.Wait()
 
 	return 0
 }

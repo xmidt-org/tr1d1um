@@ -24,7 +24,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -46,6 +49,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
+	"github.com/xmidt-org/webpa-common/v2/concurrent"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
@@ -227,6 +231,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 
 type webhookHandlerConfigIn struct {
 	fx.In
+	v                   viper.Viper
 	webhookConfigKey    ancla.Config
 	argusClientConfigIn ArgusClientTimeoutConfigIn
 	logger              log.Logger
@@ -237,40 +242,147 @@ type webhookHandlerConfigIn struct {
 }
 
 func webhookHandler(in webhookHandlerConfigIn) error {
-	webhookConfig := in.webhookConfigKey
+	//
+	// Webhooks (if not configured, handlers are not set up)
+	//
+	if in.v.IsSet(webhookConfigKey) {
+		webhookConfig := in.webhookConfigKey
 
-	webhookConfig.Logger = in.logger
-	webhookConfig.MetricsProvider = in.metricsRegistry
-	argusClientTimeout := newArgusClientTimeout(in.argusClientConfigIn)
+		webhookConfig.Logger = in.logger
+		webhookConfig.MetricsProvider = in.metricsRegistry
+		argusClientTimeout := newArgusClientTimeout(in.argusClientConfigIn)
 
-	webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.tracing)
+		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.tracing)
 
-	svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
-	if err != nil {
-		return fmt.Errorf("failed to initialize webhook service: %s", err)
+		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+		if err != nil {
+			return fmt.Errorf("failed to initialize webhook service: %s", err)
+		}
+		defer stopWatch()
+
+		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+		if err != nil {
+			return fmt.Errorf("failed to initialize webhook validators: %s", err)
+		}
+
+		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+			MetricsProvider:   in.metricsRegistry,
+			V:                 builtValidators,
+			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+			GetLogger:         getLogger,
+		})
+
+		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+			GetLogger: getLogger,
+		})
+
+		in.APIRouter.Handle("/hook", in.authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+		level.Info(in.logger).Log("Webhook service enabled")
+	} else {
+		level.Info(in.logger).Log(logging.MessageKey(), "Webhook service disabled")
 	}
-	defer stopWatch()
-
-	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
-	if err != nil {
-		return fmt.Errorf("failed to initialize webhook validators: %s", err)
-	}
-
-	addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		MetricsProvider:   in.metricsRegistry,
-		V:                 builtValidators,
-		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         getLogger,
-	})
-
-	getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-		GetLogger: getLogger,
-	})
-
-	in.APIRouter.Handle("/hook", in.authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
-	in.APIRouter.Handle("/hooks", in.authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-	level.Info(in.logger).Log("Webhook service enabled")
 	return nil
+}
+
+func ProvideHandlers() fx.Option {
+	return fx.Provide(
+		webhookHandler,
+		authenticationHandler,
+	)
+}
+
+func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
+	//
+	// Stat Service configs
+	//
+	return &stat.ServiceOptions{
+		HTTPTransactor: transaction.New(
+			&transaction.Options{
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   in.logger,
+						Retries:  in.v.GetInt(reqMaxRetriesKey),
+						Interval: in.v.GetDuration(reqRetryIntervalKey),
+					},
+					in.xmidtHTTPClient.Do),
+				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
+			}),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.v.GetString(targetURLKey)),
+	}
+}
+
+type ServiceConfigIn struct {
+	fx.In
+	v                  viper.Viper
+	logger             log.Logger
+	xmidtHTTPClient    *http.Client
+	xmidtClientTimeout httpClientTimeout
+}
+
+func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions {
+	//
+	// WRP Service configs
+	//
+	return &translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/device", in.v.GetString(targetURLKey)),
+		WRPSource:   in.v.GetString(wrpSourceKey),
+		T: transaction.New(
+			&transaction.Options{
+				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   in.logger,
+						Retries:  in.v.GetInt(reqMaxRetriesKey),
+						Interval: in.v.GetDuration(reqRetryIntervalKey),
+					},
+					in.xmidtHTTPClient.Do),
+			}),
+	}
+}
+
+type authAcquirerConfigIn struct {
+	v                           *viper.Viper
+	logger                      log.Logger
+	statServiceOptions          *stat.ServiceOptions
+	translationOptions          *translation.ServiceOptions
+	APIRouter                   *mux.Router
+	authenticate                *alice.Chain
+	reducedLoggingResponseCodes []int
+}
+
+func authAcquirerHandler(in authAcquirerConfigIn) {
+	reducedLoggingResponseCodes := in.v.GetIntSlice(reducedTransactionLoggingCodesKey)
+
+	if in.v.IsSet(authAcquirerKey) {
+		acquirer, err := createAuthAcquirer(in.v)
+		if err != nil {
+			level.Error(in.logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+		} else {
+			in.translationOptions.AuthAcquirer = acquirer
+			in.statServiceOptions.AuthAcquirer = acquirer
+			level.Info(in.logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
+		}
+	}
+	ss := stat.NewService(in.statServiceOptions)
+	ts := translation.NewService(in.translationOptions)
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   in.APIRouter,
+		Authenticate:                in.authenticate,
+		Log:                         in.logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
+
+	translation.ConfigHandler(&translation.Options{
+		S:                           ts,
+		APIRouter:                   in.APIRouter,
+		Authenticate:                in.authenticate,
+		Log:                         in.logger,
+		ValidServices:               in.v.GetStringSlice(translationServicesKey),
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
 }
 
 func provideServers() fx.Option {
@@ -316,85 +428,43 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) {
 	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
-
 }
 
-func ProvideHandlers() fx.Option {
-	return fx.Provide(
-		webhookHandler,
-		authenticationHandler,
+func runServers(logger log.Logger) error {
+	var (
+		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
+		signals                = make(chan os.Signal, 10)
 	)
-}
 
-func statHandler(v viper.Viper, logger log.Logger, xmidtHTTPClient *http.Client, xmidtClientTimeout httpClientTimeout) *stat.ServiceOptions {
 	//
-	// Stat Service configs
+	// Execute the runnable, which runs all the servers, and wait for a signal
 	//
-	statServiceOptions := &stat.ServiceOptions{
-		HTTPTransactor: transaction.New(
-			&transaction.Options{
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					xmidtHTTPClient.Do),
-				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-			}),
-		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", v.GetString(targetURLKey)),
+	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
+
+	if err != nil {
+		level.Error(logger).Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
+		return err
 	}
 
-	ss := stat.NewService(statServiceOptions)
-
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-}
-
-type ServiceConfigIn struct {
-	fx.In
-	v                  viper.Viper
-	logger             log.Logger
-	xmidtHTTPClient    *http.Client
-	xmidtClientTimeout httpClientTimeout
-	APIRouter          *mux.Router
-	authenticate       alice.Chain
-}
-
-func wrpTranslationHandler(in ServiceConfigIn) {
-	//
-	// WRP Service configs
-	//
-	translationOptions := &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/device", in.v.GetString(targetURLKey)),
-		WRPSource:   in.v.GetString(wrpSourceKey),
-		T: transaction.New(
-			&transaction.Options{
-				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   in.logger,
-						Retries:  in.v.GetInt(reqMaxRetriesKey),
-						Interval: in.v.GetDuration(reqRetryIntervalKey),
-					},
-					in.xmidtHTTPClient.Do),
-			}),
+	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
+	for exit := false; !exit; {
+		select {
+		case s := <-signals:
+			level.Error(logger).Log(logging.MessageKey(), "exiting due to signal", "signal", s)
+			exit = true
+		case <-done:
+			level.Error(logger).Log(logging.MessageKey(), "one or more servers exited")
+			exit = true
+		}
 	}
 
-	ts := translation.NewService(translationOptions)
+	close(shutdown)
+	waitGroup.Wait()
+	return nil
+}
 
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         in.logger,
-		ValidServices:               in.v.GetStringSlice(translationServicesKey),
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
+func provideAPIRouter() *mux.Router {
+	rootRouter := mux.NewRouter()
+	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+	return APIRouter
 }
