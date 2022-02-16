@@ -127,7 +127,7 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
 //nolint:funlen
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
+func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -284,7 +284,7 @@ func webhookHandler(in webhookHandlerConfigIn) error {
 func ProvideHandlers() fx.Option {
 	return fx.Provide(
 		webhookHandler,
-		authenticationHandler,
+		authenticationProvider,
 	)
 }
 
@@ -337,50 +337,6 @@ func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions 
 	}
 }
 
-type authAcquirerConfigIn struct {
-	v                           *viper.Viper
-	logger                      log.Logger
-	statServiceOptions          *stat.ServiceOptions
-	translationOptions          *translation.ServiceOptions
-	APIRouter                   *mux.Router
-	authenticate                *alice.Chain
-	reducedLoggingResponseCodes []int
-}
-
-func authAcquirerHandler(in authAcquirerConfigIn) {
-	reducedLoggingResponseCodes := in.v.GetIntSlice(reducedTransactionLoggingCodesKey)
-
-	if in.v.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(in.v)
-		if err != nil {
-			level.Error(in.logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
-		} else {
-			in.translationOptions.AuthAcquirer = acquirer
-			in.statServiceOptions.AuthAcquirer = acquirer
-			level.Info(in.logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
-		}
-	}
-	ss := stat.NewService(in.statServiceOptions)
-	ts := translation.NewService(in.translationOptions)
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.authenticate,
-		Log:                         in.logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.authenticate,
-		Log:                         in.logger,
-		ValidServices:               in.v.GetStringSlice(translationServicesKey),
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-}
-
 func provideServers() fx.Option {
 	return fx.Options(
 		arrangehttp.Server{
@@ -407,15 +363,19 @@ func provideServers() fx.Option {
 
 type PrimaryRouterIn struct {
 	fx.In
-	Router    *mux.Router `name:"server_primary"`
-	APIBase   string      `name:"api_base"`
-	AuthChain alice.Chain `name:"auth_chain"`
-	Tracing   candlelight.Tracing
-	Logger    log.Logger
+	V                  *viper.Viper
+	Router             *mux.Router `name:"server_primary"`
+	APIBase            string      `name:"api_base"`
+	AuthChain          alice.Chain `name:"auth_chain"`
+	Tracing            candlelight.Tracing
+	Logger             log.Logger
+	StatServiceOptions *stat.ServiceOptions
+	TranslationOptions *translation.ServiceOptions
+	Authenticate       *alice.Chain
 }
 
-func handlePrimaryEndpoint(in PrimaryRouterIn) {
-	level.Info(in.Logger).Log(logging.MessageKey(), "tracing status", "enabled", !in.Tracing.IsNoop())
+func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
+	rootRouter := mux.NewRouter()
 	otelMuxOptions := []otelmux.Option{
 		otelmux.WithPropagators(in.Tracing.Propagator()),
 		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
@@ -424,10 +384,39 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) {
 	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
-}
 
-func provideAPIRouter() *mux.Router {
-	rootRouter := mux.NewRouter()
 	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+
+	reducedLoggingResponseCodes := in.V.GetIntSlice(reducedTransactionLoggingCodesKey)
+
+	if in.V.IsSet(authAcquirerKey) {
+		acquirer, err := createAuthAcquirer(in.V)
+		if err != nil {
+			level.Error(in.Logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+		} else {
+			in.TranslationOptions.AuthAcquirer = acquirer
+			in.StatServiceOptions.AuthAcquirer = acquirer
+			level.Info(in.Logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
+		}
+	}
+	ss := stat.NewService(in.StatServiceOptions)
+	ts := translation.NewService(in.TranslationOptions)
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                in.Authenticate,
+		Log:                         in.Logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
+
+	translation.ConfigHandler(&translation.Options{
+		S:                           ts,
+		APIRouter:                   APIRouter,
+		Authenticate:                in.Authenticate,
+		Log:                         in.Logger,
+		ValidServices:               in.V.GetStringSlice(translationServicesKey),
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
 	return APIRouter
 }

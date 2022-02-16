@@ -32,6 +32,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/ancla"
@@ -92,7 +93,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// _, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
-	if parseErr, done := printVersion(f, arguments); done {
+	if done, parseErr := printVersion(f, arguments); done {
 		// if we're done, we're exiting no matter what
 		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
 		os.Exit(0)
@@ -114,7 +115,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			newXmidtClientTimeout,
 			newArgusClientTimeout,
 			newHTTPClient,
-			authAcquirerHandler,
 		),
 		provideServers(),
 	)
@@ -173,6 +173,7 @@ type LoadTracingConfigIn struct {
 	fx.In
 	LoadTracingConfig candlelight.Config
 	AppName           string
+	Logger            log.Logger
 }
 
 func loadTracing(in LoadTracingConfigIn) (candlelight.Tracing, error) {
@@ -182,20 +183,21 @@ func loadTracing(in LoadTracingConfigIn) (candlelight.Tracing, error) {
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
+	level.Info(in.Logger).Log(logging.MessageKey(), "tracing status", "enabled", !tracing.IsNoop())
 	return tracing, nil
 }
 
-func printVersion(f *pflag.FlagSet, arguments []string) (error, bool) {
+func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
 	printVer := f.BoolP("version", "v", false, "displays the version number")
 	if err := f.Parse(arguments); err != nil {
-		return err, true
+		return true, err
 	}
 
 	if *printVer {
 		printVersionInfo(os.Stdout)
-		return nil, true
+		return true, nil
 	}
-	return nil, false
+	return false, nil
 }
 
 func exitIfError(logger log.Logger, err error) {
