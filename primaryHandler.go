@@ -281,7 +281,7 @@ func webhookHandler(in webhookHandlerConfigIn) error {
 	return nil
 }
 
-func ProvideHandlers() fx.Option {
+func provideHandlers() fx.Option {
 	return fx.Provide(
 		webhookHandler,
 		authenticationProvider,

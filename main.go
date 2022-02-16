@@ -117,6 +117,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			newHTTPClient,
 		),
 		provideServers(),
+		provideHandlers(),
 	)
 
 	switch err := app.Err(); {
