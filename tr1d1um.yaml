@@ -377,3 +377,9 @@ tracing:
 
   # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
   # endpoint: "http://localhost:9411/api/v2/spans"
+
+# previousVersionSupport allows us to support two different major versions of
+# the API at the same time from the same application.  When this is true,
+# tr1d1um will support both "/v2" and "/v3" endpoints.  When false, only "/v3"
+# endpoints will be supported.
+previousVersionSupport: true

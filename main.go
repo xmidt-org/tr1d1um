@@ -52,8 +52,12 @@ import (
 
 // convenient global values
 const (
-	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "api/v3"
+	DefaultKeyID       = "current"
+	apiVersion         = "v3"
+	prevAPIVersion     = "v2"
+	applicationName    = "tr1d1um"
+	apiBase            = "api/" + apiVersion
+	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
 const (
@@ -141,7 +145,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator()))
 
-	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+	// if we want to support the previous API version, then include it in the
+	// api base.
+	urlPrefix := fmt.Sprintf("/%s/", apiBase)
+	if v.GetBool("previousVersionSupport") {
+		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
+	}
+	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
 
 	//
 	// Webhooks (if not configured, handlers are not set up)

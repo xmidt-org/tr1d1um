@@ -28,6 +28,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/bascule"
@@ -168,6 +169,9 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	}
 
 	authConstructor := basculehttp.NewConstructor(options...)
+	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
+		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
+	}, options...)...)
 
 	bearerRules := bascule.Validators{
 		bchecks.NonEmptyPrincipal(),
@@ -208,8 +212,21 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
-	constructors := []alice.Constructor{setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
-	chain := alice.New(constructors...)
-	return &chain, nil
+	authChain := alice.New(setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	authChainLegacy := alice.New(setLogger(logger), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
+
+	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+			vars := mux.Vars(req)
+			if vars != nil {
+				if vars["version"] == prevAPIVersion {
+					authChainLegacy.Then(next).ServeHTTP(r, req)
+					return
+				}
+			}
+			authChain.Then(next).ServeHTTP(r, req)
+		})
+	})
+	return &versionCompatibleAuth, nil
 }
