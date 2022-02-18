@@ -146,7 +146,6 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	options := []basculehttp.COption{
 		basculehttp.WithCLogger(getLogger),
 		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
 	}
 	if len(basicAllowed) > 0 {
 		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
@@ -168,8 +167,11 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		}))
 	}
 
-	authConstructor := basculehttp.NewConstructor(options...)
+	authConstructor := basculehttp.NewConstructor(append([]basculehttp.COption{
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
+	}, options...)...)
 	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/api/"+prevAPIVersion+"/", basculehttp.DefaultParseURLFunc)),
 		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
 	}, options...)...)
 
