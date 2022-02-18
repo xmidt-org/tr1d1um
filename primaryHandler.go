@@ -225,30 +225,30 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 	return &chain, nil
 }
 
-type webhookHandlerConfigIn struct {
+type webhookHandlerIn struct {
 	fx.In
-	v                   viper.Viper
-	webhookConfigKey    ancla.Config
-	argusClientConfigIn ArgusClientTimeoutConfigIn
-	logger              log.Logger
-	metricsRegistry     xmetrics.Registry
-	tracing             candlelight.Tracing
+	V                   viper.Viper
+	WebhookConfigKey    ancla.Config
+	ArgusClientConfigIn ArgusClientTimeoutConfigIn
+	Logger              log.Logger
+	MetricsRegistry     xmetrics.Registry
+	Tracing             candlelight.Tracing
 	APIRouter           *mux.Router
-	authenticate        *alice.Chain
+	Authenticate        *alice.Chain
 }
 
-func webhookHandler(in webhookHandlerConfigIn) error {
+func webhookHandler(in webhookHandlerIn) error {
 	//
 	// Webhooks (if not configured, handlers are not set up)
 	//
-	if in.v.IsSet(webhookConfigKey) {
-		webhookConfig := in.webhookConfigKey
+	if in.V.IsSet(webhookConfigKey) {
+		webhookConfig := in.WebhookConfigKey
 
-		webhookConfig.Logger = in.logger
-		webhookConfig.MetricsProvider = in.metricsRegistry
-		argusClientTimeout := newArgusClientTimeout(in.argusClientConfigIn)
+		webhookConfig.Logger = in.Logger
+		webhookConfig.MetricsProvider = in.MetricsRegistry
+		argusClientTimeout := newArgusClientTimeout(in.ArgusClientConfigIn)
 
-		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.tracing)
+		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.Tracing)
 
 		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
 		if err != nil {
@@ -262,7 +262,7 @@ func webhookHandler(in webhookHandlerConfigIn) error {
 		}
 
 		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			MetricsProvider:   in.metricsRegistry,
+			MetricsProvider:   in.MetricsRegistry,
 			V:                 builtValidators,
 			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 			GetLogger:         getLogger,
@@ -272,20 +272,28 @@ func webhookHandler(in webhookHandlerConfigIn) error {
 			GetLogger: getLogger,
 		})
 
-		in.APIRouter.Handle("/hook", in.authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-		level.Info(in.logger).Log("Webhook service enabled")
+		in.APIRouter.Handle("/hook", in.Authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.Authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+		level.Info(in.Logger).Log("Webhook service enabled")
 	} else {
-		level.Info(in.logger).Log(logging.MessageKey(), "Webhook service disabled")
+		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
 	}
 	return nil
 }
 
 func provideHandlers() fx.Option {
-	return fx.Provide(
-		webhookHandler,
-		authenticationProvider,
+	return fx.Options(
+		fx.Provide(authenticationProvider),
+		fx.Invoke(webhookHandler),
 	)
+}
+
+type ServiceConfigIn struct {
+	fx.In
+	V                  viper.Viper
+	Logger             log.Logger
+	XmidtHTTPClient    *http.Client
+	XmidtClientTimeout httpClientTimeout
 }
 
 func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
@@ -297,23 +305,15 @@ func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
 			&transaction.Options{
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   in.logger,
-						Retries:  in.v.GetInt(reqMaxRetriesKey),
-						Interval: in.v.GetDuration(reqRetryIntervalKey),
+						Logger:   in.Logger,
+						Retries:  in.V.GetInt(reqMaxRetriesKey),
+						Interval: in.V.GetDuration(reqRetryIntervalKey),
 					},
-					in.xmidtHTTPClient.Do),
-				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
+					in.XmidtHTTPClient.Do),
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 			}),
-		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.v.GetString(targetURLKey)),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.V.GetString(targetURLKey)),
 	}
-}
-
-type ServiceConfigIn struct {
-	fx.In
-	v                  viper.Viper
-	logger             log.Logger
-	xmidtHTTPClient    *http.Client
-	xmidtClientTimeout httpClientTimeout
 }
 
 func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions {
@@ -321,24 +321,28 @@ func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions 
 	// WRP Service configs
 	//
 	return &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/device", in.v.GetString(targetURLKey)),
-		WRPSource:   in.v.GetString(wrpSourceKey),
+		XmidtWrpURL: fmt.Sprintf("%s/device", in.V.GetString(targetURLKey)),
+		WRPSource:   in.V.GetString(wrpSourceKey),
 		T: transaction.New(
 			&transaction.Options{
-				RequestTimeout: in.xmidtClientTimeout.RequestTimeout,
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   in.logger,
-						Retries:  in.v.GetInt(reqMaxRetriesKey),
-						Interval: in.v.GetDuration(reqRetryIntervalKey),
+						Logger:   in.Logger,
+						Retries:  in.V.GetInt(reqMaxRetriesKey),
+						Interval: in.V.GetDuration(reqRetryIntervalKey),
 					},
-					in.xmidtHTTPClient.Do),
+					in.XmidtHTTPClient.Do),
 			}),
 	}
 }
 
 func provideServers() fx.Option {
 	return fx.Options(
+		fx.Provide(
+			statServiceProvider,
+			translationOptionsProvider,
+		),
 		arrangehttp.Server{
 			Name: "server_primary",
 			Key:  "primary",

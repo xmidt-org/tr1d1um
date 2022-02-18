@@ -84,13 +84,12 @@ var defaults = map[string]interface{}{
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
 
-	v, l, f, err := setup(os.Args[1:])
+	v, l, f, err := setup(arguments)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	logger := gokitLogger(l)
-	// _, metricsRegistry, webPA, err := server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
 
 	// This allows us to communicate the version of the binary upon request.
 	if done, parseErr := printVersion(f, arguments); done {
@@ -111,9 +110,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
 			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
 
+			fx.Annotated{
+				Name:   "xmidt_client_timeout",
+				Target: newXmidtClientTimeout,
+			},
+			fx.Annotated{
+				Name:   "argus_client_timeout",
+				Target: newArgusClientTimeout,
+			},
 			loadTracing,
-			newXmidtClientTimeout,
-			newArgusClientTimeout,
 			newHTTPClient,
 		),
 		provideServers(),
@@ -170,16 +175,15 @@ func newArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
 	return act
 }
 
-type LoadTracingConfigIn struct {
+type TracingConfigIn struct {
 	fx.In
-	LoadTracingConfig candlelight.Config
-	AppName           string
-	Logger            log.Logger
+	TracingConfig candlelight.Config
+	Logger        log.Logger
 }
 
-func loadTracing(in LoadTracingConfigIn) (candlelight.Tracing, error) {
-	traceConfig := in.LoadTracingConfig
-	traceConfig.ApplicationName = in.AppName
+func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
+	traceConfig := in.TracingConfig
+	traceConfig.ApplicationName = applicationName
 	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
