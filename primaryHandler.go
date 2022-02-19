@@ -250,11 +250,10 @@ func webhookHandler(in webhookHandlerIn) error {
 
 		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.Tracing)
 
-		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+		svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
 		if err != nil {
 			return fmt.Errorf("failed to initialize webhook service: %s", err)
 		}
-		defer stopWatch()
 
 		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
 		if err != nil {
