@@ -140,7 +140,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
-	XmidtClientTimeout httpClientTimeout
+	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
 }
 
 func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
@@ -160,7 +160,7 @@ func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 
 type ArgusClientTimeoutConfigIn struct {
 	fx.In
-	ArgusClientTimeout httpClientTimeout
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 }
 
 func newArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {

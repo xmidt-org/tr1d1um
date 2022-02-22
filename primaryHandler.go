@@ -227,14 +227,14 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 
 type webhookHandlerIn struct {
 	fx.In
-	V                   viper.Viper
-	WebhookConfigKey    ancla.Config
-	ArgusClientConfigIn ArgusClientTimeoutConfigIn
-	Logger              log.Logger
-	MetricsRegistry     xmetrics.Registry
-	Tracing             candlelight.Tracing
-	APIRouter           *mux.Router
-	Authenticate        *alice.Chain
+	V                  viper.Viper
+	WebhookConfigKey   ancla.Config
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	Logger             log.Logger
+	MetricsRegistry    xmetrics.Registry
+	Tracing            candlelight.Tracing
+	APIRouter          *mux.Router
+	Authenticate       *alice.Chain
 }
 
 func webhookHandler(in webhookHandlerIn) error {
@@ -246,9 +246,8 @@ func webhookHandler(in webhookHandlerIn) error {
 
 		webhookConfig.Logger = in.Logger
 		webhookConfig.MetricsProvider = in.MetricsRegistry
-		argusClientTimeout := newArgusClientTimeout(in.ArgusClientConfigIn)
 
-		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, in.Tracing)
+		webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
 		svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
 		if err != nil {
@@ -292,7 +291,7 @@ type ServiceConfigIn struct {
 	V                  viper.Viper
 	Logger             log.Logger
 	XmidtHTTPClient    *http.Client
-	XmidtClientTimeout httpClientTimeout
+	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
 }
 
 func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
