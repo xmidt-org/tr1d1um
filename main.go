@@ -42,8 +42,12 @@ import (
 
 // convenient global values
 const (
-	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "api/v3"
+	DefaultKeyID       = "current"
+	apiVersion         = "v3"
+	prevAPIVersion     = "v2"
+	applicationName    = "tr1d1um"
+	apiBase            = "api/" + apiVersion
+	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
 const (
