@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +19,12 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
 	"regexp"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -38,31 +32,26 @@ import (
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
+	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/clortho"
-	"github.com/xmidt-org/clortho/clorthometrics"
-	"github.com/xmidt-org/clortho/clorthozap"
-	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/touchstone"
+	"github.com/xmidt-org/tr1d1um/stat"
+	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/logging"
+	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.uber.org/zap"
-)
-
-var (
-	errFailedWebhookUnmarshal = errors.New("failed to JSON unmarshal webhook")
-
-	v2WarningHeader = "X-Xmidt-Warning"
+	"go.uber.org/fx"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -92,8 +81,8 @@ type CapabilityConfig struct {
 
 // JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
-	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
-	Config clortho.Config `json:"config"`
+	// JWTKeys is used to create the key.Resolver for JWT verification keys
+	Keys key.ResolverFactory `json:"keys"`
 
 	// Leeway is used to set the amount of time buffer should be given to JWT
 	// time values, such as nbf
@@ -137,8 +126,9 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 }
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
+//
 //nolint:funlen
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
+func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -167,96 +157,30 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	options := []basculehttp.COption{
 		basculehttp.WithCLogger(getLogger),
 		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
 	}
 	if len(basicAllowed) > 0 {
 		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
 	}
-
 	var jwtVal JWTValidator
-	// Get jwt configuration, including clortho's configuration
+
 	v.UnmarshalKey("jwtValidator", &jwtVal)
-	kr := clortho.NewKeyRing()
+	if jwtVal.Keys.URI != "" {
+		resolver, err := jwtVal.Keys.NewResolver()
+		if err != nil {
+			return &alice.Chain{}, emperror.With(err, "failed to create resolver")
+		}
 
-	// Instantiate a fetcher for refresher and resolver to share
-	f, err := clortho.NewFetcher()
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho fetcher")
+		options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
+			DefaultKeyID: DefaultKeyID,
+			Resolver:     resolver,
+			Parser:       bascule.DefaultJWTParser,
+			Leeway:       jwtVal.Leeway,
+		}))
 	}
 
-	ref, err := clortho.NewRefresher(
-		clortho.WithConfig(jwtVal.Config),
-		clortho.WithFetcher(f),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho refresher")
-	}
+	authConstructor := basculehttp.NewConstructor(options...)
 
-	resolver, err := clortho.NewResolver(
-		clortho.WithConfig(jwtVal.Config),
-		clortho.WithKeyRing(kr),
-		clortho.WithFetcher(f),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho resolver")
-	}
-
-	promReg, ok := registry.(prometheus.Registerer)
-	if !ok {
-		return &alice.Chain{}, errors.New("failed to get prometheus registerer")
-	}
-
-	var (
-		tsConfig touchstone.Config
-		zConfig  sallust.Config
-	)
-	// Get touchstone & zap configurations
-	v.UnmarshalKey("touchstone", &tsConfig)
-	v.UnmarshalKey("zap", &zConfig)
-	zlogger := zap.Must(zConfig.Build())
-	tf := touchstone.NewFactory(tsConfig, zlogger, promReg)
-	// Instantiate a metric listener for refresher and resolver to share
-	cml, err := clorthometrics.NewListener(clorthometrics.WithFactory(tf))
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho metrics listener")
-	}
-
-	// Instantiate a logging listener for refresher and resolver to share
-	czl, err := clorthozap.NewListener(
-		clorthozap.WithLogger(zlogger),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho zap logger listener")
-	}
-
-	resolver.AddListener(cml)
-	resolver.AddListener(czl)
-	ref.AddListener(cml)
-	ref.AddListener(czl)
-	ref.AddListener(kr)
-	// context.Background() is for the unused `context.Context` argument in refresher.Start
-	ref.Start(context.Background())
-	// Shutdown refresher's goroutines when SIGTERM
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		// context.Background() is for the unused `context.Context` argument in refresher.Stop
-		ref.Stop(context.Background())
-	}()
-
-	options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
-		DefaultKeyID: DefaultKeyID,
-		Resolver:     resolver,
-		Parser:       bascule.DefaultJWTParser,
-		Leeway:       jwtVal.Leeway,
-	}))
-	authConstructor := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
-	}, options...)...)
-	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/api/"+prevAPIVersion+"/", basculehttp.DefaultParseURLFunc)),
-		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
-	}, options...)...)
 	bearerRules := bascule.Validators{
 		bchecks.NonEmptyPrincipal(),
 		bchecks.NonEmptyType(),
@@ -296,133 +220,206 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
+	constructors := []alice.Constructor{setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
-	authChain := alice.New(setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	authChainLegacy := alice.New(setLogger(logger), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
-
-	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
-			vars := mux.Vars(req)
-			if vars != nil {
-				if vars["version"] == prevAPIVersion {
-					authChainLegacy.Then(next).ServeHTTP(r, req)
-					return
-				}
-			}
-			authChain.Then(next).ServeHTTP(r, req)
-		})
-	})
-	return &versionCompatibleAuth, nil
+	chain := alice.New(constructors...)
+	return &chain, nil
 }
 
-//nolint:funlen
-func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
-	if getLogger == nil {
-		getLogger = func(_ context.Context) log.Logger {
-			return nil
+type webhookHandlerIn struct {
+	fx.In
+	V                  viper.Viper
+	WebhookConfigKey   ancla.Config
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	Logger             log.Logger
+	MetricsRegistry    xmetrics.Registry
+	Tracing            candlelight.Tracing
+	APIRouter          *mux.Router
+	Authenticate       *alice.Chain
+}
+
+func webhookHandler(in webhookHandlerIn) error {
+	//
+	// Webhooks (if not configured, handlers are not set up)
+	//
+	if in.V.IsSet(webhookConfigKey) {
+		webhookConfig := in.WebhookConfigKey
+
+		webhookConfig.Logger = in.Logger
+		webhookConfig.MetricsProvider = in.MetricsRegistry
+
+		webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
+
+		svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+		if err != nil {
+			return fmt.Errorf("failed to initialize webhook service: %s", err)
+		}
+
+		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+		if err != nil {
+			return fmt.Errorf("failed to initialize webhook validators: %s", err)
+		}
+
+		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+			MetricsProvider:   in.MetricsRegistry,
+			V:                 builtValidators,
+			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+			GetLogger:         getLogger,
+		})
+
+		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+			GetLogger: getLogger,
+		})
+
+		in.APIRouter.Handle("/hook", in.Authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.Authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
+		level.Info(in.Logger).Log("Webhook service enabled")
+	} else {
+		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
+	}
+	return nil
+}
+
+func provideHandlers() fx.Option {
+	return fx.Options(
+		fx.Provide(authenticationProvider),
+		fx.Invoke(webhookHandler),
+	)
+}
+
+type ServiceConfigIn struct {
+	fx.In
+	V                  viper.Viper
+	Logger             log.Logger
+	XmidtHTTPClient    *http.Client
+	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
+}
+
+func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
+	//
+	// Stat Service configs
+	//
+	return &stat.ServiceOptions{
+		HTTPTransactor: transaction.New(
+			&transaction.Options{
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   in.Logger,
+						Retries:  in.V.GetInt(reqMaxRetriesKey),
+						Interval: in.V.GetDuration(reqRetryIntervalKey),
+					},
+					in.XmidtHTTPClient.Do),
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
+			}),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.V.GetString(targetURLKey)),
+	}
+}
+
+func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions {
+	//
+	// WRP Service configs
+	//
+	return &translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/device", in.V.GetString(targetURLKey)),
+		WRPSource:   in.V.GetString(wrpSourceKey),
+		T: transaction.New(
+			&transaction.Options{
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   in.Logger,
+						Retries:  in.V.GetInt(reqMaxRetriesKey),
+						Interval: in.V.GetDuration(reqRetryIntervalKey),
+					},
+					in.XmidtHTTPClient.Do),
+			}),
+	}
+}
+
+func provideServers() fx.Option {
+	return fx.Options(
+		fx.Provide(
+			statServiceProvider,
+			translationOptionsProvider,
+		),
+		arrangehttp.Server{
+			Name: "server_primary",
+			Key:  "primary",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_health",
+			Key:  "health",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_pprof",
+			Key:  "pprof",
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_metrics",
+			Key:  "metric",
+		}.Provide(),
+		fx.Invoke(
+			handlePrimaryEndpoint,
+		),
+	)
+}
+
+type PrimaryRouterIn struct {
+	fx.In
+	V                  *viper.Viper
+	Router             *mux.Router `name:"server_primary"`
+	APIBase            string      `name:"api_base"`
+	AuthChain          alice.Chain `name:"auth_chain"`
+	Tracing            candlelight.Tracing
+	Logger             log.Logger
+	StatServiceOptions *stat.ServiceOptions
+	TranslationOptions *translation.ServiceOptions
+	Authenticate       *alice.Chain
+}
+
+func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
+	rootRouter := mux.NewRouter()
+	otelMuxOptions := []otelmux.Option{
+		otelmux.WithPropagators(in.Tracing.Propagator()),
+		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
+	}
+
+	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
+		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
+	)
+
+	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+
+	reducedLoggingResponseCodes := in.V.GetIntSlice(reducedTransactionLoggingCodesKey)
+
+	if in.V.IsSet(authAcquirerKey) {
+		acquirer, err := createAuthAcquirer(in.V)
+		if err != nil {
+			level.Error(in.Logger).Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
+		} else {
+			in.TranslationOptions.AuthAcquirer = acquirer
+			in.StatServiceOptions.AuthAcquirer = acquirer
+			level.Info(in.Logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
 		}
 	}
-	if config.Now == nil {
-		config.Now = time.Now
-	}
-	durationCheck, err := ancla.CheckDuration(config.Max)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create duration check: %v", err)
-	}
-	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create until check: %v", err)
-	}
+	ss := stat.NewService(in.StatServiceOptions)
+	ts := translation.NewService(in.TranslationOptions)
+	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   APIRouter,
+		Authenticate:                in.Authenticate,
+		Log:                         in.Logger,
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			vars := mux.Vars(r)
-			// if this isn't v2, do nothing.
-			if vars == nil || vars["version"] != prevAPIVersion {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// if this is v2, we need to unmarshal and check the duration.  If
-			// the duration is bad, change it to 5m and add a header. Then use
-			// the v2 handler.
-			logger := getLogger(r.Context())
-			if logger == nil {
-				logger = log.NewNopLogger()
-			}
-			requestPayload, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				v2ErrEncode(w, logger, err, 0)
-				return
-			}
-
-			var wr ancla.WebhookRegistration
-			err = json.Unmarshal(requestPayload, &wr)
-			if err != nil {
-				var e *json.UnmarshalTypeError
-				if errors.As(err, &e) {
-					v2ErrEncode(w, logger,
-						fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
-						http.StatusBadRequest)
-					return
-				}
-				v2ErrEncode(w, logger, fmt.Errorf("%w: %v", errFailedWebhookUnmarshal, err),
-					http.StatusBadRequest)
-				return
-			}
-
-			// check to see if the Webhook has a valid until/duration.
-			// If not, set the WebhookRegistration  duration to 5m.
-			webhook := wr.ToWebhook()
-			if webhook.Until.IsZero() {
-				if webhook.Duration == 0 {
-					wr.Duration = ancla.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
-				} else {
-					durationErr := durationCheck(webhook)
-					if durationErr != nil {
-						wr.Duration = ancla.CustomDuration(config.Max)
-						w.Header().Add(v2WarningHeader,
-							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
-					}
-				}
-			} else {
-				untilErr := untilCheck(webhook)
-				if untilErr != nil {
-					wr.Until = time.Time{}
-					wr.Duration = ancla.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
-				}
-			}
-
-			// put the body back in the request
-			body, err := json.Marshal(wr)
-			if err != nil {
-				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
-			}
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-			if v2Handler == nil {
-				v2Handler = next
-			}
-			v2Handler.ServeHTTP(w, r)
-		})
-	}, nil
-}
-
-func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) {
-	if code == 0 {
-		code = http.StatusInternalServerError
-	}
-	level.Error(logger).Log(logging.MessageKey(), "sending non-200, non-404 response",
-		logging.ErrorKey(), err, "code", code)
-
-	w.WriteHeader(code)
-
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message": err.Error(),
-		})
+	translation.ConfigHandler(&translation.Options{
+		S:                           ts,
+		APIRouter:                   APIRouter,
+		Authenticate:                in.Authenticate,
+		Log:                         in.Logger,
+		ValidServices:               in.V.GetStringSlice(translationServicesKey),
+		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
+	})
+	return APIRouter
 }
