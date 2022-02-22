@@ -407,7 +407,7 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
 	// if we want to support the previous API version, then include it in the
 	// api base.
 	urlPrefix := fmt.Sprintf("/%s/", apiBase)
-	if v.GetBool("previousVersionSupport") {
+	if in.V.GetBool("previousVersionSupport") {
 		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
 	}
 	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
