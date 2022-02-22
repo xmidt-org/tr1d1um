@@ -156,7 +156,6 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 	options := []basculehttp.COption{
 		basculehttp.WithCLogger(getLogger),
 		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
 	}
 	if len(basicAllowed) > 0 {
 		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
@@ -178,7 +177,13 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 		}))
 	}
 
-	authConstructor := basculehttp.NewConstructor(options...)
+	authConstructor := basculehttp.NewConstructor(append([]basculehttp.COption{
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
+	}, options...)...)
+	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
+		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/api/"+prevAPIVersion+"/", basculehttp.DefaultParseURLFunc)),
+		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
+	}, options...)...)
 
 	bearerRules := bascule.Validators{
 		bchecks.NonEmptyPrincipal(),
@@ -219,10 +224,22 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 		basculehttp.WithRules("Bearer", bearerRules),
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
-	constructors := []alice.Constructor{setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener)}
 
-	chain := alice.New(constructors...)
-	return &chain, nil
+	authChain := alice.New(setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	authChainLegacy := alice.New(setLogger(logger), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+			vars := mux.Vars(req)
+			if vars != nil {
+				if vars["version"] == prevAPIVersion {
+					authChainLegacy.Then(next).ServeHTTP(r, req)
+					return
+				}
+			}
+			authChain.Then(next).ServeHTTP(r, req)
+		})
+	})
+	return &versionCompatibleAuth, nil
 }
 
 type webhookHandlerIn struct {
@@ -387,7 +404,13 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
-	APIRouter := rootRouter.PathPrefix(fmt.Sprintf("/%s/", apiBase)).Subrouter()
+	// if we want to support the previous API version, then include it in the
+	// api base.
+	urlPrefix := fmt.Sprintf("/%s/", apiBase)
+	if v.GetBool("previousVersionSupport") {
+		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
+	}
+	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
 
 	reducedLoggingResponseCodes := in.V.GetIntSlice(reducedTransactionLoggingCodesKey)
 
