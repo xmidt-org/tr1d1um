@@ -116,11 +116,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
-				Target: newXmidtClientTimeout,
+				Target: configureXmidtClientTimeout,
 			},
 			fx.Annotated{
 				Name:   "argus_client_timeout",
-				Target: newArgusClientTimeout,
+				Target: configureArgusClientTimeout,
 			},
 			loadTracing,
 			newHTTPClient,
@@ -144,10 +144,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
-	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
+	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
 }
 
-func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
+func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 	xct := in.XmidtClientTimeout
 
 	if xct.ClientTimeout == 0 {
@@ -164,10 +164,10 @@ func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 
 type ArgusClientTimeoutConfigIn struct {
 	fx.In
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
 }
 
-func newArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
+func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
 	act := in.ArgusClientTimeout
 
 	if act.ClientTimeout == 0 {

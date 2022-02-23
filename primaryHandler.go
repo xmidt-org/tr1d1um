@@ -34,6 +34,7 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
@@ -127,7 +128,7 @@ func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
 
 // authenticationHandler configures the authorization requirements for requests to reach the main handler
 //nolint:funlen
-func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
+func provideAuthentication(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
 	if registry == nil {
 		return nil, errors.New("nil registry")
 	}
@@ -242,7 +243,7 @@ func authenticationProvider(v *viper.Viper, logger log.Logger, registry xmetrics
 	return &versionCompatibleAuth, nil
 }
 
-type webhookHandlerIn struct {
+type handleWebhooksIn struct {
 	fx.In
 	V                  viper.Viper
 	WebhookConfigKey   ancla.Config
@@ -250,11 +251,11 @@ type webhookHandlerIn struct {
 	Logger             log.Logger
 	MetricsRegistry    xmetrics.Registry
 	Tracing            candlelight.Tracing
-	APIRouter          *mux.Router
+	APIRouter          *mux.Router `name:"api_router"`
 	Authenticate       *alice.Chain
 }
 
-func webhookHandler(in webhookHandlerIn) error {
+func handleWebhooks(in handleWebhooksIn) error {
 	//
 	// Webhooks (if not configured, handlers are not set up)
 	//
@@ -298,8 +299,8 @@ func webhookHandler(in webhookHandlerIn) error {
 
 func provideHandlers() fx.Option {
 	return fx.Options(
-		fx.Provide(authenticationProvider),
-		fx.Invoke(webhookHandler),
+		fx.Provide(provideAuthentication),
+		fx.Invoke(handleWebhooks),
 	)
 }
 
@@ -309,9 +310,10 @@ type ServiceConfigIn struct {
 	Logger             log.Logger
 	XmidtHTTPClient    *http.Client
 	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
+	RequestMaxRetries  int               `name:"requestMaxRetries"`
 }
 
-func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
+func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
 	//
 	// Stat Service configs
 	//
@@ -331,7 +333,7 @@ func statServiceProvider(in ServiceConfigIn) *stat.ServiceOptions {
 	}
 }
 
-func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions {
+func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 	//
 	// WRP Service configs
 	//
@@ -344,7 +346,7 @@ func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions 
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
 						Logger:   in.Logger,
-						Retries:  in.V.GetInt(reqMaxRetriesKey),
+						Retries:  in.RequestMaxRetries,
 						Interval: in.V.GetDuration(reqRetryIntervalKey),
 					},
 					in.XmidtHTTPClient.Do),
@@ -355,8 +357,14 @@ func translationOptionsProvider(in ServiceConfigIn) *translation.ServiceOptions 
 func provideServers() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			statServiceProvider,
-			translationOptionsProvider,
+			arrange.ProvideKey("requestMaxRetries", 0),
+			arrange.ProvideKey("requestRetryInterval", 0),
+			provideStatServiceOptions,
+			provideTranslationOptions,
+			fx.Annotated{
+				Name:   "api_router",
+				Target: provideAPIRouter,
+			},
 		),
 		arrangehttp.Server{
 			Name: "server_primary",
@@ -380,10 +388,11 @@ func provideServers() fx.Option {
 	)
 }
 
-type PrimaryRouterIn struct {
+type PrimaryEndpointIn struct {
 	fx.In
 	V                  *viper.Viper
 	Router             *mux.Router `name:"server_primary"`
+	APIRouter          *mux.Router `name:"api_router"`
 	APIBase            string      `name:"api_base"`
 	AuthChain          alice.Chain `name:"auth_chain"`
 	Tracing            candlelight.Tracing
@@ -393,8 +402,7 @@ type PrimaryRouterIn struct {
 	Authenticate       *alice.Chain
 }
 
-func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
-	rootRouter := mux.NewRouter()
+func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	otelMuxOptions := []otelmux.Option{
 		otelmux.WithPropagators(in.Tracing.Propagator()),
 		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
@@ -403,14 +411,6 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
 	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
-
-	// if we want to support the previous API version, then include it in the
-	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
-	if in.V.GetBool("previousVersionSupport") {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
-	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
 
 	reducedLoggingResponseCodes := in.V.GetIntSlice(reducedTransactionLoggingCodesKey)
 
@@ -426,22 +426,38 @@ func handlePrimaryEndpoint(in PrimaryRouterIn) *mux.Router {
 	}
 	ss := stat.NewService(in.StatServiceOptions)
 	ts := translation.NewService(in.TranslationOptions)
+
 	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
-		APIRouter:                   APIRouter,
+		APIRouter:                   in.APIRouter,
 		Authenticate:                in.Authenticate,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
-
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
-		APIRouter:                   APIRouter,
+		APIRouter:                   in.APIRouter,
 		Authenticate:                in.Authenticate,
 		Log:                         in.Logger,
 		ValidServices:               in.V.GetStringSlice(translationServicesKey),
 		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
 	})
+}
+
+type PrimaryRouterIn struct {
+	fx.In
+	V *viper.Viper
+}
+
+func provideAPIRouter(in PrimaryRouterIn) *mux.Router {
+	rootRouter := mux.NewRouter()
+	// if we want to support the previous API version, then include it in the
+	// api base.
+	urlPrefix := fmt.Sprintf("/%s/", apiBase)
+	if in.V.GetBool("previousVersionSupport") {
+		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
+	}
+	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
 	return APIRouter
 }
