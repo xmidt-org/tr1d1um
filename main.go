@@ -35,7 +35,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
-	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
@@ -110,9 +109,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			gokitLogger,
 			arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 			arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
-			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
-			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
-			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
+			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
 
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
