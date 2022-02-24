@@ -35,15 +35,18 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
-	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
 // convenient global values
 const (
-	DefaultKeyID             = "current"
-	applicationName, apiBase = "tr1d1um", "api/v3"
+	DefaultKeyID       = "current"
+	apiVersion         = "v3"
+	prevAPIVersion     = "v2"
+	applicationName    = "tr1d1um"
+	apiBase            = "api/" + apiVersion
+	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
 const (
@@ -106,17 +109,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 			gokitLogger,
 			arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 			arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
-			arrange.UnmarshalKey("tracingConfigKey", candlelight.Config{}),
-			arrange.UnmarshalKey("authAcquirerKey", authAcquirerConfig{}),
-			arrange.UnmarshalKey("webhookConfigKey", ancla.Config{}),
+			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
 
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
-				Target: newXmidtClientTimeout,
+				Target: configureXmidtClientTimeout,
 			},
 			fx.Annotated{
 				Name:   "argus_client_timeout",
-				Target: newArgusClientTimeout,
+				Target: configureArgusClientTimeout,
 			},
 			loadTracing,
 			newHTTPClient,
@@ -140,10 +141,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
-	XmidtClientTimeout httpClientTimeout `name:"xmidt_client_timeout"`
+	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
 }
 
-func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
+func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 	xct := in.XmidtClientTimeout
 
 	if xct.ClientTimeout == 0 {
@@ -160,10 +161,10 @@ func newXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
 
 type ArgusClientTimeoutConfigIn struct {
 	fx.In
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
 }
 
-func newArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
+func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
 	act := in.ArgusClientTimeout
 
 	if act.ClientTimeout == 0 {
