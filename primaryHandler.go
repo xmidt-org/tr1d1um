@@ -109,16 +109,16 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 
 type createAuthAcquirerIn struct {
 	fx.In
-	AuthAcquirerKey authAcquirerConfig `name:"authAcquirerKey"`
+	AuthAcquirer authAcquirerConfig `name:"authAcquirer"`
 }
 
 func createAuthAcquirer(in createAuthAcquirerIn) (acquire.Acquirer, error) {
-	if in.AuthAcquirerKey.JWT.AuthURL != "" && in.AuthAcquirerKey.JWT.Buffer != 0 && in.AuthAcquirerKey.JWT.Timeout != 0 {
-		return acquire.NewRemoteBearerTokenAcquirer(in.AuthAcquirerKey.JWT)
+	if in.AuthAcquirer.JWT.AuthURL != "" && in.AuthAcquirer.JWT.Buffer != 0 && in.AuthAcquirer.JWT.Timeout != 0 {
+		return acquire.NewRemoteBearerTokenAcquirer(in.AuthAcquirer.JWT)
 	}
 
-	if in.AuthAcquirerKey.Basic != "" {
-		return acquire.NewFixedAuthAcquirer(in.AuthAcquirerKey.Basic)
+	if in.AuthAcquirer.Basic != "" {
+		return acquire.NewFixedAuthAcquirer(in.AuthAcquirer.Basic)
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
@@ -306,7 +306,7 @@ func handleWebhooks(in handleWebhooksIn) (out handleWebhooksOut, err error) {
 func provideHandlers() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			arrange.UnmarshalKey(authAcquirerKey, authAcquirerConfig{}),
+			arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.ProvideKey("authHeader", []string{}),
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
@@ -374,7 +374,7 @@ func provideServers() fx.Option {
 	return fx.Options(
 		fx.Provide(
 			arrange.ProvideKey(reqMaxRetriesKey, 0),
-			arrange.ProvideKey(reqRetryIntervalKey, time.Now),
+			arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
 			arrange.ProvideKey("previousVersionSupport", true),
 			arrange.ProvideKey("targetURL", ""),
 			arrange.ProvideKey("WRPSource", ""),
