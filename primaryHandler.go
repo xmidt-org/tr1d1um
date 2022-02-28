@@ -253,8 +253,6 @@ type handleWebhooksIn struct {
 	Logger             log.Logger
 	MetricsRegistry    xmetrics.Registry
 	Tracing            candlelight.Tracing
-	APIRouter          *mux.Router `name:"api_router"`
-	Authenticate       *alice.Chain
 }
 
 type handleWebhooksOut struct {
@@ -273,8 +271,11 @@ type handleWebhookRoutesIn struct {
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) {
-	in.APIRouter.Handle("/hook", in.Authenticate.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
-	in.APIRouter.Handle("/hooks", in.Authenticate.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
+		in.APIRouter.Handle("/hook", in.Authenticate.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.Authenticate.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+	}
+
 }
 
 func provideWebhookHandlers(in handleWebhooksIn) (out handleWebhooksOut, err error) {
