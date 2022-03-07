@@ -253,54 +253,65 @@ type handleWebhooksIn struct {
 	Logger             log.Logger
 	MetricsRegistry    xmetrics.Registry
 	Tracing            candlelight.Tracing
-	APIRouter          *mux.Router `name:"api_router"`
-	Authenticate       *alice.Chain
 }
 
 type handleWebhooksOut struct {
 	fx.Out
+	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
 
-func handleWebhooks(in handleWebhooksIn) (out handleWebhooksOut, err error) {
-	//
-	// Webhooks (if not configured, handlers are not set up)
-	//
-	if in.V.IsSet(webhookConfigKey) {
-		webhookConfig := in.WebhookConfigKey
+type handleWebhookRoutesIn struct {
+	fx.In
+	Logger                log.Logger
+	APIRouter             *mux.Router `name:"api_router"`
+	Authenticate          *alice.Chain
+	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
+}
 
-		webhookConfig.Logger = in.Logger
-		webhookConfig.MetricsProvider = in.MetricsRegistry
-
-		webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
-
-		svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
-		if err != nil {
-			return out, fmt.Errorf("failed to initialize webhook service: %s", err)
-		}
-
-		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
-		if err != nil {
-			return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
-		}
-
-		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			MetricsProvider:   in.MetricsRegistry,
-			V:                 builtValidators,
-			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-			GetLogger:         getLogger,
-		})
-
-		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-			GetLogger: getLogger,
-		})
-
-		in.APIRouter.Handle("/hook", in.Authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.Authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-		level.Info(in.Logger).Log("Webhook service enabled")
-	} else {
-		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
+func handleWebhookRoutes(in handleWebhookRoutesIn) {
+	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
+		in.APIRouter.Handle("/hook", in.Authenticate.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.Authenticate.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
 	}
-	return out, nil
+
+}
+
+func provideWebhookHandlers(in handleWebhooksIn) (out handleWebhooksOut, err error) {
+	// Webhooks (if not configured, handlers are not set up)
+	if !in.V.IsSet(webhookConfigKey) {
+		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
+		return
+	}
+	webhookConfig := in.WebhookConfigKey
+
+	webhookConfig.Logger = in.Logger
+	webhookConfig.MetricsProvider = in.MetricsRegistry
+	webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
+
+	svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+	if err != nil {
+		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
+	}
+
+	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+	if err != nil {
+		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
+	}
+
+	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+		MetricsProvider:   in.MetricsRegistry,
+		V:                 builtValidators,
+		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		GetLogger:         getLogger,
+	})
+
+	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+		GetLogger: getLogger,
+	})
+	level.Info(in.Logger).Log("Webhook service enabled")
+	return
 }
 
 func provideHandlers() fx.Option {
@@ -313,8 +324,9 @@ func provideHandlers() fx.Option {
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			createAuthAcquirer,
 			provideAuthentication,
+			provideWebhookHandlers,
 		),
-		fx.Invoke(handleWebhooks),
+		fx.Invoke(handleWebhookRoutes),
 	)
 }
 
