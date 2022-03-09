@@ -105,6 +105,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(logger),
 		fx.Supply(v),
+		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		fx.Provide(
