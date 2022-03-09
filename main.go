@@ -32,11 +32,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
 // convenient global values
@@ -87,12 +85,11 @@ var defaults = map[string]interface{}{
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
 
-	v, l, f, err := setup(arguments)
+	v, logger, f, err := setup(arguments)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	logger := gokitLogger(l)
 
 	// This allows us to communicate the version of the binary upon request.
 	if done, parseErr := printVersion(f, arguments); done {
@@ -102,7 +99,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	app := fx.New(
-		arrange.LoggerFunc(l.Sugar().Infof),
+		arrange.LoggerFunc(logger.Sugar().Infof),
 		fx.Supply(logger),
 		fx.Supply(v),
 		arrange.ForViper(v),
@@ -179,7 +176,7 @@ func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeou
 type TracingConfigIn struct {
 	fx.In
 	TracingConfig candlelight.Config
-	Logger        log.Logger
+	Logger        *zap.Logger
 }
 
 func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
@@ -189,7 +186,7 @@ func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
-	level.Info(in.Logger).Log(logging.MessageKey(), "tracing status", "enabled", !tracing.IsNoop())
+	in.Logger.Info("tracing status", zap.Bool("enabled", !tracing.IsNoop()))
 	return tracing, nil
 }
 
@@ -214,10 +211,10 @@ func printVersionInfo(writer io.Writer) {
 	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
 
-func exitIfError(logger log.Logger, err error) {
+func exitIfError(logger *zap.Logger, err error) {
 	if err != nil {
 		if logger != nil {
-			logging.Error(logger, emperror.Context(err)...).Log(logging.ErrorKey(), err.Error())
+			logger.Error("failed to parse arguments", zap.Error(err))
 		}
 		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
 		os.Exit(1)
