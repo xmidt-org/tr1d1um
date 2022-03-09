@@ -245,22 +245,6 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 	return &versionCompatibleAuth, nil
 }
 
-type handleWebhooksIn struct {
-	fx.In
-	V                  viper.Viper
-	WebhookConfigKey   ancla.Config
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
-	Logger             log.Logger
-	MetricsRegistry    xmetrics.Registry
-	Tracing            candlelight.Tracing
-}
-
-type handleWebhooksOut struct {
-	fx.Out
-	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
-	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
-}
-
 type handleWebhookRoutesIn struct {
 	fx.In
 	Logger                log.Logger
@@ -278,7 +262,23 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) {
 
 }
 
-func provideWebhookHandlers(in handleWebhooksIn) (out handleWebhooksOut, err error) {
+type provideWebhookHandlersIn struct {
+	fx.In
+	V                  viper.Viper
+	WebhookConfigKey   ancla.Config
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	Logger             log.Logger
+	MetricsRegistry    xmetrics.Registry
+	Tracing            candlelight.Tracing
+}
+
+type provideWebhookHandlersOut struct {
+	fx.Out
+	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
+}
+
+func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
 	// Webhooks (if not configured, handlers are not set up)
 	if !in.V.IsSet(webhookConfigKey) {
 		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
@@ -316,14 +316,17 @@ func provideWebhookHandlers(in handleWebhooksIn) (out handleWebhooksOut, err err
 
 func provideHandlers() fx.Option {
 	return fx.Options(
+		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
+		arrange.ProvideKey("authHeader", []string{}),
 		fx.Provide(
-			arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
-			arrange.ProvideKey("authHeader", []string{}),
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			createAuthAcquirer,
-			provideAuthentication,
+			fx.Annotated{
+				Name:   "auth_chain",
+				Target: provideAuthentication,
+			},
 			provideWebhookHandlers,
 		),
 		fx.Invoke(handleWebhookRoutes),
@@ -384,13 +387,13 @@ func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 
 func provideServers() fx.Option {
 	return fx.Options(
+		arrange.ProvideKey(reqMaxRetriesKey, 0),
+		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
+		arrange.ProvideKey("previousVersionSupport", true),
+		arrange.ProvideKey("targetURL", ""),
+		arrange.ProvideKey("WRPSource", ""),
+		arrange.ProvideKey(translationServicesKey, []string{}),
 		fx.Provide(
-			arrange.ProvideKey(reqMaxRetriesKey, 0),
-			arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
-			arrange.ProvideKey("previousVersionSupport", true),
-			arrange.ProvideKey("targetURL", ""),
-			arrange.ProvideKey("WRPSource", ""),
-			arrange.ProvideKey(translationServicesKey, []string{}),
 			fx.Annotated{
 				Name:   "reducedLoggingResponseCodes",
 				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
@@ -427,10 +430,9 @@ func provideServers() fx.Option {
 type PrimaryEndpointIn struct {
 	fx.In
 	V                           *viper.Viper
-	Router                      *mux.Router `name:"server_primary"`
-	APIRouter                   *mux.Router `name:"api_router"`
-	APIBase                     string      `name:"api_base"`
-	AuthChain                   alice.Chain `name:"auth_chain"`
+	Router                      *mux.Router  `name:"server_primary"`
+	APIRouter                   *mux.Router  `name:"api_router"`
+	AuthChain                   *alice.Chain `name:"auth_chain"`
 	Tracing                     candlelight.Tracing
 	Logger                      log.Logger
 	StatServiceOptions          *stat.ServiceOptions
