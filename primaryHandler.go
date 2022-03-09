@@ -248,16 +248,16 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 type handleWebhookRoutesIn struct {
 	fx.In
 	Logger                log.Logger
-	APIRouter             *mux.Router `name:"api_router"`
-	Authenticate          *alice.Chain
+	APIRouter             *mux.Router  `name:"api_router"`
+	AuthChain             *alice.Chain `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		in.APIRouter.Handle("/hook", in.Authenticate.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.Authenticate.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
 	}
 
 }
@@ -437,7 +437,6 @@ type PrimaryEndpointIn struct {
 	Logger                      log.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	Authenticate                *alice.Chain
 	Acquirer                    acquire.Acquirer
 	ReducedLoggingResponseCodes []int    `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string `name:"supportedServices"`
@@ -466,14 +465,14 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.Authenticate,
+		Authenticate:                in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.Authenticate,
+		Authenticate:                in.AuthChain,
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
