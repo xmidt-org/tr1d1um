@@ -19,7 +19,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/spf13/pflag"
@@ -47,9 +46,6 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	err = fs.Parse(args)
 	if err != nil {
 		return nil, l, fs, fmt.Errorf("failed to create parse args: %w", err)
-	}
-	if printVersion, _ := fs.GetBool("version"); printVersion {
-		printVersionInfo(os.Stdout)
 	}
 
 	v := viper.New()

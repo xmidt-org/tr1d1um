@@ -102,15 +102,15 @@ func tr1d1um(arguments []string) (exitCode int) {
 	}
 
 	app := fx.New(
-		arrange.ForViper(v),
 		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(logger),
+		fx.Supply(v),
+		arrange.ForViper(v),
+		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
+		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		fx.Provide(
 			gokitLogger,
-			arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-			arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
-
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
 				Target: configureXmidtClientTimeout,
@@ -194,16 +194,24 @@ func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
 }
 
 func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
-	printVer := f.BoolP("version", "v", false, "displays the version number")
 	if err := f.Parse(arguments); err != nil {
 		return true, err
 	}
 
-	if *printVer {
+	if pVersion, _ := f.GetBool("version"); pVersion {
 		printVersionInfo(os.Stdout)
 		return true, nil
 	}
 	return false, nil
+}
+
+func printVersionInfo(writer io.Writer) {
+	fmt.Fprintf(writer, "%s:\n", applicationName)
+	fmt.Fprintf(writer, "  version: \t%s\n", Version)
+	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
+	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
+	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
+	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
 
 func exitIfError(logger log.Logger, err error) {
@@ -214,15 +222,6 @@ func exitIfError(logger log.Logger, err error) {
 		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
 		os.Exit(1)
 	}
-}
-
-func printVersionInfo(writer io.Writer) {
-	fmt.Fprintf(writer, "%s:\n", applicationName)
-	fmt.Fprintf(writer, "  version: \t%s\n", Version)
-	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
-	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
-	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
-	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
 
 func gokitLogger(l *zap.Logger) log.Logger {
