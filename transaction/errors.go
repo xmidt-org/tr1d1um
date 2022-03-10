@@ -80,7 +80,7 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 		logger := getLogger(ctx)
 		if logger != nil && code != http.StatusNotFound {
 			logger.Log("sending non-200 response, non-404 response", level.Key(), level.ErrorValue(),
-				logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string),
+				"error", e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string),
 			)
 		}
 		ee(ctx, e, w)

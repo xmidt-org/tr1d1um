@@ -135,7 +135,7 @@ func Log(logger kitlog.Logger, reducedLoggingResponseCodes []int) kithttp.Server
 		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
 
 		if !transactionLoggerOk {
-			var kvs = []interface{}{logging.MessageKey(), "transaction logger not found in context", "tid", tid}
+			var kvs = []interface{}{"msg", "transaction logger not found in context", "tid", tid}
 			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
 			errorLogger.Log(kvs...)
 			return
@@ -146,7 +146,7 @@ func Log(logger kitlog.Logger, reducedLoggingResponseCodes []int) kithttp.Server
 		if ok {
 			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
 		} else {
-			kvs := []interface{}{logging.ErrorKey(), "Request arrival not capture for transaction logger", "tid", tid}
+			kvs := []interface{}{"error", "Request arrival not capture for transaction logger", "tid", tid}
 			kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
 			errorLogger.Log(kvs...)
 		}
@@ -222,7 +222,7 @@ func Capture(logger kitlog.Logger) kithttp.RequestFunc {
 			source = host
 		}
 
-		logKVs := []interface{}{logging.MessageKey(), "record",
+		logKVs := []interface{}{"msg", "record",
 			"request", Request{
 				Address: source,
 				Path:    r.URL.Path,
