@@ -465,14 +465,14 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 		S:                           ss,
 		APIRouter:                   in.APIRouter,
 		Authenticate:                in.AuthChain,
-		Log:                         gokitLogger(in.Logger),
+		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
 		APIRouter:                   in.APIRouter,
 		Authenticate:                in.AuthChain,
-		Log:                         gokitLogger(in.Logger),
+		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
