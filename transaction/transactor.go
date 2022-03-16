@@ -153,7 +153,6 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid))
 			} else {
 				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid), zap.String("traceID", traceID), zap.String("spanID", spanID))
-
 			}
 		}
 
