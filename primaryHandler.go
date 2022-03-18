@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
@@ -48,7 +47,6 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -244,23 +242,6 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 	return &versionCompatibleAuth, nil
 }
 
-type handleWebhookRoutesIn struct {
-	fx.In
-	Logger                *zap.Logger
-	APIRouter             *mux.Router  `name:"api_router"`
-	AuthChain             *alice.Chain `name:"auth_chain"`
-	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
-	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
-}
-
-func handleWebhookRoutes(in handleWebhookRoutesIn) {
-	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
-	}
-
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
 	V                  viper.Viper
@@ -382,115 +363,4 @@ func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 					in.XmidtHTTPClient.Do),
 			}),
 	}
-}
-
-func provideServers() fx.Option {
-	return fx.Options(
-		arrange.ProvideKey(reqMaxRetriesKey, 0),
-		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
-		arrange.ProvideKey("previousVersionSupport", true),
-		arrange.ProvideKey("targetURL", ""),
-		arrange.ProvideKey("WRPSource", ""),
-		arrange.ProvideKey(translationServicesKey, []string{}),
-		fx.Provide(
-			fx.Annotated{
-				Name:   "reducedLoggingResponseCodes",
-				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
-			},
-			provideStatServiceOptions,
-			provideTranslationOptions,
-			fx.Annotated{
-				Name:   "api_router",
-				Target: provideAPIRouter,
-			},
-		),
-		arrangehttp.Server{
-			Name: "server_primary",
-			Key:  "primary",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_health",
-			Key:  "health",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_pprof",
-			Key:  "pprof",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_metrics",
-			Key:  "metric",
-		}.Provide(),
-		fx.Invoke(
-			handlePrimaryEndpoint,
-		),
-	)
-}
-
-type PrimaryEndpointIn struct {
-	fx.In
-	V                           *viper.Viper
-	Router                      *mux.Router  `name:"server_primary"`
-	APIRouter                   *mux.Router  `name:"api_router"`
-	AuthChain                   *alice.Chain `name:"auth_chain"`
-	Tracing                     candlelight.Tracing
-	Logger                      *zap.Logger
-	StatServiceOptions          *stat.ServiceOptions
-	TranslationOptions          *translation.ServiceOptions
-	Acquirer                    acquire.Acquirer
-	ReducedLoggingResponseCodes []int    `name:"reducedLoggingResponseCodes"`
-	TranslationServices         []string `name:"supportedServices"`
-}
-
-func handlePrimaryEndpoint(in PrimaryEndpointIn) {
-	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(in.Tracing.Propagator()),
-		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
-	}
-
-	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
-		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
-	)
-
-	if in.V.IsSet(authAcquirerKey) {
-		acquirer := in.Acquirer
-		in.TranslationOptions.AuthAcquirer = acquirer
-		in.StatServiceOptions.AuthAcquirer = acquirer
-		in.Logger.Info("Outbound request authentication token acquirer enabled")
-	}
-	ss := stat.NewService(in.StatServiceOptions)
-	ts := translation.NewService(in.TranslationOptions)
-
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
-		Log:                         in.Logger,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
-		Log:                         in.Logger,
-		ValidServices:               in.TranslationServices,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
-}
-
-type APIRouterIn struct {
-	fx.In
-	PrevVerSupport bool `name:"previousVersionSupport"`
-}
-
-func provideAPIRouter(in APIRouterIn) *mux.Router {
-	rootRouter := mux.NewRouter()
-	// if we want to support the previous API version, then include it in the
-	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
-	if in.PrevVerSupport {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
-	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
-	return APIRouter
 }

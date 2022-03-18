@@ -28,6 +28,8 @@ import (
 
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
+	"github.com/xmidt-org/touchstone"
+	"github.com/xmidt-org/touchstone/touchhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -105,6 +107,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		touchhttp.Provide(),
+		touchstone.Provide(),
 		fx.Provide(
 			gokitLogger,
 			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
@@ -121,6 +125,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		),
 		provideServers(),
 		provideHandlers(),
+		provideAuthChain("authx.inbound"),
 	)
 
 	switch err := app.Err(); {
