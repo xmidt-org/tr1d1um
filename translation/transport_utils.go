@@ -26,8 +26,8 @@ import (
 	"net/http"
 
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"go.uber.org/zap"
 
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/webpa-common/v2/device"
@@ -164,10 +164,10 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			if transactionInfoLogger, ok := ctx.Value(transaction.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
-				transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger,
-					"command", wdmp.Command,
-					"parameters", getParamNames(wdmp.Parameters),
+			if transactionInfoLogger, ok := ctx.Value(transaction.ContextKeyTransactionInfoLogger).(*zap.Logger); ok {
+				transactionInfoLogger = transactionInfoLogger.With(
+					zap.Reflect("command", wdmp.Command),
+					zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
 				)
 
 				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionInfoLogger, transactionInfoLogger)

@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
@@ -131,28 +130,28 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(kitlog.Logger)
+		transactionInfoLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionInfoLogger).(*zap.Logger)
 
 		if !transactionLoggerOk {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
 				logger.Error("transaction logger not found in context", zap.String("tid", tid))
 			} else {
-				logger.Error("transaction logger not found in context", zap.String("tid", tid), zap.String("traceID", traceID), zap.String("spanID", spanID))
+				logger.Error("transaction logger not found in context", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
 			}
 			return
 		}
 
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
-		if ok {
-			transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger, "duration", time.Since(requestArrival))
+		if !ok {
+			transactionInfoLogger = transactionInfoLogger.With(zap.Reflect("duration", time.Since(requestArrival)))
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
 				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid))
 			} else {
-				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid), zap.String("traceID", traceID), zap.String("spanID", spanID))
+				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
 			}
 		}
 
@@ -170,7 +169,7 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
 		}
 
-		transactionInfoLogger.Log("response", response)
+		transactionInfoLogger.Info("response", zap.Reflect("response", response))
 	}
 }
 
@@ -242,10 +241,11 @@ func Capture(logger *zap.Logger) kithttp.RequestFunc {
 				Query:   r.URL.RawQuery,
 				Method:  r.Method}),
 				zap.String("tid", tid), zap.String("satClientID", satClientID),
-				zap.String("traceID", traceID), zap.String("spanID", spanID),
+				zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID),
 			)
 		}
-		return nctx
+		transactionInfoLogger, _ := ctx.Value(ContextKeyTransactionInfoLogger).(*zap.Logger)
+		return context.WithValue(nctx, ContextKeyTransactionInfoLogger, transactionInfoLogger)
 	}
 }
 
