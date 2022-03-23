@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/webpa-common/v2/logging"
+	"go.uber.org/zap"
 )
 
 func TestTransactError(t *testing.T) {
@@ -142,14 +142,14 @@ func TestCapture(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
 		r.Header.Set(HeaderWPATID, "tid01")
-		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
+		ctx := Capture(zap.NewNop())(context.TODO(), r)
 		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
 	})
 
 	t.Run("GeneratedTID", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
+		ctx := Capture(zap.NewNop())(context.TODO(), r)
 		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
 	})
 }
