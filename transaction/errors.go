@@ -22,10 +22,9 @@ import (
 	"errors"
 	"net/http"
 
-	kitlog "github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/xmidt-org/webpa-common/v2/logging"
+	"github.com/xmidt-org/sallust"
+	"go.uber.org/zap"
 )
 
 // ErrTr1d1umInternal should be the error shown to external API consumers in Internal Server error cases
@@ -42,7 +41,7 @@ type codedError struct {
 	statusCode int
 }
 
-type GetLoggerFunc func(context.Context) kitlog.Logger
+type GetLoggerFunc func(context.Context) *zap.Logger
 
 func (c *codedError) StatusCode() int {
 	return c.statusCode
@@ -66,7 +65,7 @@ func NewCodedError(e error, code int) CodedError {
 // errors are logged with their corresponding unique request identifier
 func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) kitlog.Logger {
+		getLogger = func(_ context.Context) *zap.Logger {
 			return nil
 		}
 	}
@@ -79,15 +78,14 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 		}
 		logger := getLogger(ctx)
 		if logger != nil && code != http.StatusNotFound {
-			logger.Log("sending non-200 response, non-404 response", level.Key(), level.ErrorValue(),
-				logging.ErrorKey(), e.Error(), "tid", ctx.Value(ContextKeyRequestTID).(string),
+			logger.Info("sending non-200 response, non-404 response", zap.String("error", e.Error()),
+				zap.String("tid", ctx.Value(ContextKeyRequestTID).(string)),
 			)
 		}
 		ee(ctx, e, w)
 	}
 }
 
-func GetLogger(ctx context.Context) kitlog.Logger {
-	logger := kitlog.With(logging.GetLogger(ctx), "ts", kitlog.DefaultTimestampUTC)
-	return logger
+func GetLogger(ctx context.Context) *zap.Logger {
+	return sallust.Get(ctx)
 }

@@ -27,15 +27,12 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
@@ -50,9 +47,9 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -126,7 +123,7 @@ func createAuthAcquirer(in createAuthAcquirerIn) (acquire.Acquirer, error) {
 
 type provideAuthenticationIn struct {
 	fx.In
-	Logger          log.Logger
+	Logger          *zap.Logger
 	Registry        xmetrics.Registry
 	AuthHeader      []string `name:"authHeader"`
 	JWTVal          JWTValidator
@@ -149,17 +146,17 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 	for _, a := range in.AuthHeader {
 		decoded, err := base64.StdEncoding.DecodeString(a)
 		if err != nil {
-			logging.Info(in.Logger).Log(logging.MessageKey(), "failed to decode auth header", "authHeader", a, logging.ErrorKey(), err.Error())
+			in.Logger.Info("failed to decode auth header", zap.String("authHeader", a), zap.Error(err))
 			continue
 		}
 
 		i := bytes.IndexByte(decoded, ':')
-		logging.Debug(in.Logger).Log(logging.MessageKey(), "decoded string", "string", decoded, "i", i)
+		in.Logger.Debug("decoded string", zap.Reflect("string", decoded), zap.Int("i", i))
 		if i > 0 {
 			basicAllowed[string(decoded[:i])] = string(decoded[i+1:])
 		}
 	}
-	logging.Debug(in.Logger).Log(logging.MessageKey(), "Created list of allowed basic auths", "allowed", basicAllowed, "config", in.AuthHeader)
+	in.Logger.Debug("Created list of allowed basic auths", zap.Reflect("allowed", basicAllowed), zap.Reflect("config", in.AuthHeader))
 
 	options := []basculehttp.COption{
 		basculehttp.WithCLogger(getLogger),
@@ -207,7 +204,7 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 		for _, e := range in.CapabilityCheck.EndpointBuckets {
 			r, err := regexp.Compile(e)
 			if err != nil {
-				logging.Error(in.Logger).Log(logging.MessageKey(), "failed to compile regular expression", "regex", e, logging.ErrorKey(), err.Error())
+				in.Logger.Error("failed to compile regular expression", zap.String("regex", e), zap.Error(err))
 				continue
 			}
 			endpoints = append(endpoints, r)
@@ -229,8 +226,8 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
 	)
 
-	authChain := alice.New(setLogger(in.Logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	authChainLegacy := alice.New(setLogger(in.Logger), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	authChain := alice.New(setLogger(gokitLogger(in.Logger)), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
+	authChainLegacy := alice.New(setLogger(gokitLogger(in.Logger)), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
 	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
@@ -246,29 +243,12 @@ func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
 	return &versionCompatibleAuth, nil
 }
 
-type handleWebhookRoutesIn struct {
-	fx.In
-	Logger                log.Logger
-	APIRouter             *mux.Router  `name:"api_router"`
-	AuthChain             *alice.Chain `name:"auth_chain"`
-	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
-	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
-}
-
-func handleWebhookRoutes(in handleWebhookRoutesIn) {
-	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
-	}
-
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
 	V                  viper.Viper
 	WebhookConfigKey   ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
-	Logger             log.Logger
+	Logger             *zap.Logger
 	MetricsRegistry    xmetrics.Registry
 	Tracing            candlelight.Tracing
 }
@@ -282,12 +262,12 @@ type provideWebhookHandlersOut struct {
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
 	// Webhooks (if not configured, handlers are not set up)
 	if !in.V.IsSet(webhookConfigKey) {
-		level.Info(in.Logger).Log(logging.MessageKey(), "Webhook service disabled")
+		in.Logger.Info("Webhook service disabled")
 		return
 	}
 	webhookConfig := in.WebhookConfigKey
 
-	webhookConfig.Logger = in.Logger
+	webhookConfig.Logger = gokitLogger(in.Logger)
 	webhookConfig.MetricsProvider = in.MetricsRegistry
 	webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
@@ -311,7 +291,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
 		GetLogger: getLogger,
 	})
-	level.Info(in.Logger).Log("Webhook service enabled")
+	in.Logger.Info("Webhook service enabled")
 	return
 }
 
@@ -336,7 +316,7 @@ func provideHandlers() fx.Option {
 
 type ServiceConfigIn struct {
 	fx.In
-	Logger               log.Logger
+	Logger               *zap.Logger
 	XmidtHTTPClient      *http.Client
 	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
 	RequestMaxRetries    int               `name:"requestMaxRetries"`
@@ -354,7 +334,7 @@ func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
 			&transaction.Options{
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   in.Logger,
+						Logger:   gokitLogger(in.Logger),
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},
@@ -377,122 +357,11 @@ func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   in.Logger,
+						Logger:   gokitLogger(in.Logger),
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},
 					in.XmidtHTTPClient.Do),
 			}),
 	}
-}
-
-func provideServers() fx.Option {
-	return fx.Options(
-		arrange.ProvideKey(reqMaxRetriesKey, 0),
-		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
-		arrange.ProvideKey("previousVersionSupport", true),
-		arrange.ProvideKey("targetURL", ""),
-		arrange.ProvideKey("WRPSource", ""),
-		arrange.ProvideKey(translationServicesKey, []string{}),
-		fx.Provide(
-			fx.Annotated{
-				Name:   "reducedLoggingResponseCodes",
-				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
-			},
-			provideStatServiceOptions,
-			provideTranslationOptions,
-			fx.Annotated{
-				Name:   "api_router",
-				Target: provideAPIRouter,
-			},
-		),
-		arrangehttp.Server{
-			Name: "server_primary",
-			Key:  "primary",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_health",
-			Key:  "health",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_pprof",
-			Key:  "pprof",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_metrics",
-			Key:  "metric",
-		}.Provide(),
-		fx.Invoke(
-			handlePrimaryEndpoint,
-		),
-	)
-}
-
-type PrimaryEndpointIn struct {
-	fx.In
-	V                           *viper.Viper
-	Router                      *mux.Router  `name:"server_primary"`
-	APIRouter                   *mux.Router  `name:"api_router"`
-	AuthChain                   *alice.Chain `name:"auth_chain"`
-	Tracing                     candlelight.Tracing
-	Logger                      log.Logger
-	StatServiceOptions          *stat.ServiceOptions
-	TranslationOptions          *translation.ServiceOptions
-	Acquirer                    acquire.Acquirer
-	ReducedLoggingResponseCodes []int    `name:"reducedLoggingResponseCodes"`
-	TranslationServices         []string `name:"supportedServices"`
-}
-
-func handlePrimaryEndpoint(in PrimaryEndpointIn) {
-	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(in.Tracing.Propagator()),
-		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
-	}
-
-	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
-		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
-	)
-
-	if in.V.IsSet(authAcquirerKey) {
-		acquirer := in.Acquirer
-		in.TranslationOptions.AuthAcquirer = acquirer
-		in.StatServiceOptions.AuthAcquirer = acquirer
-		level.Info(in.Logger).Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
-	}
-	ss := stat.NewService(in.StatServiceOptions)
-	ts := translation.NewService(in.TranslationOptions)
-
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
-		Log:                         in.Logger,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
-		Log:                         in.Logger,
-		ValidServices:               in.TranslationServices,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
-}
-
-type APIRouterIn struct {
-	fx.In
-	PrevVerSupport bool `name:"previousVersionSupport"`
-}
-
-func provideAPIRouter(in APIRouterIn) *mux.Router {
-	rootRouter := mux.NewRouter()
-	// if we want to support the previous API version, then include it in the
-	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
-	if in.PrevVerSupport {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
-	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
-	return APIRouter
 }

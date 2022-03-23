@@ -26,11 +26,11 @@ import (
 	"net/http"
 	"strings"
 
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tr1d1um/transaction"
@@ -52,7 +52,7 @@ type Options struct {
 	APIRouter *mux.Router
 
 	Authenticate                *alice.Chain
-	Log                         kitlog.Logger
+	Log                         *zap.Logger
 	ValidServices               []string
 	ReducedLoggingResponseCodes []int
 }
