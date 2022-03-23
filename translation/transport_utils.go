@@ -164,13 +164,13 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			if transactionInfoLogger, ok := ctx.Value(transaction.ContextKeyTransactionInfoLogger).(*zap.Logger); ok {
-				transactionInfoLogger = transactionInfoLogger.With(
+			if transactionLogger, ok := ctx.Value(transaction.ContextKeyTransactionLogger).(*zap.Logger); ok {
+				transactionLogger = transactionLogger.With(
 					zap.Reflect("command", wdmp.Command),
 					zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
 				)
 
-				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionInfoLogger, transactionInfoLogger)
+				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionLogger, transactionLogger)
 			}
 		}
 	}

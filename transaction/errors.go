@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 )
 
@@ -86,5 +87,5 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 }
 
 func GetLogger(ctx context.Context) *zap.Logger {
-	return ctx.Value(1).(*zap.Logger)
+	return sallust.Get(ctx)
 }
