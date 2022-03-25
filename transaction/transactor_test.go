@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/candlelight"
 	"go.uber.org/zap"
 )
 
@@ -141,7 +142,7 @@ func TestCapture(t *testing.T) {
 	t.Run("GivenTID", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		r.Header.Set(HeaderWPATID, "tid01")
+		r.Header.Set(candlelight.HeaderWPATIDKeyName, "tid01")
 		ctx := Capture(zap.NewNop())(context.TODO(), r)
 		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
 	})

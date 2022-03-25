@@ -33,6 +33,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
@@ -173,7 +174,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
@@ -208,7 +209,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
 
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {

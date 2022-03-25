@@ -19,8 +19,6 @@ package transaction
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net"
@@ -33,9 +31,6 @@ import (
 	"github.com/xmidt-org/candlelight"
 	"go.uber.org/zap"
 )
-
-// HeaderWPATID is the header key for the WebPA transaction UUID
-const HeaderWPATID = "X-WebPA-Transaction-Id"
 
 // XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
 // the XMiDT API
@@ -204,8 +199,8 @@ func Capture(logger *zap.Logger) kithttp.RequestFunc {
 	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
 		var tid string
 
-		if tid = r.Header.Get(HeaderWPATID); tid == "" {
-			tid = GenTID()
+		if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
+			tid = candlelight.GenTID()
 		}
 
 		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
@@ -244,15 +239,4 @@ func Capture(logger *zap.Logger) kithttp.RequestFunc {
 		}
 		return context.WithValue(nctx, ContextKeyTransactionLogger, transactionLogger)
 	}
-}
-
-// GenTID generates a 16-byte long string
-// it returns "N/A" in the extreme case the random string could not be generated
-func GenTID() (tid string) {
-	buf := make([]byte, 16)
-	tid = "N/A"
-	if _, err := rand.Read(buf); err == nil {
-		tid = base64.RawURLEncoding.EncodeToString(buf)
-	}
-	return
 }

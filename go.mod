@@ -14,10 +14,10 @@ require (
 	github.com/xmidt-org/ancla v0.3.5
 	github.com/xmidt-org/arrange v0.3.0
 	github.com/xmidt-org/bascule v0.10.2
-	github.com/xmidt-org/candlelight v0.0.5
+	github.com/xmidt-org/candlelight v0.0.8
 	github.com/xmidt-org/sallust v0.1.5
 	github.com/xmidt-org/touchstone v0.0.3
-	github.com/xmidt-org/webpa-common/v2 v2.0.1
+	github.com/xmidt-org/webpa-common/v2 v2.0.4
 	github.com/xmidt-org/wrp-go/v3 v3.0.1
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.19.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.19.0
