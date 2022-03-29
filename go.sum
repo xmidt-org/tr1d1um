@@ -726,6 +726,8 @@ github.com/xmidt-org/bascule v0.10.2/go.mod h1:8Mx4EW1AXTWnvh2rDl+/GYPLH4QSJIuPB
 github.com/xmidt-org/candlelight v0.0.5/go.mod h1:j9Q2tzrOAywm+JvvVJjlOmlPJvdlRrOyFjLz33SaU1Y=
 github.com/xmidt-org/candlelight v0.0.8 h1:mMHEvLEGpS+bC28RNzUczxh86dvG3sabRrX+DogVWas=
 github.com/xmidt-org/candlelight v0.0.8/go.mod h1:hIGM1g5ksy5/X1+JAVrETFysdtYGA1f0abrb+hBmFdE=
+github.com/xmidt-org/candlelight v0.0.9 h1:FXYDnPtkuJzaRgK1jprdOJmWADMeln6/s764FaJfN2I=
+github.com/xmidt-org/candlelight v0.0.9/go.mod h1:hIGM1g5ksy5/X1+JAVrETFysdtYGA1f0abrb+hBmFdE=
 github.com/xmidt-org/httpaux v0.1.2/go.mod h1:qZnH2uObGPwHnOz8HcPNlbcd3gKEvdmxbIK3rgbQhto=
 github.com/xmidt-org/httpaux v0.2.1 h1:SFK+Bab5c6r70VxMfJcDR49aBHIUs0uQJruC+nMpAcg=
 github.com/xmidt-org/httpaux v0.2.1/go.mod h1:mviIlg5fHGb3lAv3l0sbiwVG/q9rqvXaudEYxVrzXdE=
