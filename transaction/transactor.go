@@ -21,13 +21,11 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
 	"go.uber.org/zap"
 )
@@ -195,48 +193,16 @@ func Welcome(delegate http.Handler) http.Handler {
 // Capture (for lack of a better name) captures context values of interest
 // from the incoming request. Unlike Welcome, values captured here are
 // intended to be used only throughout the gokit server flow: (request decoding, business logic, response encoding)
-func Capture(logger *zap.Logger) kithttp.RequestFunc {
-	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
-		var tid string
+// func Capture(logger *zap.Logger) kithttp.RequestFunc {
+// 	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
+// 		var tid string
 
-		if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
-			tid = candlelight.GenTID()
-		}
+// 		if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
+// 			tid = candlelight.GenTID()
+// 		}
 
-		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
+// 		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
 
-		var satClientID = "N/A"
-
-		// retrieve satClientID from request context
-		if auth, ok := bascule.FromContext(r.Context()); ok {
-			satClientID = auth.Token.Principal()
-		}
-
-		var source string
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			source = r.RemoteAddr
-		} else {
-			source = host
-		}
-
-		transactionLogger := logger.With(
-			zap.Reflect("request", Request{
-				Address: source,
-				Path:    r.URL.Path,
-				Query:   r.URL.RawQuery,
-				Method:  r.Method},
-			),
-			zap.String("tid", tid),
-			zap.String("satClientID", satClientID),
-		)
-		traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
-		if ok {
-			transactionLogger = transactionLogger.With(
-				zap.String(candlelight.TraceIdLogKeyName, traceID),
-				zap.String(candlelight.SpanIDLogKeyName, spanID),
-			)
-		}
-		return context.WithValue(nctx, ContextKeyTransactionLogger, transactionLogger)
-	}
-}
+// 		return context.WithValue(nctx, ContextKeyTransactionLogger, logger)
+// 	}
+// }

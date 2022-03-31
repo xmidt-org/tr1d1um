@@ -61,7 +61,7 @@ type Options struct {
 // ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(transaction.Capture(c.Log), captureWDMPParameters),
+		kithttp.ServerBefore(captureWDMPParameters),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Log(c.Log, c.ReducedLoggingResponseCodes)),
 	}

@@ -49,7 +49,6 @@ type Options struct {
 // That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(transaction.Capture(c.Log)),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Log(c.Log, c.ReducedLoggingResponseCodes)),
 	}

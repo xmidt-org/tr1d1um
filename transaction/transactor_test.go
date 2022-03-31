@@ -19,7 +19,6 @@ package transaction
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -27,8 +26,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/candlelight"
-	"go.uber.org/zap"
 )
 
 func TestTransactError(t *testing.T) {
@@ -136,21 +133,4 @@ func TestWelcome(t *testing.T) {
 	decorated := Welcome(handler)
 	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
 	decorated.ServeHTTP(nil, req)
-}
-
-func TestCapture(t *testing.T) {
-	t.Run("GivenTID", func(t *testing.T) {
-		assert := assert.New(t)
-		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		r.Header.Set(candlelight.HeaderWPATIDKeyName, "tid01")
-		ctx := Capture(zap.NewNop())(context.TODO(), r)
-		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
-	})
-
-	t.Run("GeneratedTID", func(t *testing.T) {
-		assert := assert.New(t)
-		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		ctx := Capture(zap.NewNop())(context.TODO(), r)
-		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
-	})
 }
