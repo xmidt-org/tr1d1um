@@ -189,20 +189,3 @@ func Welcome(delegate http.Handler) http.Handler {
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
-
-// Capture (for lack of a better name) captures context values of interest
-// from the incoming request. Unlike Welcome, values captured here are
-// intended to be used only throughout the gokit server flow: (request decoding, business logic, response encoding)
-// func Capture(logger *zap.Logger) kithttp.RequestFunc {
-// 	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
-// 		var tid string
-
-// 		if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
-// 			tid = candlelight.GenTID()
-// 		}
-
-// 		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
-
-// 		return context.WithValue(nctx, ContextKeyTransactionLogger, logger)
-// 	}
-// }
