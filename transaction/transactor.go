@@ -123,28 +123,17 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-		transactionLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionLogger).(*zap.Logger)
-
-		if !transactionLoggerOk {
-			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
-			if !ok {
-				logger.Error("transaction logger not found in context", zap.String("tid", tid))
-			} else {
-				logger.Error("transaction logger not found in context", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
-			}
-			return
-		}
 
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
 		if !ok {
-			transactionLogger = transactionLogger.With(zap.Reflect("duration", time.Since(requestArrival)))
+			logger = logger.With(zap.Reflect("duration", time.Since(requestArrival)))
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
-				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid))
+				logger.Error("Request arrival not capture for logger", zap.String("tid", tid))
 			} else {
-				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
+				logger.Error("Request arrival not capture for logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
 			}
 		}
 
@@ -162,7 +151,7 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
 		}
 
-		transactionLogger.Info("response", zap.Reflect("response", response))
+		logger.Info("response", zap.Reflect("response", response))
 	}
 }
 
