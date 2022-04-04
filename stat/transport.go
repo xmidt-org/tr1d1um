@@ -23,6 +23,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"go.uber.org/zap"
 
@@ -48,7 +49,6 @@ type Options struct {
 // That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(transaction.Capture(c.Log)),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Log(c.Log, c.ReducedLoggingResponseCodes)),
 	}
@@ -80,7 +80,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		// if ce, ok := err.(transaction.CodedError); ok {
@@ -108,7 +108,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		w.Header().Del("Content-Type")
 	}
 
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)
