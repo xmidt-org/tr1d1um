@@ -181,7 +181,7 @@ func provideHandlers() fx.Option {
 type ServiceConfigIn struct {
 	fx.In
 	Logger               *zap.Logger
-	XmidtHTTPClient      *http.Client
+	XmidtHTTPClient      *http.Client      `name:"xmidt_http_client"`
 	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
 	RequestMaxRetries    int               `name:"requestMaxRetries"`
 	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`

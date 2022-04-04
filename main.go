@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
@@ -233,14 +234,23 @@ func gokitLogger(l *zap.Logger) log.Logger {
 	}
 }
 
-type ConstOut struct {
-	fx.Out
-	DefaultKeyID string `name:"default_key_id"`
+type ConstIn struct {
+	fx.In
+	Hct     httpClientTimeout `name:"xmidt_client_timeout"`
+	Tracing candlelight.Tracing
 }
 
-func consts() ConstOut {
+type ConstOut struct {
+	fx.Out
+	DefaultKeyID    string       `name:"default_key_id"`
+	XmidtHTTPClient *http.Client `name:"xmidt_http_client"`
+}
+
+func consts(in ConstIn) ConstOut {
+	xhttpc := newHTTPClient(in.Hct, in.Tracing)
 	return ConstOut{
-		DefaultKeyID: DefaultKeyID,
+		DefaultKeyID:    DefaultKeyID,
+		XmidtHTTPClient: xhttpc,
 	}
 }
 
