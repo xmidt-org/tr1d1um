@@ -243,7 +243,7 @@ authHeader: ["dXNlcjpwYXNz"]
 
 # jwtValidator provides Bearer auth configuration
 jwtValidator:
-  keys:
+  key:
     factory:
       uri: "http://localhost:6500/keys/development"
     purpose: 0
