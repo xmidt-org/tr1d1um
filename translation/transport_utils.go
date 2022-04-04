@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"go.uber.org/zap"
 
@@ -156,22 +157,22 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 
 func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
 	nctx = ctx
+	logger := sallust.Get(ctx)
 
 	if r.Method == http.MethodPatch {
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		r.Body.Close()
 
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+		if e == nil {
 
-		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			if transactionLogger, ok := ctx.Value(transaction.ContextKeyTransactionLogger).(*zap.Logger); ok {
-				transactionLogger = transactionLogger.With(
-					zap.Reflect("command", wdmp.Command),
-					zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
-				)
+			logger = logger.With(
+				zap.Reflect("command", wdmp.Command),
+				zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
+			)
 
-				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionLogger, transactionLogger)
-			}
+			nctx = sallust.With(ctx, logger)
 		}
 	}
 

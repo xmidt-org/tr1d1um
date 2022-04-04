@@ -19,23 +19,16 @@ package transaction
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
 	"go.uber.org/zap"
 )
-
-// HeaderWPATID is the header key for the WebPA transaction UUID
-const HeaderWPATID = "X-WebPA-Transaction-Id"
 
 // XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
 // the XMiDT API
@@ -130,28 +123,17 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-		transactionLogger, transactionLoggerOk := ctx.Value(ContextKeyTransactionLogger).(*zap.Logger)
-
-		if !transactionLoggerOk {
-			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
-			if !ok {
-				logger.Error("transaction logger not found in context", zap.String("tid", tid))
-			} else {
-				logger.Error("transaction logger not found in context", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
-			}
-			return
-		}
 
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
 		if !ok {
-			transactionLogger = transactionLogger.With(zap.Reflect("duration", time.Since(requestArrival)))
+			logger = logger.With(zap.Reflect("duration", time.Since(requestArrival)))
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
-				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid))
+				logger.Error("Request arrival not capture for logger", zap.String("tid", tid))
 			} else {
-				logger.Error("Request arrival not capture for transaction logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
+				logger.Error("Request arrival not capture for logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
 			}
 		}
 
@@ -169,7 +151,7 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
 		}
 
-		transactionLogger.Info("response", zap.Reflect("response", response))
+		logger.Info("response", zap.Reflect("response", response))
 	}
 }
 
@@ -195,64 +177,4 @@ func Welcome(delegate http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
-}
-
-// Capture (for lack of a better name) captures context values of interest
-// from the incoming request. Unlike Welcome, values captured here are
-// intended to be used only throughout the gokit server flow: (request decoding, business logic, response encoding)
-func Capture(logger *zap.Logger) kithttp.RequestFunc {
-	return func(ctx context.Context, r *http.Request) (nctx context.Context) {
-		var tid string
-
-		if tid = r.Header.Get(HeaderWPATID); tid == "" {
-			tid = GenTID()
-		}
-
-		nctx = context.WithValue(ctx, ContextKeyRequestTID, tid)
-
-		var satClientID = "N/A"
-
-		// retrieve satClientID from request context
-		if auth, ok := bascule.FromContext(r.Context()); ok {
-			satClientID = auth.Token.Principal()
-		}
-
-		var source string
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			source = r.RemoteAddr
-		} else {
-			source = host
-		}
-
-		transactionLogger := logger.With(
-			zap.Reflect("request", Request{
-				Address: source,
-				Path:    r.URL.Path,
-				Query:   r.URL.RawQuery,
-				Method:  r.Method},
-			),
-			zap.String("tid", tid),
-			zap.String("satClientID", satClientID),
-		)
-		traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
-		if ok {
-			transactionLogger = transactionLogger.With(
-				zap.String(candlelight.TraceIdLogKeyName, traceID),
-				zap.String(candlelight.SpanIDLogKeyName, spanID),
-			)
-		}
-		return context.WithValue(nctx, ContextKeyTransactionLogger, transactionLogger)
-	}
-}
-
-// GenTID generates a 16-byte long string
-// it returns "N/A" in the extreme case the random string could not be generated
-func GenTID() (tid string) {
-	buf := make([]byte, 16)
-	tid = "N/A"
-	if _, err := rand.Read(buf); err == nil {
-		tid = base64.RawURLEncoding.EncodeToString(buf)
-	}
-	return
 }
