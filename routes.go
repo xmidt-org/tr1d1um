@@ -40,9 +40,9 @@ import (
 type PrimaryEndpointIn struct {
 	fx.In
 	V                           *viper.Viper
-	Router                      *mux.Router  `name:"server_primary"`
-	APIRouter                   *mux.Router  `name:"api_router"`
-	AuthChain                   *alice.Chain `name:"auth_chain"`
+	Router                      *mux.Router `name:"server_primary"`
+	APIRouter                   *mux.Router `name:"api_router"`
+	AuthChain                   alice.Chain `name:"auth_chain"`
 	Tracing                     candlelight.Tracing
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
@@ -56,7 +56,7 @@ type handleWebhookRoutesIn struct {
 	fx.In
 	Logger                *zap.Logger
 	APIRouter             *mux.Router  `name:"api_router"`
-	AuthChain             *alice.Chain `name:"auth_chain"`
+	AuthChain             alice.Chain  `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
@@ -154,14 +154,14 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
+		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
+		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,

@@ -18,32 +18,22 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"regexp"
 	"time"
 
-	"github.com/goph/emperror"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
-	bchecks "github.com/xmidt-org/bascule/basculechecks"
-	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
-	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
@@ -121,127 +111,6 @@ func createAuthAcquirer(in createAuthAcquirerIn) (acquire.Acquirer, error) {
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-type provideAuthenticationIn struct {
-	fx.In
-	Logger          *zap.Logger
-	Registry        xmetrics.Registry
-	AuthHeader      []string `name:"authHeader"`
-	JWTVal          JWTValidator
-	CapabilityCheck CapabilityConfig
-}
-
-// authenticationHandler configures the authorization requirements for requests to reach the main handler
-//nolint:funlen
-func provideAuthentication(in provideAuthenticationIn) (*alice.Chain, error) {
-	if in.Registry == nil {
-		return nil, errors.New("nil registry")
-	}
-
-	basculeMeasures := basculemetrics.NewAuthValidationMeasures(in.Registry)
-	capabilityCheckMeasures := basculechecks.NewAuthCapabilityCheckMeasures(in.Registry)
-	listener := basculemetrics.NewMetricListener(basculeMeasures)
-
-	basicAllowed := make(map[string]string)
-	for _, a := range in.AuthHeader {
-		decoded, err := base64.StdEncoding.DecodeString(a)
-		if err != nil {
-			in.Logger.Info("failed to decode auth header", zap.String("authHeader", a), zap.Error(err))
-			continue
-		}
-
-		i := bytes.IndexByte(decoded, ':')
-		in.Logger.Debug("decoded string", zap.Reflect("string", decoded), zap.Int("i", i))
-		if i > 0 {
-			basicAllowed[string(decoded[:i])] = string(decoded[i+1:])
-		}
-	}
-	in.Logger.Debug("Created list of allowed basic auths", zap.Reflect("allowed", basicAllowed), zap.Reflect("config", in.AuthHeader))
-
-	options := []basculehttp.COption{
-		basculehttp.WithCLogger(getLogger),
-		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
-	}
-	if len(basicAllowed) > 0 {
-		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
-	}
-
-	if in.JWTVal.Keys.URI != "" {
-		resolver, err := in.JWTVal.Keys.NewResolver()
-		if err != nil {
-			return &alice.Chain{}, emperror.With(err, "failed to create resolver")
-		}
-
-		options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
-			DefaultKeyID: DefaultKeyID,
-			Resolver:     resolver,
-			Parser:       bascule.DefaultJWTParser,
-			Leeway:       in.JWTVal.Leeway,
-		}))
-	}
-
-	authConstructor := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
-	}, options...)...)
-	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/api/"+prevAPIVersion+"/", basculehttp.DefaultParseURLFunc)),
-		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
-	}, options...)...)
-
-	bearerRules := bascule.Validators{
-		bchecks.NonEmptyPrincipal(),
-		bchecks.NonEmptyType(),
-		bchecks.ValidType([]string{"jwt"}),
-	}
-
-	// only add capability check if the configuration is set
-	if in.CapabilityCheck.Type == "enforce" || in.CapabilityCheck.Type == "monitor" {
-		var endpoints []*regexp.Regexp
-		c, err := basculechecks.NewEndpointRegexCheck(in.CapabilityCheck.Prefix, in.CapabilityCheck.AcceptAllMethod)
-		if err != nil {
-			return nil, emperror.With(err, "failed to create capability check")
-		}
-		for _, e := range in.CapabilityCheck.EndpointBuckets {
-			r, err := regexp.Compile(e)
-			if err != nil {
-				in.Logger.Error("failed to compile regular expression", zap.String("regex", e), zap.Error(err))
-				continue
-			}
-			endpoints = append(endpoints, r)
-		}
-		m := basculechecks.MetricValidator{
-			C:         basculechecks.CapabilitiesValidator{Checker: c},
-			Measures:  capabilityCheckMeasures,
-			Endpoints: endpoints,
-		}
-		bearerRules = append(bearerRules, m.CreateValidator(in.CapabilityCheck.Type == "enforce"))
-	}
-
-	authEnforcer := basculehttp.NewEnforcer(
-		basculehttp.WithELogger(getLogger),
-		basculehttp.WithRules("Basic", bascule.Validators{
-			bchecks.AllowAll(),
-		}),
-		basculehttp.WithRules("Bearer", bearerRules),
-		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
-	)
-
-	authChain := alice.New(setLogger(gokitLogger(in.Logger)), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	authChainLegacy := alice.New(setLogger(gokitLogger(in.Logger)), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
-			vars := mux.Vars(req)
-			if vars != nil {
-				if vars["version"] == prevAPIVersion {
-					authChainLegacy.Then(next).ServeHTTP(r, req)
-					return
-				}
-			}
-			authChain.Then(next).ServeHTTP(r, req)
-		})
-	})
-	return &versionCompatibleAuth, nil
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
 	V                  viper.Viper
@@ -303,10 +172,6 @@ func provideHandlers() fx.Option {
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			createAuthAcquirer,
-			fx.Annotated{
-				Name:   "auth_chain",
-				Target: provideAuthentication,
-			},
 			provideWebhookHandlers,
 		),
 		fx.Invoke(handleWebhookRoutes),
@@ -322,6 +187,7 @@ type ServiceConfigIn struct {
 	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
 	TargetURL            string            `name:"targetURL"`
 	WRPSource            string            `name:"WRPSource"`
+	Tracing              candlelight.Tracing
 }
 
 func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {

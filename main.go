@@ -110,6 +110,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		touchhttp.Provide(),
 		touchstone.Provide(),
 		fx.Provide(
+			consts,
 			gokitLogger,
 			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
 			fx.Annotated{
@@ -125,7 +126,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		),
 		provideServers(),
 		provideHandlers(),
-		provideAuthChain("authx.inbound"),
+		provideAuthChain("jwtValidator"),
 	)
 
 	switch err := app.Err(); {
@@ -229,6 +230,17 @@ func exitIfError(logger *zap.Logger, err error) {
 func gokitLogger(l *zap.Logger) log.Logger {
 	return sallustkit.Logger{
 		Zap: l,
+	}
+}
+
+type ConstOut struct {
+	fx.Out
+	DefaultKeyID string `name:"default_key_id"`
+}
+
+func consts() ConstOut {
+	return ConstOut{
+		DefaultKeyID: DefaultKeyID,
 	}
 }
 
