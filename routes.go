@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
-	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
@@ -47,9 +46,9 @@ type PrimaryEndpointIn struct {
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	Acquirer                    acquire.Acquirer
-	ReducedLoggingResponseCodes []int    `name:"reducedLoggingResponseCodes"`
-	TranslationServices         []string `name:"supportedServices"`
+	AuthAcquirer                authAcquirerConfig `name:"authAcquirer"`
+	ReducedLoggingResponseCodes []int              `name:"reducedLoggingResponseCodes"`
+	TranslationServices         []string           `name:"supportedServices"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -142,10 +141,14 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	)
 
 	if in.V.IsSet(authAcquirerKey) {
-		acquirer := in.Acquirer
-		in.TranslationOptions.AuthAcquirer = acquirer
-		in.StatServiceOptions.AuthAcquirer = acquirer
-		in.Logger.Info("Outbound request authentication token acquirer enabled")
+		acquirer, err := createAuthAcquirer(in.AuthAcquirer)
+		if err != nil {
+			in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
+		} else {
+			in.TranslationOptions.AuthAcquirer = acquirer
+			in.StatServiceOptions.AuthAcquirer = acquirer
+			in.Logger.Info("Outbound request authentication token acquirer enabled")
+		}
 	}
 	ss := stat.NewService(in.StatServiceOptions)
 	ts := translation.NewService(in.TranslationOptions)

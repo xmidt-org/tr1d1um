@@ -94,18 +94,13 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
-type createAuthAcquirerIn struct {
-	fx.In
-	AuthAcquirer authAcquirerConfig `name:"authAcquirer"`
-}
-
-func createAuthAcquirer(in createAuthAcquirerIn) (acquire.Acquirer, error) {
-	if in.AuthAcquirer.JWT.AuthURL != "" && in.AuthAcquirer.JWT.Buffer != 0 && in.AuthAcquirer.JWT.Timeout != 0 {
-		return acquire.NewRemoteBearerTokenAcquirer(in.AuthAcquirer.JWT)
+func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
+	if config.JWT.AuthURL != "" && config.JWT.Buffer != 0 && config.JWT.Timeout != 0 {
+		return acquire.NewRemoteBearerTokenAcquirer(config.JWT)
 	}
 
-	if in.AuthAcquirer.Basic != "" {
-		return acquire.NewFixedAuthAcquirer(in.AuthAcquirer.Basic)
+	if config.Basic != "" {
+		return acquire.NewFixedAuthAcquirer(config.Basic)
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
@@ -113,7 +108,7 @@ func createAuthAcquirer(in createAuthAcquirerIn) (acquire.Acquirer, error) {
 
 type provideWebhookHandlersIn struct {
 	fx.In
-	V                  viper.Viper
+	V                  *viper.Viper
 	WebhookConfigKey   ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
@@ -171,7 +166,6 @@ func provideHandlers() fx.Option {
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
-			createAuthAcquirer,
 			provideWebhookHandlers,
 		),
 		fx.Invoke(handleWebhookRoutes),
