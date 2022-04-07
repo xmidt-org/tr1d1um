@@ -36,7 +36,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
-	"github.com/xmidt-org/webpa-common/v2/xmetrics"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -112,7 +111,7 @@ type provideWebhookHandlersIn struct {
 	WebhookConfigKey   ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
-	MetricsRegistry    xmetrics.Registry
+	Measures           ancla.Measures
 	Tracing            candlelight.Tracing
 }
 
@@ -131,7 +130,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	webhookConfig := in.WebhookConfigKey
 
 	webhookConfig.Logger = gokitLogger(in.Logger)
-	webhookConfig.MetricsProvider = in.MetricsRegistry
+	webhookConfig.Measures = in.Measures
 	webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
 	svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
@@ -145,7 +144,6 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	}
 
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		MetricsProvider:   in.MetricsRegistry,
 		V:                 builtValidators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         getLogger,

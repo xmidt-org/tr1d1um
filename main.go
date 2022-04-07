@@ -27,6 +27,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
 	"github.com/xmidt-org/touchstone"
@@ -110,6 +111,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		touchhttp.Provide(),
 		touchstone.Provide(),
+		ancla.ProvideMetrics(),
 		fx.Provide(
 			consts,
 			gokitLogger,
