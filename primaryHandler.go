@@ -111,7 +111,8 @@ type provideWebhookHandlersIn struct {
 	WebhookConfigKey   ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
-	Measures           ancla.Measures
+	Measures           *ancla.Measures
+	MeasuresIn         ancla.MeasuresIn
 	Tracing            candlelight.Tracing
 }
 
@@ -130,7 +131,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	webhookConfig := in.WebhookConfigKey
 
 	webhookConfig.Logger = gokitLogger(in.Logger)
-	webhookConfig.Measures = in.Measures
+	webhookConfig.Measures = *in.Measures
 	webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
 	svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
