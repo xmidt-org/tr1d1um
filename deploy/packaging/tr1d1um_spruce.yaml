@@ -1,5 +1,12 @@
 ---
 
+logging:
+  level: debug
+  development: true
+  encoderConfig:
+    messageKey: msg
+    levelKey: level
+
 ########################################
 #   Labeling/Tracing via HTTP Headers Configuration
 ########################################
@@ -239,7 +246,7 @@ authHeader:
 
 # jwtValidator provides Bearer auth configuration
 jwtValidator:
-  keys:
+  key:
     factory:
       uri: "http://themis:6500/keys/docker"
     purpose: 0

@@ -1,5 +1,12 @@
 ---
 
+logging:
+  level: debug
+  development: true
+  encoderConfig:
+    messageKey: msg
+    levelKey: level
+
 ########################################
 #   Labeling/Tracing via HTTP Headers Configuration
 ########################################
