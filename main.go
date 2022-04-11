@@ -61,7 +61,7 @@ const (
 	reqMaxRetriesKey                  = "requestMaxRetries"
 	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
+	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
