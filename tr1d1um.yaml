@@ -324,12 +324,12 @@ requestMaxRetries: 2
 # authAcquirer enables configuring the JWT or Basic auth header value factory for outgoing
 # requests to XMiDT. If both types are configured, JWT will be preferred.
 # (Optional)
-authAcquirer:
+# authAcquirer:
   # JWT: 
   #   # requestHeaders are added to the request for the token.
   #   # (Optional)
   #   # requestHeaders:
-  #   #   "": ""
+  #   #   "": "" 
 
   #   # authURL is the URL to access for the token.
   #   authURL: ""
@@ -341,7 +341,7 @@ authAcquirer:
   #   # buffer is the length of time before a token expires to get a new token.
   #   buffer: "2m"  
     
-  Basic: "" # Must be of form: 'Basic xyz=='
+  # Basic: "" # Must be of form: 'Basic xyz=='
 
 
 # tracing provides configuration around traces using OpenTelemetry.

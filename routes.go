@@ -132,11 +132,12 @@ func provideServers() fx.Option {
 
 func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(in.Tracing.Propagator()),
 		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
+		otelmux.WithPropagators(in.Tracing.Propagator()),
 	}
 
-	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
+	in.Router.Use(
+		otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
@@ -188,10 +189,11 @@ func provideAPIRouter(in APIRouterIn) *mux.Router {
 	rootRouter := mux.NewRouter()
 	// if we want to support the previous API version, then include it in the
 	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
+	urlPrefix := fmt.Sprintf("/%s", apiBase)
 	if in.PrevVerSupport {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
+		urlPrefix = fmt.Sprintf("/%s", apiBaseDualVersion)
 	}
 	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
+
 	return APIRouter
 }
