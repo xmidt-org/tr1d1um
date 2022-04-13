@@ -62,7 +62,8 @@ type handleWebhookRoutesIn struct {
 
 type APIRouterIn struct {
 	fx.In
-	PrevVerSupport bool `name:"previousVersionSupport"`
+	PrimaryRouter  *mux.Router `name:"server_primary"`
+	PrevVerSupport bool        `name:"previousVersionSupport"`
 }
 
 type PrimaryMMIn struct {
@@ -104,25 +105,25 @@ func provideServers() fx.Option {
 		),
 		arrangehttp.Server{
 			Name: "server_primary",
-			Key:  "primary",
+			Key:  "servers.primary",
 			Inject: arrange.Inject{
 				PrimaryMMIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_health",
-			Key:  "health",
+			Key:  "servers.health",
 			Inject: arrange.Inject{
 				HealthMMIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_pprof",
-			Key:  "pprof",
+			Key:  "servers.pprof",
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_metrics",
-			Key:  "metric",
+			Key:  "servers.metric",
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
@@ -186,14 +187,13 @@ func metricMiddleware(bundle touchhttp.ServerBundle) (out MetricMiddlewareOut) {
 }
 
 func provideAPIRouter(in APIRouterIn) *mux.Router {
-	rootRouter := mux.NewRouter()
 	// if we want to support the previous API version, then include it in the
 	// api base.
 	urlPrefix := fmt.Sprintf("/%s", apiBase)
 	if in.PrevVerSupport {
 		urlPrefix = fmt.Sprintf("/%s", apiBaseDualVersion)
 	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
+	APIRouter := in.PrimaryRouter.PathPrefix(urlPrefix).Subrouter()
 
 	return APIRouter
 }
