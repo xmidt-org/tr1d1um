@@ -28,66 +28,59 @@ region: "east"
 # (Optional)
 flavor: "mint"
 
+prometheus:
+  defaultNamespace: xmidt
+  defaultSubsystem: tr1d1um
+  constLabels:
+    development: "true"
+  handler:
+    maxRequestsInFlight: 5
+    timeout: 5s
+    instrumentMetricHandler: true
 
-##############################################################################
-# WebPA Service configuration
-##############################################################################
-
-# For a complete view of the service config structure,
-# checkout https://godoc.org/github.com/xmidt-org/webpa-common/server#WebPA
+health:
+  disableLogging: false
+  custom:
+    server: development
 
 ########################################
 #   Primary Endpoint Configuration
 ########################################
 
-# primary provides the configuration for the main server for this application
-primary:
-  address: ":6100"
+servers:
+  primary:
+    address: :6100
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
+  metrics:
+    address: :6101
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
 
-########################################
-#   Health Endpoint Configuration
-########################################
-
-# health defines the details needed for the health check endpoint.  The
-# health check endpoint is generally used by services (like AWS Route53
-# or consul) to determine if this particular machine is healthy or not.
-health:
-  address: ":6101"
-
-########################################
-#   Debugging/Pprof Configuration
-########################################
-
-# pprof defines the details needed for the pprof debug endpoint.
-# (Optional)
-pprof:
-  address: ":6102"
-
-########################################
-#   Metrics Configuration
-########################################
-
-# metric defines the details needed for the prometheus metrics endpoint
-# (Optional)
-metric:
-  address: ":6103"
-  metricsOptions:
-    # namespace is the namespace of the metrics provided
-    # (Optional)
-    namespace: "webpa"
-
-    # subsystem is the subsystem of the metrics provided
-    # (Optional)
-    subsystem: "tr1d1um"
-
+  health:
+    address: :6102
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - argus
+      X-Midt-Version:
+        - development
 ########################################
 #   Logging Related Configuration
 ########################################
 
 # log configures the logging details
 logging:
-  level: debug
-  development: true
+  level: (( grab $LOG_LEVEL || "debug" ))
+  development: (( grab $LOG_DEVELOPMENT || true ))
   encoderConfig:
     messageKey: msg
     levelKey: level
