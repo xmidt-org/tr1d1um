@@ -64,7 +64,6 @@ servers:
         - tr1d1um
       X-Midt-Version:
         - development
-
   health:
     address: :6102
     disableHTTPKeepAlives: true
@@ -73,6 +72,8 @@ servers:
         - argus
       X-Midt-Version:
         - development
+  pprof:
+    address: ":6102"
 
 ########################################
 #   Logging Related Configuration
