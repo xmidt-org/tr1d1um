@@ -73,7 +73,7 @@ servers:
       X-Midt-Version:
         - development
   pprof:
-    address: ":6102"
+    address: :6103
 
 ########################################
 #   Logging Related Configuration

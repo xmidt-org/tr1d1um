@@ -73,7 +73,7 @@ servers:
       X-Midt-Version:
         - development
   pprof:
-    address: ":6102"
+    address: :6103
 
 ########################################
 #   Logging Related Configuration
@@ -204,21 +204,22 @@ webhook:
         buffer: (( grab $ARGUS_ACQUIRE_BUFFER || "2m" ))
 
 ##############################################################################
-# Testing Authorization Credentials
+# Authorization Credentials
 ##############################################################################
 
-# authHeader is a list of Basic Auth credentials intended to be used for local testing purposes
-# WARNING! Be sure to remove this from your production config
-authHeader:
-  - (( grab $AUTH_HEADER || "dXNlcjpwYXNz" ))
+authx:
+  inbound:
+    # basic is a list of Basic Auth credentials intended to be used for local testing purposes
+    # WARNING! Be sure to remove this from your production config
+    basic: ["dXNlcjpwYXNz"]
 
-# jwtValidator provides Bearer auth configuration
-jwtValidator:
-  key:
-    factory:
-      uri: "http://themis:6500/keys/docker"
-    purpose: 0
-    updateInterval: 604800000000000
+    # jwtValidator provides Bearer auth configuration
+    jwtValidator:
+      key:
+        factory:
+          uri: "http://localhost:6500/keys/development"
+        purpose: 0
+        updateInterval: 604800000000000
 
 # capabilityCheck provides the details needed for checking an incoming JWT's
 # capabilities.  If the type of check isn't provided, no checking is done.  The
