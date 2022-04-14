@@ -51,7 +51,7 @@ type PrimaryEndpointIn struct {
 	TranslationServices         []string           `name:"supportedServices"`
 }
 
-type handleWebhookRoutesIn struct {
+type HandleWebhookRoutesIn struct {
 	fx.In
 	Logger                *zap.Logger
 	APIRouter             *mux.Router  `name:"api_router"`
@@ -62,8 +62,13 @@ type handleWebhookRoutesIn struct {
 
 type APIRouterIn struct {
 	fx.In
-	PrimaryRouter  *mux.Router `name:"server_primary"`
-	PrevVerSupport bool        `name:"previousVersionSupport"`
+	PrimaryRouter *mux.Router `name:"server_primary"`
+	URLPrefix     string      `name:"url_prefix"`
+}
+
+type ProvideURLPrefixIn struct {
+	fx.In
+	PrevVerSupport bool `name:"previousVersionSupport"`
 }
 
 type PrimaryMMIn struct {
@@ -101,6 +106,10 @@ func provideServers() fx.Option {
 			fx.Annotated{
 				Name:   "api_router",
 				Target: provideAPIRouter,
+			},
+			fx.Annotated{
+				Name:   "url_prefix",
+				Target: provideURLPrefix,
 			},
 		),
 		arrangehttp.Server{
@@ -173,7 +182,7 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	})
 }
 
-func handleWebhookRoutes(in handleWebhookRoutesIn) {
+func handleWebhookRoutes(in HandleWebhookRoutesIn) {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
 		in.APIRouter.Handle("/hook", in.AuthChain.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
@@ -187,13 +196,16 @@ func metricMiddleware(bundle touchhttp.ServerBundle) (out MetricMiddlewareOut) {
 }
 
 func provideAPIRouter(in APIRouterIn) *mux.Router {
+	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
+	return APIRouter
+}
+
+func provideURLPrefix(in ProvideURLPrefixIn) string {
 	// if we want to support the previous API version, then include it in the
 	// api base.
 	urlPrefix := fmt.Sprintf("/%s", apiBase)
 	if in.PrevVerSupport {
 		urlPrefix = fmt.Sprintf("/%s", apiBaseDualVersion)
 	}
-	APIRouter := in.PrimaryRouter.PathPrefix(urlPrefix).Subrouter()
-
-	return APIRouter
+	return urlPrefix
 }

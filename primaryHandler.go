@@ -69,11 +69,39 @@ type CapabilityConfig struct {
 // JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// JWTKeys is used to create the key.Resolver for JWT verification keys
-	Keys key.ResolverFactory `json:"keys"`
+	Keys key.ResolverFactory `json:"key"`
 
 	// Leeway is used to set the amount of time buffer should be given to JWT
 	// time values, such as nbf
 	Leeway bascule.Leeway
+}
+
+type provideWebhookHandlersIn struct {
+	fx.In
+	V                  *viper.Viper
+	WebhookConfigKey   ancla.Config
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	Logger             *zap.Logger
+	Measures           *ancla.Measures
+	MeasuresIn         ancla.MeasuresIn
+	Tracing            candlelight.Tracing
+}
+
+type provideWebhookHandlersOut struct {
+	fx.Out
+	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
+}
+
+type ServiceConfigIn struct {
+	fx.In
+	Logger               *zap.Logger
+	XmidtHTTPClient      *http.Client      `name:"xmidt_http_client"`
+	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
+	RequestMaxRetries    int               `name:"requestMaxRetries"`
+	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
+	TargetURL            string            `name:"targetURL"`
+	WRPSource            string            `name:"WRPSource"`
 }
 
 func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *http.Client {
@@ -103,23 +131,6 @@ func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
-}
-
-type provideWebhookHandlersIn struct {
-	fx.In
-	V                  *viper.Viper
-	WebhookConfigKey   ancla.Config
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
-	Logger             *zap.Logger
-	Measures           *ancla.Measures
-	MeasuresIn         ancla.MeasuresIn
-	Tracing            candlelight.Tracing
-}
-
-type provideWebhookHandlersOut struct {
-	fx.Out
-	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
-	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
@@ -160,7 +171,6 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 func provideHandlers() fx.Option {
 	return fx.Options(
 		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
-		arrange.ProvideKey("authHeader", []string{}),
 		fx.Provide(
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
@@ -171,21 +181,8 @@ func provideHandlers() fx.Option {
 	)
 }
 
-type ServiceConfigIn struct {
-	fx.In
-	Logger               *zap.Logger
-	XmidtHTTPClient      *http.Client      `name:"xmidt_http_client"`
-	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
-	RequestMaxRetries    int               `name:"requestMaxRetries"`
-	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
-	TargetURL            string            `name:"targetURL"`
-	WRPSource            string            `name:"WRPSource"`
-}
-
 func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
-	//
 	// Stat Service configs
-	//
 	return &stat.ServiceOptions{
 		HTTPTransactor: transaction.New(
 			&transaction.Options{
@@ -203,9 +200,7 @@ func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
 }
 
 func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
-	//
 	// WRP Service configs
-	//
 	return &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/device", in.TargetURL),
 		WRPSource:   in.WRPSource,

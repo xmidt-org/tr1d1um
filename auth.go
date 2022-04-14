@@ -35,7 +35,7 @@ func provideAuthChain(configKey string) fx.Option {
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory(configKey, false),
+		basculehttp.ProvideBearerTokenFactory(configKey+".jwtValidator", false),
 		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilities", configKey)),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
