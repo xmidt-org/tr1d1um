@@ -18,7 +18,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -31,7 +34,7 @@ func provideAuthChain(configKey string) fx.Option {
 		basculechecks.ProvideMetrics(),
 		fx.Provide(
 			func() basculehttp.ParseURL {
-				return basculehttp.CreateRemovePrefixURLFunc("/"+apiBase, nil)
+				return createRemovePrefixURLFuncLegacy([]string{"/api/v3", "/api/v2"})
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
@@ -40,4 +43,23 @@ func provideAuthChain(configKey string) fx.Option {
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)
+}
+
+func createRemovePrefixURLFuncLegacy(prefixes []string) basculehttp.ParseURL {
+	return func(u *url.URL) (*url.URL, error) {
+		escapedPath := u.EscapedPath()
+		var prefix string
+		for _, p := range prefixes {
+			if strings.HasPrefix(escapedPath, p) {
+				prefix = p
+				break
+			}
+		}
+		if prefix == "" {
+			return nil, errors.New("unexpected URL, did not start with expected prefix")
+		}
+		u.Path = escapedPath[len(prefix):]
+		u.RawPath = escapedPath[len(prefix):]
+		return u, nil
+	}
 }
