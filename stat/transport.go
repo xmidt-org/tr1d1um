@@ -102,6 +102,11 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*transaction.XmidtResponse)
 
+	if resp == nil || resp.Body == nil {
+		err = errors.New("response is nil")
+		return
+	}
+
 	if resp.Code == http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
 	} else {
@@ -112,6 +117,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)
+
 	_, err = w.Write(resp.Body)
 	return
 }
