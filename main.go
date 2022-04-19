@@ -198,7 +198,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 			GetLogger: getLogger,
 		})
 
-		APIRouter.Handle("/hook", authenticate.Then(addWebhookHandler)).Methods(http.MethodPost)
+		fixV2Middleware, err := fixV2Duration(getLogger, webhookConfig.Validation.TTL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
+			return 1
+		}
+
+		APIRouter.Handle("/hook", authenticate.Then(fixV2Middleware(addWebhookHandler))).Methods(http.MethodPost)
 		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
 
 		infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
@@ -348,7 +354,6 @@ func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
 		timeouts.NetDialerTimeout = time.Second * 5
 	}
 	return timeouts, nil
-
 }
 
 func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
