@@ -19,18 +19,24 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
+	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	bchecks "github.com/xmidt-org/bascule/basculechecks"
@@ -42,6 +48,12 @@ import (
 	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xmetrics"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+)
+
+var (
+	errFailedWebhookUnmarshal = errors.New("failed to JSON unmarshal webhook")
+
+	v2WarningHeader = "X-Xmidt-Warning"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -231,4 +243,100 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 		})
 	})
 	return &versionCompatibleAuth, nil
+}
+
+//nolint:funlen
+func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alice.Constructor, error) {
+	if getLogger == nil {
+		getLogger = func(_ context.Context) log.Logger {
+			return nil
+		}
+	}
+	if config.Now == nil {
+		config.Now = time.Now
+	}
+	durationCheck, err := ancla.CheckDuration(config.Max)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create duration check: %v", err)
+	}
+	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create until check: %v", err)
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			vars := mux.Vars(r)
+			// if this is v2, we need to unmarshal and check the duration.  If
+			// the duration is bad, change it to 5m and add a header.
+			if vars != nil && vars["version"] == prevAPIVersion {
+				logger := getLogger(r.Context())
+				if logger == nil {
+					logger = log.NewNopLogger()
+				}
+				requestPayload, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					v2ErrEncode(w, logger, err, 0)
+					return
+				}
+
+				var webhook ancla.Webhook
+				err = json.Unmarshal(requestPayload, &webhook)
+				if err != nil {
+					var e *json.UnmarshalTypeError
+					if errors.As(err, &e) {
+						v2ErrEncode(w, logger,
+							fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
+							http.StatusBadRequest)
+						return
+					}
+					v2ErrEncode(w, logger, fmt.Errorf("%w: %v", errFailedWebhookUnmarshal, err),
+						http.StatusBadRequest)
+					return
+				}
+
+				// check to see if the webhook has a valid until/duration.
+				// If not, set it to 5m.
+				if webhook.Until.IsZero() {
+					durationErr := durationCheck(webhook)
+					if durationErr != nil {
+						webhook.Duration = config.Max
+						w.Header().Add(v2WarningHeader,
+							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
+					}
+				} else {
+					untilErr := untilCheck(webhook)
+					if untilErr != nil {
+						webhook.Until = time.Time{}
+						webhook.Duration = config.Max
+						w.Header().Add(v2WarningHeader,
+							fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
+					}
+				}
+
+				// put the body back in the request
+				body, err := json.Marshal(webhook)
+				if err != nil {
+					v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+				}
+				r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+			}
+			next.ServeHTTP(w, r)
+		})
+	}, nil
+}
+
+func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) {
+	if code == 0 {
+		code = http.StatusInternalServerError
+	}
+	level.Error(logger).Log(logging.MessageKey(), "sending non-200, non-404 response",
+		logging.ErrorKey(), err, "code", code)
+
+	w.WriteHeader(code)
+
+	json.NewEncoder(w).Encode(
+		map[string]interface{}{
+			"message": err.Error(),
+		})
 }
