@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.7.2]
+- Fixed v2 endpoint to allow for invalid duration or until fields.  When they are invalid, the duration of the webhook is set to the configured maximum. [#266](https://github.com/xmidt-org/tr1d1um/pull/266)
+
 ## [v0.7.1]
 - Renamed common folder and reallocated util.go functions. [#235](https://github.com/xmidt-org/tr1d1um/pull/235)
 - Separated main.go into main.go and primaryHandler.go. [#239](https://github.com/xmidt-org/tr1d1um/pull/239)
@@ -135,7 +138,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.2...HEAD
+[v0.7.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.1...v0.7.2
 [v0.7.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.0...v0.7.1
 [v0.7.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.4...v0.7.0
 [v0.6.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.6.3...v0.6.4
