@@ -245,6 +245,7 @@ func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.
 	return &versionCompatibleAuth, nil
 }
 
+//nolint:funlen
 func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alice.Constructor, error) {
 	if getLogger == nil {
 		getLogger = func(_ context.Context) log.Logger {
