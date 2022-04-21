@@ -177,7 +177,6 @@ func provideHandlers() fx.Option {
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			provideWebhookHandlers,
 		),
-		fx.Invoke(handleWebhookRoutes),
 	)
 }
 

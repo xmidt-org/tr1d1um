@@ -136,6 +136,7 @@ func provideServers() fx.Option {
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
+			handleWebhookRoutes,
 		),
 	)
 }

@@ -80,7 +80,13 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		// if ce, ok := err.(transaction.CodedError); ok {
@@ -113,7 +119,14 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		w.Header().Del("Content-Type")
 	}
 
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)

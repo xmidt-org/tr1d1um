@@ -132,9 +132,15 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		wrpMsg  *wrp.Message
 	)
 	if payload, err = requestPayload(r); err == nil {
-		var tid = ctx.Value(transaction.ContextKeyRequestTID).(string)
+		var tid string
+		ctxtid := ctx.Value(transaction.ContextKeyRequestTID)
+		if ctxtid != nil {
+			tid = ctxtid.(string)
+		}
+
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
-		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
+		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs)
+		if err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
 				AuthHeaderValue: r.Header.Get(authHeaderKey),
@@ -174,7 +180,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
@@ -209,7 +220,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	ctxKeyReqTID := ctx.Value(transaction.ContextKeyRequestTID)
+	if ctxKeyReqTID != nil {
+		w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID.(string))
+	} else {
+		w.Header().Set(candlelight.HeaderWPATIDKeyName, "")
+	}
 
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
