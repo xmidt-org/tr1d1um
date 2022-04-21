@@ -220,12 +220,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	ctxKeyReqTID := ctx.Value(transaction.ContextKeyRequestTID)
-	if ctxKeyReqTID != nil {
-		w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID.(string))
-	} else {
-		w.Header().Set(candlelight.HeaderWPATIDKeyName, "")
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
 	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
