@@ -101,8 +101,6 @@ func provideServers() fx.Option {
 				Name:   "reducedLoggingResponseCodes",
 				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
 			},
-			provideStatServiceOptions,
-			provideTranslationOptions,
 			fx.Annotated{
 				Name:   "api_router",
 				Target: provideAPIRouter,
@@ -111,6 +109,7 @@ func provideServers() fx.Option {
 				Name:   "url_prefix",
 				Target: provideURLPrefix,
 			},
+			provideServiceOptions,
 		),
 		arrangehttp.Server{
 			Name: "server_primary",

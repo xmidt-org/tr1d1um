@@ -93,15 +93,21 @@ type provideWebhookHandlersOut struct {
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
 
-type ServiceConfigIn struct {
+type ServiceOptionsIn struct {
 	fx.In
 	Logger               *zap.Logger
-	XmidtHTTPClient      *http.Client      `name:"xmidt_http_client"`
 	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
 	RequestMaxRetries    int               `name:"requestMaxRetries"`
 	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
 	TargetURL            string            `name:"targetURL"`
 	WRPSource            string            `name:"WRPSource"`
+	Tracing              candlelight.Tracing
+}
+
+type ServiceOptionsOut struct {
+	fx.Out
+	StatServiceOptions        *stat.ServiceOptions
+	TranslationServiceOptions *translation.ServiceOptions
 }
 
 func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *http.Client {
@@ -180,9 +186,10 @@ func provideHandlers() fx.Option {
 	)
 }
 
-func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
+func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
+	xmidtHTTPClient := newHTTPClient(in.XmidtClientTimeout, in.Tracing)
 	// Stat Service configs
-	return &stat.ServiceOptions{
+	statOptions := &stat.ServiceOptions{
 		HTTPTransactor: transaction.New(
 			&transaction.Options{
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
@@ -191,16 +198,14 @@ func provideStatServiceOptions(in ServiceConfigIn) *stat.ServiceOptions {
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},
-					in.XmidtHTTPClient.Do),
+					xmidtHTTPClient.Do),
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.TargetURL),
 	}
-}
 
-func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 	// WRP Service configs
-	return &translation.ServiceOptions{
+	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/device", in.TargetURL),
 		WRPSource:   in.WRPSource,
 		T: transaction.New(
@@ -212,7 +217,12 @@ func provideTranslationOptions(in ServiceConfigIn) *translation.ServiceOptions {
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},
-					in.XmidtHTTPClient.Do),
+					xmidtHTTPClient.Do),
 			}),
+	}
+
+	return ServiceOptionsOut{
+		StatServiceOptions:        statOptions,
+		TranslationServiceOptions: translationOptions,
 	}
 }

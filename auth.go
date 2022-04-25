@@ -28,13 +28,18 @@ import (
 	"go.uber.org/fx"
 )
 
+var possiblePrefixURLs = []string{
+	"/" + apiBase,
+	"/" + prevAPIBase,
+}
+
 func provideAuthChain(configKey string) fx.Option {
 	return fx.Options(
 		basculehttp.ProvideMetrics(),
 		basculechecks.ProvideMetrics(),
 		fx.Provide(
 			func() basculehttp.ParseURL {
-				return createRemovePrefixURLFuncLegacy([]string{"/api/v3", "/api/v2"})
+				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),

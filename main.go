@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
@@ -48,6 +47,7 @@ const (
 	prevAPIVersion     = "v2"
 	applicationName    = "tr1d1um"
 	apiBase            = "api/" + apiVersion
+	prevAPIBase        = "api/" + prevAPIVersion
 	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
@@ -102,23 +102,14 @@ type TracingConfigIn struct {
 	Logger        *zap.Logger
 }
 
-type ConstIn struct {
-	fx.In
-	Hct     httpClientTimeout `name:"xmidt_client_timeout"`
-	Tracing candlelight.Tracing
-}
-
 type ConstOut struct {
 	fx.Out
-	DefaultKeyID    string       `name:"default_key_id"`
-	XmidtHTTPClient *http.Client `name:"xmidt_http_client"`
+	DefaultKeyID string `name:"default_key_id"`
 }
 
-func consts(in ConstIn) ConstOut {
-	xhttpc := newHTTPClient(in.Hct, in.Tracing)
+func consts() ConstOut {
 	return ConstOut{
-		DefaultKeyID:    DefaultKeyID,
-		XmidtHTTPClient: xhttpc,
+		DefaultKeyID: DefaultKeyID,
 	}
 }
 
