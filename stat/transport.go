@@ -80,7 +80,13 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		// if ce, ok := err.(transaction.CodedError); ok {
@@ -102,16 +108,29 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*transaction.XmidtResponse)
 
+	if resp == nil || resp.Body == nil {
+		err = errors.New("response is nil")
+		return
+	}
+
 	if resp.Code == http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
 	} else {
 		w.Header().Del("Content-Type")
 	}
 
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)
+
 	_, err = w.Write(resp.Body)
 	return
 }
