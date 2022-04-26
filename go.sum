@@ -64,7 +64,6 @@ github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go
 github.com/Microsoft/go-winio v0.4.3/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
 github.com/NYTimes/gziphandler v1.0.1/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/SermoDigital/jose v0.9.2-0.20161205224733-f6df55f235c2 h1:koK7z0nSsRiRiBWwa+E714Puh+DO+ZRdIyAXiXzL+lg=
 github.com/SermoDigital/jose v0.9.2-0.20161205224733-f6df55f235c2/go.mod h1:ARgCUhI1MHQH+ONky/PAtmVHQrP5JlGY0F3poXOp/fA=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
@@ -706,15 +705,16 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/vmware/govmomi v0.18.0/go.mod h1:URlwyTFZX72RmxtxuaFL2Uj3fD1JTvZdx59bHWk6aFU=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
-github.com/xmidt-org/ancla v0.3.5 h1:zXDFTxZHVl5UTyIFQYB2FdQRMlAcp16MMEOYagIdCeo=
-github.com/xmidt-org/ancla v0.3.5/go.mod h1:UO6v7K+KQ7OtFi0nFF4zAZRMW9T83m4mZqw6iirQSs4=
+github.com/xmidt-org/ancla v0.3.8 h1:u6epqsIjX7yYvv2JH74t+DYwddl2Xn298rOjDuh3AxM=
+github.com/xmidt-org/ancla v0.3.8/go.mod h1:gkucjfyH7zDvCJCQTx++E2iaMugBNrq0G1OGzE2nzIs=
 github.com/xmidt-org/argus v0.3.9/go.mod h1:mDFS44R704gl9Fif3gkfAyvnZa53SvMepmXjYWABPvk=
 github.com/xmidt-org/argus v0.3.10-0.20201105190057-402fede05764/go.mod h1:lnMCVB/i0gOlUOOd2WbzDDgzTEqP5TipzQ8xKIw+N/I=
 github.com/xmidt-org/argus v0.3.10-0.20201217204602-66f69b12c498/go.mod h1:lnMCVB/i0gOlUOOd2WbzDDgzTEqP5TipzQ8xKIw+N/I=
 github.com/xmidt-org/argus v0.3.12/go.mod h1:T0oHbqQ1SAjE616Q9f1p+7nsmuvmHNoC0zAIUpUiFuE=
 github.com/xmidt-org/argus v0.5.1/go.mod h1:cnx+z2O5mwhS/mCtvbVatZhZ8npBQSaXlzDk5RT3SkM=
-github.com/xmidt-org/argus v0.6.0 h1:cjAeyILtyGSvUv02e4wEpUdYtgd1EYoFtwfjC5JroQ8=
 github.com/xmidt-org/argus v0.6.0/go.mod h1:IRVJlpd8JsoWXhys8o6tFU+dZi9Q6YWTX1Wn3AkyEkI=
+github.com/xmidt-org/argus v0.8.0 h1:xYLn9lLNEjR24OiLBrxEsgOzMIb50IFFmagK6TebMqU=
+github.com/xmidt-org/argus v0.8.0/go.mod h1:IRVJlpd8JsoWXhys8o6tFU+dZi9Q6YWTX1Wn3AkyEkI=
 github.com/xmidt-org/arrange v0.1.9/go.mod h1:PRA8iEZ11L93NsEkDP56x1mZyfDcWxzDULgHj56TaEk=
 github.com/xmidt-org/arrange v0.3.0 h1:YNO+1lufCx3EeN17xuSRMC1sci9y9rzZVZ+TkWwq9QE=
 github.com/xmidt-org/arrange v0.3.0/go.mod h1:pCHeb93OFA0QnEJ//Mmly7QqUt7y/w3xllK0VQ3Bigo=
@@ -724,8 +724,6 @@ github.com/xmidt-org/bascule v0.9.0/go.mod h1:C64nSBtUTTK/f2/mCvvp/qJhav5raD0T+b
 github.com/xmidt-org/bascule v0.10.2 h1:Z51Qu4BAh/tk4fccQ/Xv3gCuqjYcPKZ8kYCw03rgjYM=
 github.com/xmidt-org/bascule v0.10.2/go.mod h1:8Mx4EW1AXTWnvh2rDl+/GYPLH4QSJIuPB6r94IWoKxg=
 github.com/xmidt-org/candlelight v0.0.5/go.mod h1:j9Q2tzrOAywm+JvvVJjlOmlPJvdlRrOyFjLz33SaU1Y=
-github.com/xmidt-org/candlelight v0.0.8 h1:mMHEvLEGpS+bC28RNzUczxh86dvG3sabRrX+DogVWas=
-github.com/xmidt-org/candlelight v0.0.8/go.mod h1:hIGM1g5ksy5/X1+JAVrETFysdtYGA1f0abrb+hBmFdE=
 github.com/xmidt-org/candlelight v0.0.9 h1:FXYDnPtkuJzaRgK1jprdOJmWADMeln6/s764FaJfN2I=
 github.com/xmidt-org/candlelight v0.0.9/go.mod h1:hIGM1g5ksy5/X1+JAVrETFysdtYGA1f0abrb+hBmFdE=
 github.com/xmidt-org/httpaux v0.1.2/go.mod h1:qZnH2uObGPwHnOz8HcPNlbcd3gKEvdmxbIK3rgbQhto=

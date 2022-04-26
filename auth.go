@@ -18,12 +18,20 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"go.uber.org/fx"
 )
+
+var possiblePrefixURLs = []string{
+	"/" + apiBase,
+	"/" + prevAPIBase,
+}
 
 func provideAuthChain(configKey string) fx.Option {
 	return fx.Options(
@@ -31,13 +39,32 @@ func provideAuthChain(configKey string) fx.Option {
 		basculechecks.ProvideMetrics(),
 		fx.Provide(
 			func() basculehttp.ParseURL {
-				return basculehttp.CreateRemovePrefixURLFunc("/"+apiBase, nil)
+				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory(configKey, false),
+		basculehttp.ProvideBearerTokenFactory(configKey+".jwtValidator", false),
 		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilities", configKey)),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)
+}
+
+func createRemovePrefixURLFuncLegacy(prefixes []string) basculehttp.ParseURL {
+	return func(u *url.URL) (*url.URL, error) {
+		escapedPath := u.EscapedPath()
+		var prefix string
+		for _, p := range prefixes {
+			if strings.HasPrefix(escapedPath, p) {
+				prefix = p
+				break
+			}
+		}
+		if prefix == "" {
+			return nil, errors.New("unexpected URL, did not start with expected prefix")
+		}
+		u.Path = escapedPath[len(prefix):]
+		u.RawPath = escapedPath[len(prefix):]
+		return u, nil
+	}
 }

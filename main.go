@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
 	"github.com/xmidt-org/touchstone"
@@ -46,6 +47,7 @@ const (
 	prevAPIVersion     = "v2"
 	applicationName    = "tr1d1um"
 	apiBase            = "api/" + apiVersion
+	prevAPIBase        = "api/" + prevAPIVersion
 	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
@@ -59,7 +61,7 @@ const (
 	reqMaxRetriesKey                  = "requestMaxRetries"
 	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
+	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
@@ -84,66 +86,37 @@ var defaults = map[string]interface{}{
 	hooksSchemeKey:         "https",
 }
 
-//nolint:funlen
-func tr1d1um(arguments []string) (exitCode int) {
-
-	v, logger, f, err := setup(arguments)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-
-	// This allows us to communicate the version of the binary upon request.
-	if done, parseErr := printVersion(f, arguments); done {
-		// if we're done, we're exiting no matter what
-		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
-		os.Exit(0)
-	}
-
-	app := fx.New(
-		arrange.LoggerFunc(logger.Sugar().Infof),
-		fx.Supply(logger),
-		fx.Supply(v),
-		arrange.ForViper(v),
-		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
-		touchhttp.Provide(),
-		touchstone.Provide(),
-		fx.Provide(
-			gokitLogger,
-			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
-			fx.Annotated{
-				Name:   "xmidt_client_timeout",
-				Target: configureXmidtClientTimeout,
-			},
-			fx.Annotated{
-				Name:   "argus_client_timeout",
-				Target: configureArgusClientTimeout,
-			},
-			loadTracing,
-			newHTTPClient,
-		),
-		provideServers(),
-		provideHandlers(),
-		provideAuthChain("authx.inbound"),
-	)
-
-	switch err := app.Err(); {
-	case errors.Is(err, pflag.ErrHelp):
-		return
-	case err == nil:
-		app.Run()
-	default:
-		fmt.Fprintln(os.Stderr, err)
-		return 2
-	}
-
-	return 0
-}
-
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
 	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
+}
+
+type ArgusClientTimeoutConfigIn struct {
+	fx.In
+	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
+}
+
+type TracingConfigIn struct {
+	fx.In
+	TracingConfig candlelight.Config
+	Logger        *zap.Logger
+}
+
+type ConstOut struct {
+	fx.Out
+	DefaultKeyID string `name:"default_key_id"`
+}
+
+func consts() ConstOut {
+	return ConstOut{
+		DefaultKeyID: DefaultKeyID,
+	}
+}
+
+func gokitLogger(l *zap.Logger) log.Logger {
+	return sallustkit.Logger{
+		Zap: l,
+	}
 }
 
 func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
@@ -161,11 +134,6 @@ func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeou
 	return xct
 }
 
-type ArgusClientTimeoutConfigIn struct {
-	fx.In
-	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
-}
-
 func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
 	act := in.ArgusClientTimeout
 
@@ -176,12 +144,6 @@ func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeou
 		act.NetDialerTimeout = time.Second * 5
 	}
 	return act
-}
-
-type TracingConfigIn struct {
-	fx.In
-	TracingConfig candlelight.Config
-	Logger        *zap.Logger
 }
 
 func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
@@ -226,10 +188,63 @@ func exitIfError(logger *zap.Logger, err error) {
 	}
 }
 
-func gokitLogger(l *zap.Logger) log.Logger {
-	return sallustkit.Logger{
-		Zap: l,
+//nolint:funlen
+func tr1d1um(arguments []string) (exitCode int) {
+
+	v, logger, f, err := setup(arguments)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
 	}
+
+	// This allows us to communicate the version of the binary upon request.
+	if done, parseErr := printVersion(f, arguments); done {
+		// if we're done, we're exiting no matter what
+		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
+		os.Exit(0)
+	}
+
+	app := fx.New(
+		arrange.LoggerFunc(logger.Sugar().Infof),
+		fx.Supply(logger),
+		fx.Supply(v),
+		arrange.ForViper(v),
+		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
+		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		touchhttp.Provide(),
+		touchstone.Provide(),
+		ancla.ProvideMetrics(),
+		fx.Provide(
+			consts,
+			gokitLogger,
+			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
+			fx.Annotated{
+				Name:   "xmidt_client_timeout",
+				Target: configureXmidtClientTimeout,
+			},
+			fx.Annotated{
+				Name:   "argus_client_timeout",
+				Target: configureArgusClientTimeout,
+			},
+			loadTracing,
+			newHTTPClient,
+		),
+		provideAuthChain("authx.inbound"),
+		provideServers(),
+		provideHandlers(),
+	)
+
+	switch err := app.Err(); {
+	case errors.Is(err, pflag.ErrHelp):
+		return
+	case err == nil:
+		app.Run()
+	default:
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+
+	return 0
 }
 
 func main() {

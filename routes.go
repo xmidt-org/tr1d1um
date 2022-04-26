@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
-	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
@@ -40,28 +39,34 @@ import (
 type PrimaryEndpointIn struct {
 	fx.In
 	V                           *viper.Viper
-	Router                      *mux.Router  `name:"server_primary"`
-	APIRouter                   *mux.Router  `name:"api_router"`
-	AuthChain                   *alice.Chain `name:"auth_chain"`
+	Router                      *mux.Router `name:"server_primary"`
+	APIRouter                   *mux.Router `name:"api_router"`
+	AuthChain                   alice.Chain `name:"auth_chain"`
 	Tracing                     candlelight.Tracing
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	Acquirer                    acquire.Acquirer
-	ReducedLoggingResponseCodes []int    `name:"reducedLoggingResponseCodes"`
-	TranslationServices         []string `name:"supportedServices"`
+	AuthAcquirer                authAcquirerConfig `name:"authAcquirer"`
+	ReducedLoggingResponseCodes []int              `name:"reducedLoggingResponseCodes"`
+	TranslationServices         []string           `name:"supportedServices"`
 }
 
-type handleWebhookRoutesIn struct {
+type HandleWebhookRoutesIn struct {
 	fx.In
 	Logger                *zap.Logger
 	APIRouter             *mux.Router  `name:"api_router"`
-	AuthChain             *alice.Chain `name:"auth_chain"`
+	AuthChain             alice.Chain  `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 }
 
 type APIRouterIn struct {
+	fx.In
+	PrimaryRouter *mux.Router `name:"server_primary"`
+	URLPrefix     string      `name:"url_prefix"`
+}
+
+type ProvideURLPrefixIn struct {
 	fx.In
 	PrevVerSupport bool `name:"previousVersionSupport"`
 }
@@ -96,56 +101,65 @@ func provideServers() fx.Option {
 				Name:   "reducedLoggingResponseCodes",
 				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
 			},
-			provideStatServiceOptions,
-			provideTranslationOptions,
 			fx.Annotated{
 				Name:   "api_router",
 				Target: provideAPIRouter,
 			},
+			fx.Annotated{
+				Name:   "url_prefix",
+				Target: provideURLPrefix,
+			},
+			provideServiceOptions,
 		),
 		arrangehttp.Server{
 			Name: "server_primary",
-			Key:  "primary",
+			Key:  "servers.primary",
 			Inject: arrange.Inject{
 				PrimaryMMIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_health",
-			Key:  "health",
+			Key:  "servers.health",
 			Inject: arrange.Inject{
 				HealthMMIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_pprof",
-			Key:  "pprof",
+			Key:  "servers.pprof",
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_metrics",
-			Key:  "metric",
+			Key:  "servers.metric",
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
+			handleWebhookRoutes,
 		),
 	)
 }
 
 func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(in.Tracing.Propagator()),
 		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
+		otelmux.WithPropagators(in.Tracing.Propagator()),
 	}
 
-	in.Router.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
+	in.Router.Use(
+		otelmux.Middleware("mainSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
 	if in.V.IsSet(authAcquirerKey) {
-		acquirer := in.Acquirer
-		in.TranslationOptions.AuthAcquirer = acquirer
-		in.StatServiceOptions.AuthAcquirer = acquirer
-		in.Logger.Info("Outbound request authentication token acquirer enabled")
+		acquirer, err := createAuthAcquirer(in.AuthAcquirer)
+		if err != nil {
+			in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
+		} else {
+			in.TranslationOptions.AuthAcquirer = acquirer
+			in.StatServiceOptions.AuthAcquirer = acquirer
+			in.Logger.Info("Outbound request authentication token acquirer enabled")
+		}
 	}
 	ss := stat.NewService(in.StatServiceOptions)
 	ts := translation.NewService(in.TranslationOptions)
@@ -154,21 +168,21 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
+		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
 		APIRouter:                   in.APIRouter,
-		Authenticate:                in.AuthChain,
+		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 }
 
-func handleWebhookRoutes(in handleWebhookRoutesIn) {
+func handleWebhookRoutes(in HandleWebhookRoutesIn) {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
 		in.APIRouter.Handle("/hook", in.AuthChain.Then(in.AddWebhookHandler)).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
@@ -182,13 +196,16 @@ func metricMiddleware(bundle touchhttp.ServerBundle) (out MetricMiddlewareOut) {
 }
 
 func provideAPIRouter(in APIRouterIn) *mux.Router {
-	rootRouter := mux.NewRouter()
+	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
+	return APIRouter
+}
+
+func provideURLPrefix(in ProvideURLPrefixIn) string {
 	// if we want to support the previous API version, then include it in the
 	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
+	urlPrefix := fmt.Sprintf("/%s", apiBase)
 	if in.PrevVerSupport {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
+		urlPrefix = fmt.Sprintf("/%s", apiBaseDualVersion)
 	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
-	return APIRouter
+	return urlPrefix
 }
