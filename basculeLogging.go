@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
@@ -37,18 +36,6 @@ func sanitizeHeaders(headers http.Header) (filtered http.Header) {
 		}
 	}
 	return
-}
-
-func setLogger(logger log.Logger) func(delegate http.Handler) http.Handler {
-	return func(delegate http.Handler) http.Handler {
-		return http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				kvs := []interface{}{"requestHeaders", sanitizeHeaders(r.Header), "requestURL", r.URL.EscapedPath(), "method", r.Method}
-				kvs, _ = candlelight.AppendTraceInfo(r.Context(), kvs)
-				ctx := r.WithContext(logging.WithLogger(r.Context(), log.With(logger, kvs...)))
-				delegate.ServeHTTP(w, ctx)
-			})
-	}
 }
 
 func getLogger(ctx context.Context) log.Logger {
