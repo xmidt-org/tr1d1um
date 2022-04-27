@@ -27,7 +27,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	transaction "github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/webpa-common/v2/device"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
@@ -177,7 +176,7 @@ func TestWrapInWRP(t *testing.T) {
 		w, e := wrap([]byte(""), "", nil, nil)
 
 		assert.Nil(w)
-		assert.EqualValues(transaction.NewBadRequestError(device.ErrorInvalidDeviceName), e)
+		assert.EqualValues(transaction.NewBadRequestError(wrp.ErrorInvalidDeviceName), e)
 	})
 
 	t.Run("GivenParameters", func(t *testing.T) {

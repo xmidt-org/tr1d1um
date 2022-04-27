@@ -31,7 +31,6 @@ import (
 
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
-	"github.com/xmidt-org/webpa-common/v2/device"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
@@ -109,7 +108,7 @@ func getCommandForParams(params []setParam) (command string) {
 
 // wrp merges different values from a WDMP request into a WRP message
 func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (*wrp.Message, error) {
-	canonicalDeviceID, err := device.ParseID(pathVars["deviceid"])
+	canonicalDeviceID, err := wrp.ParseDeviceID(pathVars["deviceid"])
 	if err != nil {
 		return nil, transaction.NewBadRequestError(err)
 	}
