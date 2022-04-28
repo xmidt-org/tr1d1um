@@ -131,7 +131,7 @@ func TestEncodeResponse(t *testing.T) {
 		respRecorder              *httptest.ResponseRecorder
 	}{
 		{
-			desc: "Base Sucess",
+			desc: "Base Success",
 			resp: &transaction.XmidtResponse{
 				Code:             http.StatusOK,
 				ForwardedHeaders: http.Header{},
