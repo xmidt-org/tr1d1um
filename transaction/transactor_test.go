@@ -19,13 +19,16 @@ package transaction
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestTransactError(t *testing.T) {
@@ -133,4 +136,49 @@ func TestWelcome(t *testing.T) {
 	decorated := Welcome(handler)
 	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
 	decorated.ServeHTTP(nil, req)
+}
+
+func TestLog(t *testing.T) {
+	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+
+	tcs := []struct {
+		desc                        string
+		logger                      *zap.Logger
+		reducedLoggingResponseCodes []int
+		ctx                         context.Context
+		code                        int
+		request                     *http.Request
+	}{
+		{
+			desc:                        "Sanity Check",
+			logger:                      zap.NewNop(),
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         context.Background(),
+			code:                        200,
+			request:                     &http.Request{},
+		},
+		{
+			desc:                        "Arrival Time Present",
+			logger:                      zap.NewNop(),
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         ctxWithArrivalTime,
+			code:                        200,
+			request:                     &http.Request{},
+		},
+		{
+			desc:                        "IncludeHeaders is False",
+			logger:                      zap.NewNop(),
+			reducedLoggingResponseCodes: []int{200},
+			ctx:                         context.Background(),
+			code:                        200,
+			request:                     &http.Request{},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			s := Log(tc.logger, tc.reducedLoggingResponseCodes)
+			s(tc.ctx, tc.code, tc.request)
+		})
+	}
 }

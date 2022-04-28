@@ -222,3 +222,32 @@ func TestContains(t *testing.T) {
 	assert.False(contains("a", []string{}))
 	assert.True(contains("a", []string{"a", "b"}))
 }
+
+func TestGetParamNames(t *testing.T) {
+	j := "Josh"
+	b := "Brian"
+	tcs := []struct {
+		desc               string
+		params             []setParam
+		expectedParamnames []string
+	}{
+		{
+			desc:               "Empty Params",
+			params:             []setParam{},
+			expectedParamnames: []string{},
+		},
+		{
+			desc:               "Pull Params",
+			params:             []setParam{{Name: &j}, {Name: &b}},
+			expectedParamnames: []string{"Josh", "Brian"},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			r := getParamNames(tc.params)
+			assert.Equal(r, tc.expectedParamnames)
+		})
+	}
+}
