@@ -27,10 +27,10 @@ import (
 	"testing"
 
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/wrp-go/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/webpa-common/v2/device"
 )
 
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "testTID")
@@ -47,7 +47,7 @@ func TestDecodeRequest(t *testing.T) {
 		resp, err := decodeRequest(ctxTID, r)
 
 		assert.Nil(resp)
-		assert.Equal(device.ErrorInvalidDeviceName.Error(), err.Error())
+		assert.Equal(wrp.ErrorInvalidDeviceName.Error(), err.Error())
 
 	})
 
@@ -79,7 +79,7 @@ func TestEncodeError(t *testing.T) {
 
 	t.Run("BadRequest", func(t *testing.T) {
 		testErrorEncode(t, http.StatusBadRequest, []error{
-			transaction.NewBadRequestError(device.ErrorInvalidDeviceName),
+			transaction.NewBadRequestError(wrp.ErrorInvalidDeviceName),
 		})
 	})
 

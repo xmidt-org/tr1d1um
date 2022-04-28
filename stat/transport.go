@@ -25,9 +25,8 @@ import (
 
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/wrp-go/v3"
 	"go.uber.org/zap"
-
-	"github.com/xmidt-org/webpa-common/v2/device"
 
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
@@ -65,8 +64,8 @@ func ConfigHandler(c *Options) {
 }
 
 func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err error) {
-	var deviceID device.ID
-	if deviceID, err = device.ParseID(mux.Vars(r)["deviceid"]); err == nil {
+	var deviceID wrp.DeviceID
+	if deviceID, err = wrp.ParseDeviceID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
 			AuthHeaderValue: r.Header.Get("Authorization"),
 			DeviceID:        string(deviceID),
