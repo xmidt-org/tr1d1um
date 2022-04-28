@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [v0.7.3]
 - Bumped ancla to v0.3.9 to fix Duration bug in webhook registration - Duration should be an int in seconds. It will also accept strings such as "5m". [#270](https://github.com/xmidt-org/tr1d1um/pull/270)
+- Updated v2 webhook registration to allow for no Duration or Until set. [#270](https://github.com/xmidt-org/tr1d1um/pull/270)
 
 ## [v0.7.2]
 - Fixed v2 endpoint to allow for invalid duration or until fields.  When they are invalid, the duration of the webhook is set to the configured maximum. [#266](https://github.com/xmidt-org/tr1d1um/pull/266)

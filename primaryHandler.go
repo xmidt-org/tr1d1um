@@ -299,11 +299,17 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alic
 				// If not, set the WebhookRegistration  duration to 5m.
 				webhook := wr.ToWebhook()
 				if webhook.Until.IsZero() {
-					durationErr := durationCheck(webhook)
-					if durationErr != nil {
+					if webhook.Duration == 0 {
 						wr.Duration = ancla.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
-							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
+							fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
+					} else {
+						durationErr := durationCheck(webhook)
+						if durationErr != nil {
+							wr.Duration = ancla.CustomDuration(config.Max)
+							w.Header().Add(v2WarningHeader,
+								fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
+						}
 					}
 				} else {
 					untilErr := untilCheck(webhook)
