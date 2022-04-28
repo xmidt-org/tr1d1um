@@ -166,7 +166,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 
 		webhookConfig.Logger = logger
-		webhookConfig.MetricsProvider = metricsRegistry
+		webhookConfig.Measures = *ancla.NewMeasures(metricsRegistry)
 		argusClientTimeout, err := newArgusClientTimeout(v)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
@@ -188,7 +188,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 
 		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			MetricsProvider:   metricsRegistry,
 			V:                 builtValidators,
 			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 			GetLogger:         getLogger,
