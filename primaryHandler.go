@@ -280,8 +280,8 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alic
 					return
 				}
 
-				var webhook ancla.Webhook
-				err = json.Unmarshal(requestPayload, &webhook)
+				var wr ancla.WebhookRegistration
+				err = json.Unmarshal(requestPayload, &wr)
 				if err != nil {
 					var e *json.UnmarshalTypeError
 					if errors.As(err, &e) {
@@ -295,27 +295,28 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alic
 					return
 				}
 
-				// check to see if the webhook has a valid until/duration.
-				// If not, set it to 5m.
+				// check to see if the Webhook has a valid until/duration.
+				// If not, set the WebhookRegistration  duration to 5m.
+				webhook := wr.ToWebhook()
 				if webhook.Until.IsZero() {
 					durationErr := durationCheck(webhook)
 					if durationErr != nil {
-						webhook.Duration = config.Max
+						wr.Duration = ancla.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
 					}
 				} else {
 					untilErr := untilCheck(webhook)
 					if untilErr != nil {
-						webhook.Until = time.Time{}
-						webhook.Duration = config.Max
+						wr.Until = time.Time{}
+						wr.Duration = ancla.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 					}
 				}
 
 				// put the body back in the request
-				body, err := json.Marshal(webhook)
+				body, err := json.Marshal(wr)
 				if err != nil {
 					v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
 				}
