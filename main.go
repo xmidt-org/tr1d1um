@@ -181,6 +181,10 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 		defer stopWatch()
 
+		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+			GetLogger: getLogger,
+		})
+
 		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
@@ -193,11 +197,29 @@ func tr1d1um(arguments []string) (exitCode int) {
 			GetLogger:         getLogger,
 		})
 
-		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-			GetLogger: getLogger,
+		//build validators and webhook handler for previous version that only check loopback.
+		v2Validation := ancla.ValidatorConfig{
+			URL: ancla.URLVConfig{
+				AllowLoopback:        webhookConfig.Validation.URL.AllowLoopback,
+				AllowIP:              true,
+				AllowSpecialUseHosts: true,
+				AllowSpecialUseIPs:   true,
+			},
+			TTL: webhookConfig.Validation.TTL,
+		}
+		v2Validators, err := ancla.BuildValidators(v2Validation)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize v2 webhook validators: %s\n", err.Error())
+			return 1
+		}
+
+		v2AddWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+			V:                 v2Validators,
+			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+			GetLogger:         getLogger,
 		})
 
-		fixV2Middleware, err := fixV2Duration(getLogger, webhookConfig.Validation.TTL)
+		fixV2Middleware, err := fixV2Duration(getLogger, webhookConfig.Validation.TTL, v2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return 1
