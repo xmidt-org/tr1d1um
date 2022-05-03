@@ -334,6 +334,9 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Han
 			}
 			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
+			if v2Handler == nil {
+				v2Handler = next
+			}
 			v2Handler.ServeHTTP(w, r)
 		})
 	}, nil
