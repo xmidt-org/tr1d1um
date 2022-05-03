@@ -33,6 +33,10 @@ import (
 	"github.com/justinas/alice"
 )
 
+var (
+	errResponseIsNil = errors.New("response is nil")
+)
+
 // Options wraps the properties needed to set up the stat server
 type Options struct {
 	S Service
@@ -108,7 +112,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	resp := response.(*transaction.XmidtResponse)
 
 	if resp == nil || resp.Body == nil {
-		err = errors.New("response is nil")
+		err = errResponseIsNil
 		return
 	}
 

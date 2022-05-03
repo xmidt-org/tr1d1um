@@ -83,3 +83,12 @@ func (_m *MockTr1d1umTransactor) Transact(_a0 *http.Request) (*transaction.Xmidt
 
 	return r0, r1
 }
+
+type mockAcquirer struct {
+	mock.Mock
+}
+
+func (m *mockAcquirer) Acquire() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
