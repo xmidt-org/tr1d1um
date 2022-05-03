@@ -209,7 +209,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 		v2Validators, err := ancla.BuildValidators(v2Validation)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
+			fmt.Fprintf(os.Stderr, "Failed to initialize v2 webhook validators: %s\n", err.Error())
 			return 1
 		}
 
