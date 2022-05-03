@@ -162,12 +162,12 @@ func TestEncodeResponse(t *testing.T) {
 				assert.True(errors.Is(e, tc.expectedErr),
 					fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain",
 						e, tc.expectedErr))
-			} else {
-				assert.Nil(e)
-				assert.EqualValues(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
-				assert.EqualValues(tc.resp.Body, tc.respRecorder.Body.String())
-				assert.EqualValues(tc.resp.Code, tc.respRecorder.Code)
+				return
 			}
+			assert.Nil(e)
+			assert.EqualValues(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
+			assert.EqualValues(tc.resp.Body, tc.respRecorder.Body.String())
+			assert.EqualValues(tc.resp.Code, tc.respRecorder.Code)
 		})
 	}
 }

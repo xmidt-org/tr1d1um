@@ -142,7 +142,6 @@ func TestWelcome(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
-	logCount := 0
 	tcs := []struct {
 		desc                        string
 		logger                      *zap.Logger
@@ -153,15 +152,7 @@ func TestLog(t *testing.T) {
 		expectedLogCount            int
 	}{
 		{
-			desc: "Sanity Check",
-			logger: zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
-				func(e zapcore.Entry) error {
-					if e.Level == zap.ErrorLevel {
-						t.Fatal("Error should never happen!")
-					}
-					logCount++
-					return nil
-				}))),
+			desc:                        "Sanity Check",
 			reducedLoggingResponseCodes: []int{},
 			ctx:                         context.Background(),
 			code:                        200,
@@ -169,12 +160,7 @@ func TestLog(t *testing.T) {
 			expectedLogCount:            1,
 		},
 		{
-			desc: "Arrival Time Present",
-			logger: zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
-				func(e zapcore.Entry) error {
-					logCount++
-					return nil
-				}))),
+			desc:                        "Arrival Time Present",
 			reducedLoggingResponseCodes: []int{},
 			ctx:                         ctxWithArrivalTime,
 			code:                        200,
@@ -182,12 +168,7 @@ func TestLog(t *testing.T) {
 			expectedLogCount:            2,
 		},
 		{
-			desc: "IncludeHeaders is False",
-			logger: zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
-				func(e zapcore.Entry) error {
-					logCount++
-					return nil
-				}))),
+			desc:                        "IncludeHeaders is False",
 			reducedLoggingResponseCodes: []int{200},
 			ctx:                         context.Background(),
 			code:                        200,
@@ -199,8 +180,13 @@ func TestLog(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert := assert.New(t)
-			logCount = 0
-			s := Log(tc.logger, tc.reducedLoggingResponseCodes)
+			var logCount = 0
+			logger := zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
+				func(e zapcore.Entry) error {
+					logCount++
+					return nil
+				})))
+			s := Log(logger, tc.reducedLoggingResponseCodes)
 			s(tc.ctx, tc.code, tc.request)
 			assert.Equal(tc.expectedLogCount, logCount)
 		})
