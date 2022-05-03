@@ -62,13 +62,10 @@ func NewService(o *ServiceOptions) Service {
 }
 
 type service struct {
-	transactor transaction.T
-
+	transactor   transaction.T
 	authAcquirer acquire.Acquirer
-
-	xmidtWrpURL string
-
-	wrpSource string
+	xmidtWrpURL  string
+	wrpSource    string
 }
 
 // SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
