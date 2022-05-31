@@ -73,6 +73,7 @@ type HandleWebhookRoutesIn struct {
 	APIRouter             *mux.Router  `name:"api_router"`
 	AuthChain             alice.Chain  `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 	WebhookConfigKey      ancla.Config
 }
@@ -201,7 +202,7 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 
 func handleWebhookRoutes(in HandleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(getLogger, in.WebhookConfigKey.Validation.TTL)
+		fixV2Middleware, err := fixV2Duration(getLogger, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
@@ -234,7 +235,7 @@ func provideURLPrefix(in ProvideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alice.Constructor, error) {
+func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if getLogger == nil {
 		getLogger = func(_ context.Context) log.Logger {
 			return nil
@@ -255,61 +256,77 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig) (alic
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			vars := mux.Vars(r)
-			// if this is v2, we need to unmarshal and check the duration.  If
-			// the duration is bad, change it to 5m and add a header.
-			if vars != nil && vars["version"] == prevAPIVersion {
-				logger := getLogger(r.Context())
-				if logger == nil {
-					logger = log.NewNopLogger()
-				}
-				requestPayload, err := ioutil.ReadAll(r.Body)
-				if err != nil {
-					v2ErrEncode(w, logger, err, 0)
-					return
-				}
+			// if this isn't v2, do nothing.
+			if vars == nil || vars["version"] != prevAPIVersion {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-				var webhook ancla.Webhook
-				err = json.Unmarshal(requestPayload, &webhook)
-				if err != nil {
-					var e *json.UnmarshalTypeError
-					if errors.As(err, &e) {
-						v2ErrEncode(w, logger,
-							fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
-							http.StatusBadRequest)
-						return
-					}
-					v2ErrEncode(w, logger, fmt.Errorf("%w: %v", errFailedWebhookUnmarshal, err),
+			// if this is v2, we need to unmarshal and check the duration.  If
+			// the duration is bad, change it to 5m and add a header. Then use
+			// the v2 handler.
+			logger := getLogger(r.Context())
+			if logger == nil {
+				logger = log.NewNopLogger()
+			}
+			requestPayload, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				v2ErrEncode(w, logger, err, 0)
+				return
+			}
+
+			var wr ancla.WebhookRegistration
+			err = json.Unmarshal(requestPayload, &wr)
+			if err != nil {
+				var e *json.UnmarshalTypeError
+				if errors.As(err, &e) {
+					v2ErrEncode(w, logger,
+						fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
 						http.StatusBadRequest)
 					return
 				}
+				v2ErrEncode(w, logger, fmt.Errorf("%w: %v", errFailedWebhookUnmarshal, err),
+					http.StatusBadRequest)
+				return
+			}
 
-				// check to see if the webhook has a valid until/duration.
-				// If not, set it to 5m.
-				if webhook.Until.IsZero() {
+			// check to see if the Webhook has a valid until/duration.
+			// If not, set the WebhookRegistration  duration to 5m.
+			webhook := wr.ToWebhook()
+			if webhook.Until.IsZero() {
+				if webhook.Duration == 0 {
+					wr.Duration = ancla.CustomDuration(config.Max)
+					w.Header().Add(v2WarningHeader,
+						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
+				} else {
 					durationErr := durationCheck(webhook)
 					if durationErr != nil {
-						webhook.Duration = config.Max
+						wr.Duration = ancla.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
 					}
-				} else {
-					untilErr := untilCheck(webhook)
-					if untilErr != nil {
-						webhook.Until = time.Time{}
-						webhook.Duration = config.Max
-						w.Header().Add(v2WarningHeader,
-							fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
-					}
 				}
-
-				// put the body back in the request
-				body, err := json.Marshal(webhook)
-				if err != nil {
-					v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+			} else {
+				untilErr := untilCheck(webhook)
+				if untilErr != nil {
+					wr.Until = time.Time{}
+					wr.Duration = ancla.CustomDuration(config.Max)
+					w.Header().Add(v2WarningHeader,
+						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 				}
-				r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 			}
-			next.ServeHTTP(w, r)
+
+			// put the body back in the request
+			body, err := json.Marshal(wr)
+			if err != nil {
+				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+			}
+			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+			if v2Handler == nil {
+				v2Handler = next
+			}
+			v2Handler.ServeHTTP(w, r)
 		})
 	}, nil
 }
