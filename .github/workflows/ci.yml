@@ -21,4 +21,5 @@ jobs:
     uses: xmidt-org/.github/.github/workflows/go-ci.yml@go-ci-v1
     with:
       style-skip: true
+      license-skip: true
     secrets: inherit
