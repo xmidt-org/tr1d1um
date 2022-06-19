@@ -1,11 +1,12 @@
 # tr1d1um
 
-[![Build Status](https://github.com/xmidt-org/tr1d1um/workflows/CI/badge.svg)](https://github.com/xmidt-org/tr1d1um/actions)
-[![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=main)](https://codecov.io/github/xmidt-org/tr1d1um?branch=main)
+[![Build Status](https://github.com/xmidt-org/tr1d1um/actions/workflows/ci.yml/badge.svg)](https://github.com/xmidt-org/tr1d1um/actions/workflows/ci.yml)
+[![Dependency Updateer](https://github.com/xmidt-org/tr1d1um/actions/workflows/updater.yml/badge.svg)](https://github.com/xmidt-org/tr1d1um/actions/workflows/updater.yml)
+[![codecov.io](http://codecov.io/github/xmidt-org/tr1d1um/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/tr1d1um?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/tr1d1um)](https://goreportcard.com/report/github.com/xmidt-org/tr1d1um)
-[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/tr1d1um/blob/main/LICENSE)
-[![GitHub release](https://img.shields.io/github/release/xmidt-org/tr1d1um.svg)](CHANGELOG.md)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=xmidt-org_tr1d1um&metric=alert_status)](https://sonarcloud.io/dashboard?id=xmidt-org_tr1d1um)
+[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/tr1d1um/blob/main/LICENSE)
+[![GitHub Release](https://img.shields.io/github/release/xmidt-org/tr1d1um.svg)](CHANGELOG.md)
 
 
 ## Summary
