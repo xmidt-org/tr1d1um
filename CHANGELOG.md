@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - Dependency update
-  - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but nothing has no vulnerabilities have been filed
+  - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
+  -  [github.com/gorilla/sessions v1.2.1 cwe-613 no patch available](https://ossindex.sonatype.org/vulnerability/sonatype-2021-4899)
 
 ## [v0.7.4]
 - Updated v2 hook endpoint to only enforce loopback validation (when configured). [#277](https://github.com/xmidt-org/tr1d1um/pull/277)
