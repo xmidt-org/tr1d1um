@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Dependency update
+  - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but nothing has no vulnerabilities have been filed
 
 ## [v0.7.4]
 - Updated v2 hook endpoint to only enforce loopback validation (when configured). [#277](https://github.com/xmidt-org/tr1d1um/pull/277)
