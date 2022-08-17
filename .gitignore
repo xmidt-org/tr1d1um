@@ -39,6 +39,10 @@ vendor
 .ignore
 report.json
 
+# VSCode
+*.code-workspace
+.vscode/*
+
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out
