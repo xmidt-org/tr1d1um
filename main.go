@@ -166,20 +166,30 @@ func tr1d1um(arguments []string) (exitCode int) {
 		}
 
 		webhookConfig.Logger = logger
-		webhookConfig.Measures = *ancla.NewMeasures(metricsRegistry)
+		listenerMeasures := ancla.ListenerConfig{
+			Measures: *ancla.NewMeasures(metricsRegistry),
+		}
+
 		argusClientTimeout, err := newArgusClientTimeout(v)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
 			return 1
 		}
-		webhookConfig.Argus.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
 
-		svc, stopWatch, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+		webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
+		svc, err := ancla.NewService(webhookConfig, getLogger)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
 			return 1
 		}
-		defer stopWatch()
+		stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Webhook service start listener error: %v\n", err)
+			return 1
+		}
+		level.Info(logger).Log(logging.MessageKey(), "Webhook service enabled")
+
+		defer stopWatches()
 
 		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
 			GetLogger: getLogger,
