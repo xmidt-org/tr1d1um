@@ -5,9 +5,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.7.5]
 - Dependency update
   - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
   -  [github.com/gorilla/sessions v1.2.1 cwe-613 no patch available](https://ossindex.sonatype.org/vulnerability/sonatype-2021-4899)
+- JWT Migration #289 
+  - update to use clortho `Resolver` & `Refresher`
+  - update to use clortho `metrics` & `logging`
+- Update ancla client initialization
+- Update Config
+  - Use [uber/zap](https://github.com/uber-go/zap) for clortho logging
+  - Use [xmidt-org/sallust](https://github.com/xmidt-org/sallust) for the zap config unmarshalling 
+  - Update auth config for clortho
+  - Update ancla config
 
 ## [v0.7.4]
 - Updated v2 hook endpoint to only enforce loopback validation (when configured). [#277](https://github.com/xmidt-org/tr1d1um/pull/277)
@@ -148,7 +159,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.5...HEAD
+[v0.7.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.4...v0.7.5
 [v0.7.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.3...v0.7.4
 [v0.7.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.2...v0.7.3
 [v0.7.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.1...v0.7.2
