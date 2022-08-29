@@ -30,8 +30,8 @@ import (
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
-	"github.com/xmidt-org/bascule/key"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -69,8 +69,8 @@ type CapabilityConfig struct {
 
 // JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
-	// JWTKeys is used to create the key.Resolver for JWT verification keys
-	Keys key.ResolverFactory `json:"key"`
+	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
+	Resolver clortho.Resolver
 
 	// Leeway is used to set the amount of time buffer should be given to JWT
 	// time values, such as nbf
