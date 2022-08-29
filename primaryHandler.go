@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -141,6 +140,24 @@ func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
+func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
+	//build validators and webhook handler for previous version that only check loopback.
+	v, err := ancla.BuildValidators(ancla.ValidatorConfig{
+		URL: ancla.URLVConfig{
+			AllowLoopback:        c.Validation.URL.AllowLoopback,
+			AllowIP:              true,
+			AllowSpecialUseHosts: true,
+			AllowSpecialUseIPs:   true,
+		},
+		TTL: c.Validation.TTL,
+	})
+	if err != nil {
+		return ancla.Validators{}, err
+	}
+
+	return v, nil
+}
+
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
 	// Webhooks (if not configured, handlers are not set up)
 	if !in.V.IsSet(webhookConfigKey) {
@@ -183,24 +200,13 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		GetLogger:         getLogger,
 	})
 
-	//build validators and webhook handler for previous version that only check loopback.
-	v2Validation := ancla.ValidatorConfig{
-		URL: ancla.URLVConfig{
-			AllowLoopback:        webhookConfig.Validation.URL.AllowLoopback,
-			AllowIP:              true,
-			AllowSpecialUseHosts: true,
-			AllowSpecialUseIPs:   true,
-		},
-		TTL: webhookConfig.Validation.TTL,
-	}
-	v2Validators, err := ancla.BuildValidators(v2Validation)
+	v, err := v2WebhookValidators(webhookConfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize v2 webhook validators: %s\n", err.Error())
-		return out, err
+		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
 	}
 
 	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 v2Validators,
+		V:                 v,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         getLogger,
 	})
