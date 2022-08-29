@@ -1,13 +1,10 @@
 FROM docker.io/library/golang:1.19-alpine as builder
 
-MAINTAINER Jack Murdock <jack_murdock@comcast.com>
-
 WORKDIR /src
 
 ARG VERSION
 ARG GITCOMMIT
 ARG BUILDTIME
-
 
 RUN apk add --no-cache --no-progress \
     ca-certificates \
