@@ -27,6 +27,10 @@ src/tr1d1um/output
 src/tr1d1um/tr1d1um.json
 keys/*.private
 
+# VSCode
+*.code-workspace
+.vscode/*
+
 # Vim
 *.swp
 *.out
