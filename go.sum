@@ -974,6 +974,8 @@ github.com/xmidt-org/bascule v0.10.3-0.20220812183557-0b9b46b94ce6/go.mod h1:6Jn
 github.com/xmidt-org/bascule v0.11.0 h1:A5RoGFA3XqF7Az1FBF9uEBqhUQ3dLvyhefpS7UkNAvA=
 github.com/xmidt-org/bascule v0.11.0/go.mod h1:6JnrbmFjVueyUL496MidJYBDotPpuGTGsPOBnCATvQ8=
 github.com/xmidt-org/candlelight v0.0.5/go.mod h1:j9Q2tzrOAywm+JvvVJjlOmlPJvdlRrOyFjLz33SaU1Y=
+github.com/xmidt-org/candlelight v0.0.9 h1:FXYDnPtkuJzaRgK1jprdOJmWADMeln6/s764FaJfN2I=
+github.com/xmidt-org/candlelight v0.0.9/go.mod h1:hIGM1g5ksy5/X1+JAVrETFysdtYGA1f0abrb+hBmFdE=
 github.com/xmidt-org/candlelight v0.0.10 h1:pCArPPCnNjvaTMCdUeEwGh8Nj4moN6r8XLVVorN/xGU=
 github.com/xmidt-org/candlelight v0.0.10/go.mod h1:Vy5vSLpwDkphgJ2lOOLBlKOjcgSWq3lA8e0yyVzQCJg=
 github.com/xmidt-org/chronon v0.1.1 h1:SzOYkT/nmps3jH4sWu6A52ToKvv5Bu0Gb45/ec5Ty9U=
