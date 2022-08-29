@@ -37,10 +37,11 @@ import (
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/logging"
+	"github.com/xmidt-org/webpa-common/v2/logging"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -213,9 +214,40 @@ func handleWebhookRoutes(in HandleWebhookRoutesIn) error {
 	return nil
 }
 
-func metricMiddleware(bundle touchhttp.ServerBundle) (out MetricMiddlewareOut) {
-	out.Primary = alice.New(bundle.ForServer("server_primary").Then)
-	out.Health = alice.New(bundle.ForServer("server_health").Then)
+func metricMiddleware() (out MetricMiddlewareOut) {
+
+	var bundle touchhttp.ServerBundle
+	fx.New(
+		touchstone.Provide(),
+		fx.Provide(
+			fx.Annotated{
+				Name: "server_primary",
+				Target: bundle.NewInstrumenter(
+					touchhttp.ServerLabel, "server_primary",
+				),
+			},
+			fx.Annotated{
+				Name: "server_health",
+				Target: bundle.NewInstrumenter(
+					touchhttp.ServerLabel, "server_health",
+				),
+			},
+		),
+		fx.Invoke(
+			fx.Annotate(
+				func(si touchhttp.ServerInstrumenter) {
+					out.Health = alice.New(si.Then)
+				},
+				fx.ParamTags(`name:"server_primary"`),
+			),
+			fx.Annotate(
+				func(si touchhttp.ServerInstrumenter) {
+					out.Primary = alice.New(si.Then)
+				},
+				fx.ParamTags(`name:"server_health"`),
+			),
+		),
+	)
 	return
 }
 

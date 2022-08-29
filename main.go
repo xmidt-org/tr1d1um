@@ -29,7 +29,6 @@ import (
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
-	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -212,7 +211,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		touchhttp.Provide(),
-		touchstone.Provide(),
 		ancla.ProvideMetrics(),
 		fx.Provide(
 			consts,
