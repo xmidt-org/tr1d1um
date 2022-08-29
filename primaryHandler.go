@@ -147,16 +147,26 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
+
 	webhookConfig := in.WebhookConfigKey
-
 	webhookConfig.Logger = gokitLogger(in.Logger)
-	webhookConfig.Measures = *in.Measures
-	webhookConfig.Argus.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
+	listenerMeasures := ancla.ListenerConfig{
+		Measures: *in.Measures,
+	}
+	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
-	svc, _, err := ancla.Initialize(webhookConfig, getLogger, logging.WithLogger)
+	svc, err := ancla.NewService(webhookConfig, getLogger)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
+
+	stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
+	if err != nil {
+		return out, fmt.Errorf("webhook service start listener error: %s", err)
+	}
+	in.Logger.Info("Webhook service enabled")
+
+	defer stopWatches()
 
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
 		GetLogger: getLogger,
