@@ -228,7 +228,6 @@ func handleWebhookRoutes(in HandleWebhookRoutesIn) error {
 }
 
 func metricMiddleware() (out MetricMiddlewareOut) {
-
 	var bundle touchhttp.ServerBundle
 	fx.New(
 		// QUESTION is this touchstone.Provide() needed even tho we provided 1 at main.go
