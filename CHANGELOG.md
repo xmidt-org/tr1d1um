@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Uber fx integration
   - https://github.com/xmidt-org/tr1d1um/issues/288
   - https://github.com/xmidt-org/tr1d1um/issues/291
+- Major changes to server config, sections changed
+  - `primary` => `servers.primary`
+  - `alternate ` => `servers.alternate`
+  - `health ` => `servers.health`
+  - `pprof ` => `servers.pprof`
+  - `alternate` => `servers.alternate`
+  - Sections `log` and `zap` were replaced with `logging`
+  - Section `touchstone ` was replaced with `prometheus` 
 
 ## [v0.7.6]
 - Dependency update
