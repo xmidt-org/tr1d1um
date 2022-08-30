@@ -239,7 +239,7 @@ jwtValidator:
       # Template is a URI template used to fetch keys.  This template may
       # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
       # This field is required and has no default.
-      Template: "https://sat-prod.codebig2.net/v2/sign-keys/{keyID}"
+      Template: "http://localhost/{keyID}"
     Refresh:
       Sources:
         # URI is the location where keys are served.  By default, clortho supports
@@ -247,7 +247,7 @@ jwtValidator:
         # such as /etc/foo/bar.jwk.
         #
         # This field is required and has no default.
-        - URI: "https://sat-prod.codebig2.net/v2/sign-keys/available"
+        - URI: "http://localhost/available"
 
 authx:
   inbound:
