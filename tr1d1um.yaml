@@ -232,28 +232,28 @@ webhook:
 ##############################################################################
 # Authorization Credentials
 ##############################################################################
+# jwtValidator provides Bearer auth configuration
+jwtValidator:
+  Config:
+    Resolve:
+      # Template is a URI template used to fetch keys.  This template may
+      # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
+      # This field is required and has no default.
+      Template: "https://sat-prod.codebig2.net/v2/sign-keys/{keyID}"
+    Refresh:
+      Sources:
+        # URI is the location where keys are served.  By default, clortho supports
+        # file://, http://, and https:// URIs, as well as standard file system paths
+        # such as /etc/foo/bar.jwk.
+        #
+        # This field is required and has no default.
+        - URI: "https://sat-prod.codebig2.net/v2/sign-keys/available"
 
 authx:
   inbound:
     # basic is a list of Basic Auth credentials intended to be used for local testing purposes
     # WARNING! Be sure to remove this from your production config
     basic: ["dXNlcjpwYXNz"]
-  # jwtValidator provides Bearer auth configuration
-  jwtValidator:
-    Config:
-      Resolve:
-        # Template is a URI template used to fetch keys.  This template may
-        # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
-        # This field is required and has no default.
-        Template: "http://localhost/{keyID}"
-      Refresh:
-        Sources:
-          # URI is the location where keys are served.  By default, clortho supports
-          # file://, http://, and https:// URIs, as well as standard file system paths
-          # such as /etc/foo/bar.jwk.
-          #
-          # This field is required and has no default.
-          - URI: "http://localhost/available"
 
 # capabilityCheck provides the details needed for checking an incoming JWT's
 # capabilities.  If the type of check isn't provided, no checking is done.  The 
