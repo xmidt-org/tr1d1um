@@ -28,101 +28,58 @@ region: "east"
 # (Optional)
 flavor: "mint"
 
+prometheus:
+  defaultNamespace: xmidt
+  defaultSubsystem: tr1d1um
+  constLabels:
+    development: "true"
+  handler:
+    maxRequestsInFlight: 5
+    timeout: 5s
+    instrumentMetricHandler: true
 
-##############################################################################
-# WebPA Service configuration
-##############################################################################
-
-# For a complete view of the service config structure, 
-# checkout https://godoc.org/github.com/xmidt-org/webpa-common/server#WebPA
+health:
+  disableLogging: false
+  custom:
+    server: development
 
 ########################################
 #   Primary Endpoint Configuration
 ########################################
 
-# primary provides the configuration for the main server for this application
-primary:
-  address: ":6100"
-
-########################################
-#   Health Endpoint Configuration
-########################################
-
-# health defines the details needed for the health check endpoint.  The
-# health check endpoint is generally used by services (like AWS Route53
-# or consul) to determine if this particular machine is healthy or not.
-health:
-  address: ":6101"
-
-########################################
-#   Debugging/Pprof Configuration
-########################################
-
-# pprof defines the details needed for the pprof debug endpoint.
-# (Optional)
-pprof:
-  address: ":6102"
-
-########################################
-#   Metrics Configuration
-########################################
-
-# metric defines the details needed for the prometheus metrics endpoint
-# (Optional)
-metric:
-  address: ":6103"
-  metricsOptions:
-    # namespace is the namespace of the metrics provided
-    # (Optional)
-    namespace: "webpa"
-
-    # subsystem is the subsystem of the metrics provided
-    # (Optional)
-    subsystem: "tr1d1um"
-
-touchstone:
-  # DefaultNamespace is the prometheus namespace to apply when a metric has no namespace
-  defaultNamespace: "xmidt"
-  # DefaultSubsystem is the prometheus subsystem to apply when a metric has no subsystem
-  defaultSubsystem: "tr1d1um"
+servers:
+  primary:
+    address: :6100
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
+  metrics:
+    address: :6101
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
+  health:
+    address: :6102
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - argus
+      X-Midt-Version:
+        - development
+  pprof:
+    address: :6103
 
 ########################################
 #   Logging Related Configuration
 ########################################
 
-# log configures the logging subsystem details
-log:
-  # file is the name of the most recent log file.  If set to "stdout" this
-  # will log to os.Stdout.
-  # (Optional) defaults to os.TempDir()
-  file: "stdout"
-
-  # level is the logging level to use - INFO, DEBUG, WARN, ERROR
-  # (Optional) defaults to ERROR
-  level: "DEBUG"
-
-  # maxsize is the maximum log file size in MB
-  # (Optional) defaults to max 100MB
-  maxsize: 50
-
-  # maxage is the maximum number of days to retain old log files
-  # (Optional) defaults to ignore age limit (0)
-  maxage: 30
-
-  # maxbackups is the maximum number of old log files to retain
-  # (Optional) defaults to retain all (0)
-  maxbackups: 10
-
-  # json is a flag indicating whether JSON logging output should be used.
-  # (Optional) defaults to false
-  json: true
-
-  # reducedLoggingResponseCodes allows disabling verbose transaction logs for 
-  # benign responses from the target server given HTTP status codes.
-  # (Optional)
-  # reducedLoggingResponseCodes: [200, 504]
-
-zap:
+logging:
   # OutputPaths is a list of URLs or file paths to write logging output to.
   outputPaths:
     - stdout
@@ -137,7 +94,7 @@ zap:
   # zapcore.EncoderConfig for details.
   errorOutputPaths:
     - stderr
-    # - /var/log/tr1d1um/tr1d1um.log
+    - denopink-tr1d1um.log
 
   # EncoderConfig sets options for the chosen encoder. See
   # zapcore.EncoderConfig for details.
@@ -145,6 +102,10 @@ zap:
     messageKey: message
     levelKey: key
     levelEncoder: lowercase
+  # reducedLoggingResponseCodes allows disabling verbose transaction logs for 
+  # benign responses from the target server given HTTP status codes.
+  # (Optional)
+  # reducedLoggingResponseCodes: [200, 504]
 
   # Encoding sets the logger's encoding. Valid values are "json" and
   # "console", as well as any third-party encodings registered via
@@ -269,19 +230,14 @@ webhook:
   #      buffer: "2m"
 
 ##############################################################################
-# Testing Authorization Credentials
+# Authorization Credentials
 ##############################################################################
-
-# authHeader is a list of Basic Auth credentials intended to be used for local testing purposes
-# WARNING! Be sure to remove this from your production config
-authHeader: ["dXNlcjpwYXNz"]
-
 # jwtValidator provides Bearer auth configuration
 jwtValidator:
   Config:
     Resolve:
       # Template is a URI template used to fetch keys.  This template may
-	    # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
+      # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
       # This field is required and has no default.
       Template: "http://localhost/{keyID}"
     Refresh:
@@ -291,7 +247,13 @@ jwtValidator:
         # such as /etc/foo/bar.jwk.
         #
         # This field is required and has no default.
-        - URI: "http://localhost"
+        - URI: "http://localhost/available"
+
+authx:
+  inbound:
+    # basic is a list of Basic Auth credentials intended to be used for local testing purposes
+    # WARNING! Be sure to remove this from your production config
+    basic: ["dXNlcjpwYXNz"]
 
 # capabilityCheck provides the details needed for checking an incoming JWT's
 # capabilities.  If the type of check isn't provided, no checking is done.  The 
@@ -388,12 +350,12 @@ requestMaxRetries: 2
 # authAcquirer enables configuring the JWT or Basic auth header value factory for outgoing
 # requests to XMiDT. If both types are configured, JWT will be preferred.
 # (Optional)
-authAcquirer:
+# authAcquirer:
   # JWT: 
   #   # requestHeaders are added to the request for the token.
   #   # (Optional)
   #   # requestHeaders:
-  #   #   "": ""
+  #   #   "": "" 
 
   #   # authURL is the URL to access for the token.
   #   authURL: ""
@@ -405,7 +367,7 @@ authAcquirer:
   #   # buffer is the length of time before a token expires to get a new token.
   #   buffer: "2m"  
     
-  Basic: "" # Must be of form: 'Basic xyz=='
+  # Basic: "" # Must be of form: 'Basic xyz=='
 
 
 # tracing provides configuration around traces using OpenTelemetry.

@@ -72,9 +72,3 @@ func TestErrorLogEncoder(t *testing.T) {
 		})
 	}
 }
-
-func TestGenTID(t *testing.T) {
-	assert := assert.New(t)
-	tid := GenTID()
-	assert.NotEmpty(tid)
-}

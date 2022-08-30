@@ -22,15 +22,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/wrp-go/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/webpa-common/v2/device"
 )
 
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "testTID")
@@ -47,7 +48,7 @@ func TestDecodeRequest(t *testing.T) {
 		resp, err := decodeRequest(ctxTID, r)
 
 		assert.Nil(resp)
-		assert.Equal(device.ErrorInvalidDeviceName.Error(), err.Error())
+		assert.Equal(wrp.ErrorInvalidDeviceName.Error(), err.Error())
 
 	})
 
@@ -79,7 +80,7 @@ func TestEncodeError(t *testing.T) {
 
 	t.Run("BadRequest", func(t *testing.T) {
 		testErrorEncode(t, http.StatusBadRequest, []error{
-			transaction.NewBadRequestError(device.ErrorInvalidDeviceName),
+			transaction.NewBadRequestError(wrp.ErrorInvalidDeviceName),
 		})
 	})
 
@@ -121,24 +122,52 @@ func testErrorEncode(t *testing.T, expectedCode int, es []error) {
 }
 
 func TestEncodeResponse(t *testing.T) {
-	var assert = assert.New(t)
 
-	var (
-		w = httptest.NewRecorder()
-		p = []byte(`{"dBytesSent": "1024"}`)
-
-		resp = &transaction.XmidtResponse{
-			Code:             http.StatusOK,
-			ForwardedHeaders: http.Header{},
-			Body:             p,
-		}
-	)
-
-	//Tr1d1um just forwards the response
-	var e = encodeResponse(ctxTID, w, resp)
-
-	assert.Nil(e)
-	assert.EqualValues("application/json", w.Header().Get("Content-Type"))
-	assert.EqualValues(p, w.Body.String())
-	assert.EqualValues(resp.Code, w.Code)
+	tcs := []struct {
+		desc                      string
+		expectedErr               error
+		expectedContentTypeHeader string
+		resp                      *transaction.XmidtResponse
+		respRecorder              *httptest.ResponseRecorder
+	}{
+		{
+			desc: "Base Success",
+			resp: &transaction.XmidtResponse{
+				Code:             http.StatusOK,
+				ForwardedHeaders: http.Header{},
+				Body:             []byte(`{"dBytesSent": "1024"}`),
+			},
+			expectedContentTypeHeader: "application/json",
+			respRecorder:              httptest.NewRecorder(),
+		},
+		{
+			desc: "Response Body is Nil Failure",
+			resp: &transaction.XmidtResponse{
+				Code:             http.StatusOK,
+				ForwardedHeaders: http.Header{},
+			},
+			expectedErr: errResponseIsNil,
+		},
+		{
+			desc:        "Response is Nil Failure",
+			expectedErr: errResponseIsNil,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			//Tr1d1um just forwards the response
+			var e = encodeResponse(ctxTID, tc.respRecorder, tc.resp)
+			if tc.expectedErr != nil {
+				assert.True(errors.Is(e, tc.expectedErr),
+					fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain",
+						e, tc.expectedErr))
+				return
+			}
+			assert.Nil(e)
+			assert.EqualValues(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
+			assert.EqualValues(tc.resp.Body, tc.respRecorder.Body.String())
+			assert.EqualValues(tc.resp.Code, tc.respRecorder.Code)
+		})
+	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,36 +18,26 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
 
-	"github.com/xmidt-org/tr1d1um/stat"
-	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/tr1d1um/translation"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/arrange"
+	"github.com/xmidt-org/sallust/sallustkit"
+	"github.com/xmidt-org/touchstone"
+	"github.com/xmidt-org/touchstone/touchhttp"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/goph/emperror"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
-	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
-	"github.com/xmidt-org/webpa-common/v2/concurrent"
-	"github.com/xmidt-org/webpa-common/v2/logging"
-	"github.com/xmidt-org/webpa-common/v2/server"
-	"github.com/xmidt-org/webpa-common/v2/xhttp"
 )
 
 // convenient global values
@@ -57,6 +47,7 @@ const (
 	prevAPIVersion     = "v2"
 	applicationName    = "tr1d1um"
 	apiBase            = "api/" + apiVersion
+	prevAPIBase        = "api/" + prevAPIVersion
 	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
 )
 
@@ -70,7 +61,7 @@ const (
 	reqMaxRetriesKey                  = "requestMaxRetries"
 	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "log.reducedLoggingResponseCodes"
+	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
@@ -95,335 +86,87 @@ var defaults = map[string]interface{}{
 	hooksSchemeKey:         "https",
 }
 
-//nolint:funlen
-func tr1d1um(arguments []string) (exitCode int) {
-
-	var (
-		f, v                                = pflag.NewFlagSet(applicationName, pflag.ContinueOnError), viper.New()
-		logger, metricsRegistry, webPA, err = server.Initialize(applicationName, arguments, f, v, ancla.Metrics, basculechecks.Metrics, basculemetrics.Metrics)
-	)
-
-	// This allows us to communicate the version of the binary upon request.
-	if parseErr, done := printVersion(f, arguments); done {
-		// if we're done, we're exiting no matter what
-		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
-		os.Exit(0)
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialize viper: %s\n", err.Error())
-		return 1
-	}
-
-	var (
-		infoLogger, errorLogger = logging.Info(logger), logging.Error(logger)
-		authenticate            *alice.Chain
-	)
-
-	for k, va := range defaults {
-		v.SetDefault(k, va)
-	}
-
-	infoLogger.Log("configurationFile", v.ConfigFileUsed())
-
-	tracing, err := loadTracing(v, applicationName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build tracing component: %v \n", err)
-		return 1
-	}
-	infoLogger.Log(logging.MessageKey(), "tracing status", "enabled", !tracing.IsNoop())
-	authenticate, err = authenticationHandler(v, logger, metricsRegistry)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to build authentication handler: %s\n", err.Error())
-		return 1
-	}
-
-	rootRouter := mux.NewRouter()
-	otelMuxOptions := []otelmux.Option{
-		otelmux.WithPropagators(tracing.Propagator()),
-		otelmux.WithTracerProvider(tracing.TracerProvider()),
-	}
-	rootRouter.Use(otelmux.Middleware("mainSpan", otelMuxOptions...), candlelight.EchoFirstTraceNodeInfo(tracing.Propagator()))
-
-	// if we want to support the previous API version, then include it in the
-	// api base.
-	urlPrefix := fmt.Sprintf("/%s/", apiBase)
-	if v.GetBool("previousVersionSupport") {
-		urlPrefix = fmt.Sprintf("/%s/", apiBaseDualVersion)
-	}
-	APIRouter := rootRouter.PathPrefix(urlPrefix).Subrouter()
-
-	//
-	// Webhooks (if not configured, handlers are not set up)
-	//
-	if v.IsSet(webhookConfigKey) {
-		var webhookConfig ancla.Config
-		err := v.UnmarshalKey(webhookConfigKey, &webhookConfig)
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to decode config for webhook service: %s\n", err.Error())
-			return 1
-		}
-
-		webhookConfig.Logger = logger
-		listenerMeasures := ancla.ListenerConfig{
-			Measures: *ancla.NewMeasures(metricsRegistry),
-		}
-
-		argusClientTimeout, err := newArgusClientTimeout(v)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to parse argus client timeout config values: %s \n", err.Error())
-			return 1
-		}
-
-		webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(argusClientTimeout, tracing)
-		svc, err := ancla.NewService(webhookConfig, getLogger)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize webhook service: %s\n", err.Error())
-			return 1
-		}
-		stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Webhook service start listener error: %v\n", err)
-			return 1
-		}
-		level.Info(logger).Log(logging.MessageKey(), "Webhook service enabled")
-
-		defer stopWatches()
-
-		getAllWebhooksHandler := ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-			GetLogger: getLogger,
-		})
-
-		builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize webhook validators: %s\n", err.Error())
-			return 1
-		}
-
-		addWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			V:                 builtValidators,
-			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-			GetLogger:         getLogger,
-		})
-
-		//build validators and webhook handler for previous version that only check loopback.
-		v2Validation := ancla.ValidatorConfig{
-			URL: ancla.URLVConfig{
-				AllowLoopback:        webhookConfig.Validation.URL.AllowLoopback,
-				AllowIP:              true,
-				AllowSpecialUseHosts: true,
-				AllowSpecialUseIPs:   true,
-			},
-			TTL: webhookConfig.Validation.TTL,
-		}
-		v2Validators, err := ancla.BuildValidators(v2Validation)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize v2 webhook validators: %s\n", err.Error())
-			return 1
-		}
-
-		v2AddWebhookHandler := ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-			V:                 v2Validators,
-			DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-			GetLogger:         getLogger,
-		})
-
-		fixV2Middleware, err := fixV2Duration(getLogger, webhookConfig.Validation.TTL, v2AddWebhookHandler)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
-			return 1
-		}
-
-		APIRouter.Handle("/hook", authenticate.Then(fixV2Middleware(addWebhookHandler))).Methods(http.MethodPost)
-		APIRouter.Handle("/hooks", authenticate.Then(getAllWebhooksHandler)).Methods(http.MethodGet)
-
-		infoLogger.Log(logging.MessageKey(), "Webhook service enabled")
-	} else {
-		infoLogger.Log(logging.MessageKey(), "Webhook service disabled")
-	}
-
-	xmidtClientTimeout, err := newXmidtClientTimeout(v)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse xmidt client timeout config values: %s \n", err.Error())
-		return 1
-	}
-	xmidtHTTPClient := newHTTPClient(xmidtClientTimeout, tracing)
-
-	//
-	// Stat Service configs
-	//
-	statServiceOptions := &stat.ServiceOptions{
-		HTTPTransactor: transaction.New(
-			&transaction.Options{
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					xmidtHTTPClient.Do),
-				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-			}),
-		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", v.GetString(targetURLKey)),
-	}
-
-	//
-	// WRP Service configs
-	//
-	translationOptions := &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/device", v.GetString(targetURLKey)),
-		WRPSource:   v.GetString(wrpSourceKey),
-		T: transaction.New(
-			&transaction.Options{
-				RequestTimeout: xmidtClientTimeout.RequestTimeout,
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   logger,
-						Retries:  v.GetInt(reqMaxRetriesKey),
-						Interval: v.GetDuration(reqRetryIntervalKey),
-					},
-					xmidtHTTPClient.Do),
-			}),
-	}
-
-	reducedLoggingResponseCodes := v.GetIntSlice(reducedTransactionLoggingCodesKey)
-
-	if v.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(v)
-		if err != nil {
-			errorLogger.Log(logging.MessageKey(), "Could not configure auth acquirer", logging.ErrorKey(), err)
-		} else {
-			translationOptions.AuthAcquirer = acquirer
-			statServiceOptions.AuthAcquirer = acquirer
-			infoLogger.Log(logging.MessageKey(), "Outbound request authentication token acquirer enabled")
-		}
-	}
-
-	ss := stat.NewService(statServiceOptions)
-	ts := translation.NewService(translationOptions)
-
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   APIRouter,
-		Authenticate:                authenticate,
-		Log:                         logger,
-		ValidServices:               v.GetStringSlice(translationServicesKey),
-		ReducedLoggingResponseCodes: reducedLoggingResponseCodes,
-	})
-
-	var (
-		_, tr1d1umServer, done = webPA.Prepare(logger, nil, metricsRegistry, rootRouter)
-		signals                = make(chan os.Signal, 10)
-	)
-
-	//
-	// Execute the runnable, which runs all the servers, and wait for a signal
-	//
-	waitGroup, shutdown, err := concurrent.Execute(tr1d1umServer)
-
-	if err != nil {
-		errorLogger.Log(logging.MessageKey(), "Unable to start tr1d1um", logging.ErrorKey(), err)
-		return 4
-	}
-
-	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
-	for exit := false; !exit; {
-		select {
-		case s := <-signals:
-			level.Error(logger).Log(logging.MessageKey(), "exiting due to signal", "signal", s)
-			exit = true
-		case <-done:
-			level.Error(logger).Log(logging.MessageKey(), "one or more servers exited")
-			exit = true
-		}
-	}
-
-	close(shutdown)
-	waitGroup.Wait()
-
-	return 0
+type XmidtClientTimeoutConfigIn struct {
+	fx.In
+	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
 }
 
-func newXmidtClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
-	var timeouts httpClientTimeout
-	err := v.UnmarshalKey("xmidtClientTimeout", &timeouts)
-	if err != nil {
-		return httpClientTimeout{}, err
-	}
-	if timeouts.ClientTimeout == 0 {
-		timeouts.ClientTimeout = time.Second * 135
-	}
-	if timeouts.NetDialerTimeout == 0 {
-		timeouts.NetDialerTimeout = time.Second * 5
-	}
-	if timeouts.RequestTimeout == 0 {
-		timeouts.RequestTimeout = time.Second * 129
-	}
-	return timeouts, nil
+type ArgusClientTimeoutConfigIn struct {
+	fx.In
+	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
 }
 
-func newArgusClientTimeout(v *viper.Viper) (httpClientTimeout, error) {
-	var timeouts httpClientTimeout
-	err := v.UnmarshalKey("argusClientTimeout", &timeouts)
-	if err != nil {
-		return httpClientTimeout{}, err
-	}
-	if timeouts.ClientTimeout == 0 {
-		timeouts.ClientTimeout = time.Second * 50
-	}
-	if timeouts.NetDialerTimeout == 0 {
-		timeouts.NetDialerTimeout = time.Second * 5
-	}
-	return timeouts, nil
+type TracingConfigIn struct {
+	fx.In
+	TracingConfig candlelight.Config
+	Logger        *zap.Logger
 }
 
-func loadTracing(v *viper.Viper, appName string) (candlelight.Tracing, error) {
-	var traceConfig candlelight.Config
-	err := v.UnmarshalKey(tracingConfigKey, &traceConfig)
-	if err != nil {
-		return candlelight.Tracing{}, err
-	}
-	traceConfig.ApplicationName = appName
+type ConstOut struct {
+	fx.Out
+	DefaultKeyID string `name:"default_key_id"`
+}
 
+func consts() ConstOut {
+	return ConstOut{
+		DefaultKeyID: DefaultKeyID,
+	}
+}
+
+func gokitLogger(l *zap.Logger) log.Logger {
+	return sallustkit.Logger{
+		Zap: l,
+	}
+}
+
+func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
+	xct := in.XmidtClientTimeout
+
+	if xct.ClientTimeout == 0 {
+		xct.ClientTimeout = time.Second * 135
+	}
+	if xct.NetDialerTimeout == 0 {
+		xct.NetDialerTimeout = time.Second * 5
+	}
+	if xct.RequestTimeout == 0 {
+		xct.RequestTimeout = time.Second * 129
+	}
+	return xct
+}
+
+func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
+	act := in.ArgusClientTimeout
+
+	if act.ClientTimeout == 0 {
+		act.ClientTimeout = time.Second * 50
+	}
+	if act.NetDialerTimeout == 0 {
+		act.NetDialerTimeout = time.Second * 5
+	}
+	return act
+}
+
+func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
+	traceConfig := in.TracingConfig
+	traceConfig.ApplicationName = applicationName
 	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
 	}
-
+	in.Logger.Info("tracing status", zap.Bool("enabled", !tracing.IsNoop()))
 	return tracing, nil
 }
 
-func printVersion(f *pflag.FlagSet, arguments []string) (error, bool) {
-	printVer := f.BoolP("version", "v", false, "displays the version number")
+func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
 	if err := f.Parse(arguments); err != nil {
-		return err, true
+		return true, err
 	}
 
-	if *printVer {
+	if pVersion, _ := f.GetBool("version"); pVersion {
 		printVersionInfo(os.Stdout)
-		return nil, true
+		return true, nil
 	}
-	return nil, false
-}
-
-func exitIfError(logger log.Logger, err error) {
-	if err != nil {
-		if logger != nil {
-			logging.Error(logger, emperror.Context(err)...).Log(logging.ErrorKey(), err.Error())
-		}
-		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
-		os.Exit(1)
-	}
+	return false, nil
 }
 
 func printVersionInfo(writer io.Writer) {
@@ -433,6 +176,74 @@ func printVersionInfo(writer io.Writer) {
 	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
 	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
 	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
+}
+
+func exitIfError(logger *zap.Logger, err error) {
+	if err != nil {
+		if logger != nil {
+			logger.Error("failed to parse arguments", zap.Error(err))
+		}
+		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
+		os.Exit(1)
+	}
+}
+
+//nolint:funlen
+func tr1d1um(arguments []string) (exitCode int) {
+	v, l, f, err := setup(arguments)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+
+	// This allows us to communicate the version of the binary upon request.
+	if done, parseErr := printVersion(f, arguments); done {
+		// if we're done, we're exiting no matter what
+		exitIfError(l, emperror.Wrap(parseErr, "failed to parse arguments"))
+		os.Exit(0)
+	}
+
+	app := fx.New(
+		arrange.LoggerFunc(l.Sugar().Infof),
+		fx.Supply(l),
+		fx.Supply(v),
+		arrange.ForViper(v),
+		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
+		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		touchstone.Provide(),
+		touchhttp.Provide(),
+		ancla.ProvideMetrics(),
+		fx.Provide(
+			consts,
+			gokitLogger,
+			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
+			fx.Annotated{
+				Name:   "xmidt_client_timeout",
+				Target: configureXmidtClientTimeout,
+			},
+			fx.Annotated{
+				Name:   "argus_client_timeout",
+				Target: configureArgusClientTimeout,
+			},
+			loadTracing,
+			newHTTPClient,
+		),
+		provideAuthChain("authx.inbound"),
+		provideServers(),
+		provideHandlers(),
+	)
+
+	switch err := app.Err(); {
+	case errors.Is(err, pflag.ErrHelp):
+		return
+	case err == nil:
+		app.Run()
+	default:
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+
+	return 0
 }
 
 func main() {

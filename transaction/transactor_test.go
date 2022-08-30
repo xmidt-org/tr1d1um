@@ -25,9 +25,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/webpa-common/v2/logging"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestTransactError(t *testing.T) {
@@ -137,19 +140,55 @@ func TestWelcome(t *testing.T) {
 	decorated.ServeHTTP(nil, req)
 }
 
-func TestCapture(t *testing.T) {
-	t.Run("GivenTID", func(t *testing.T) {
-		assert := assert.New(t)
-		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		r.Header.Set(HeaderWPATID, "tid01")
-		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
-		assert.EqualValues("tid01", ctx.Value(ContextKeyRequestTID).(string))
-	})
+func TestLog(t *testing.T) {
+	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+	tcs := []struct {
+		desc                        string
+		logger                      *zap.Logger
+		reducedLoggingResponseCodes []int
+		ctx                         context.Context
+		code                        int
+		request                     *http.Request
+		expectedLogCount            int
+	}{
+		{
+			desc:                        "Sanity Check",
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         context.Background(),
+			code:                        200,
+			request:                     &http.Request{},
+			expectedLogCount:            1,
+		},
+		{
+			desc:                        "Arrival Time Present",
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         ctxWithArrivalTime,
+			code:                        200,
+			request:                     &http.Request{},
+			expectedLogCount:            2,
+		},
+		{
+			desc:                        "IncludeHeaders is False",
+			reducedLoggingResponseCodes: []int{200},
+			ctx:                         context.Background(),
+			code:                        200,
+			request:                     &http.Request{},
+			expectedLogCount:            1,
+		},
+	}
 
-	t.Run("GeneratedTID", func(t *testing.T) {
-		assert := assert.New(t)
-		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		ctx := Capture(logging.NewTestLogger(nil, t))(context.TODO(), r)
-		assert.NotEmpty(ctx.Value(ContextKeyRequestTID).(string))
-	})
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			var logCount = 0
+			logger := zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
+				func(e zapcore.Entry) error {
+					logCount++
+					return nil
+				})))
+			s := Log(logger, tc.reducedLoggingResponseCodes)
+			s(tc.ctx, tc.code, tc.request)
+			assert.Equal(tc.expectedLogCount, logCount)
+		})
+	}
 }

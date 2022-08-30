@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,13 +98,4 @@ func TestRequestStat(t *testing.T) {
 			}
 		})
 	}
-}
-
-type mockAcquirer struct {
-	mock.Mock
-}
-
-func (m *mockAcquirer) Acquire() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
 }

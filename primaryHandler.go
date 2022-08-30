@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Comcast Cable Communications Management, LLC
+ * Copyright 2022 Comcast Cable Communications Management, LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,51 +18,29 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"regexp"
-	"syscall"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/goph/emperror"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
-	bchecks "github.com/xmidt-org/bascule/basculechecks"
-	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/clortho"
-	"github.com/xmidt-org/clortho/clorthometrics"
-	"github.com/xmidt-org/clortho/clorthozap"
-	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
-	"github.com/xmidt-org/webpa-common/v2/basculemetrics"
+	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/stat"
+	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webpa-common/v2/logging"
-	"github.com/xmidt-org/webpa-common/v2/xmetrics"
+	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
-)
-
-var (
-	errFailedWebhookUnmarshal = errors.New("failed to JSON unmarshal webhook")
-
-	v2WarningHeader = "X-Xmidt-Warning"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -93,11 +71,46 @@ type CapabilityConfig struct {
 // JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
-	Config clortho.Config `json:"config"`
+	Config clortho.Config
 
 	// Leeway is used to set the amount of time buffer should be given to JWT
 	// time values, such as nbf
 	Leeway bascule.Leeway
+}
+
+type provideWebhookHandlersIn struct {
+	fx.In
+	V                  *viper.Viper
+	WebhookConfigKey   ancla.Config
+	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	Logger             *zap.Logger
+	Measures           *ancla.Measures
+	MeasuresIn         ancla.MeasuresIn
+	Tracing            candlelight.Tracing
+}
+
+type provideWebhookHandlersOut struct {
+	fx.Out
+	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
+	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
+	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
+}
+
+type ServiceOptionsIn struct {
+	fx.In
+	Logger               *zap.Logger
+	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
+	RequestMaxRetries    int               `name:"requestMaxRetries"`
+	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
+	TargetURL            string            `name:"targetURL"`
+	WRPSource            string            `name:"WRPSource"`
+	Tracing              candlelight.Tracing
+}
+
+type ServiceOptionsOut struct {
+	fx.Out
+	StatServiceOptions        *stat.ServiceOptions
+	TranslationServiceOptions *translation.ServiceOptions
 }
 
 func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *http.Client {
@@ -117,312 +130,147 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
-func createAuthAcquirer(v *viper.Viper) (acquire.Acquirer, error) {
-	var options authAcquirerConfig
-	err := v.UnmarshalKey(authAcquirerKey, &options)
-
-	if err != nil {
-		return nil, err
+func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
+	if config.JWT.AuthURL != "" && config.JWT.Buffer != 0 && config.JWT.Timeout != 0 {
+		return acquire.NewRemoteBearerTokenAcquirer(config.JWT)
 	}
 
-	if options.JWT.AuthURL != "" && options.JWT.Buffer != 0 && options.JWT.Timeout != 0 {
-		return acquire.NewRemoteBearerTokenAcquirer(options.JWT)
-	}
-
-	if options.Basic != "" {
-		return acquire.NewFixedAuthAcquirer(options.Basic)
+	if config.Basic != "" {
+		return acquire.NewFixedAuthAcquirer(config.Basic)
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-// authenticationHandler configures the authorization requirements for requests to reach the main handler
-//nolint:funlen
-func authenticationHandler(v *viper.Viper, logger log.Logger, registry xmetrics.Registry) (*alice.Chain, error) {
-	if registry == nil {
-		return nil, errors.New("nil registry")
-	}
-
-	basculeMeasures := basculemetrics.NewAuthValidationMeasures(registry)
-	capabilityCheckMeasures := basculechecks.NewAuthCapabilityCheckMeasures(registry)
-	listener := basculemetrics.NewMetricListener(basculeMeasures)
-
-	basicAllowed := make(map[string]string)
-	basicAuth := v.GetStringSlice("authHeader")
-	for _, a := range basicAuth {
-		decoded, err := base64.StdEncoding.DecodeString(a)
-		if err != nil {
-			logging.Info(logger).Log(logging.MessageKey(), "failed to decode auth header", "authHeader", a, logging.ErrorKey(), err.Error())
-			continue
-		}
-
-		i := bytes.IndexByte(decoded, ':')
-		logging.Debug(logger).Log(logging.MessageKey(), "decoded string", "string", decoded, "i", i)
-		if i > 0 {
-			basicAllowed[string(decoded[:i])] = string(decoded[i+1:])
-		}
-	}
-	logging.Debug(logger).Log(logging.MessageKey(), "Created list of allowed basic auths", "allowed", basicAllowed, "config", basicAuth)
-
-	options := []basculehttp.COption{
-		basculehttp.WithCLogger(getLogger),
-		basculehttp.WithCErrorResponseFunc(listener.OnErrorResponse),
-	}
-	if len(basicAllowed) > 0 {
-		options = append(options, basculehttp.WithTokenFactory("Basic", basculehttp.BasicTokenFactory(basicAllowed)))
-	}
-
-	var jwtVal JWTValidator
-	// Get jwt configuration, including clortho's configuration
-	v.UnmarshalKey("jwtValidator", &jwtVal)
-	kr := clortho.NewKeyRing()
-
-	// Instantiate a fetcher for refresher and resolver to share
-	f, err := clortho.NewFetcher()
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho fetcher")
-	}
-
-	ref, err := clortho.NewRefresher(
-		clortho.WithConfig(jwtVal.Config),
-		clortho.WithFetcher(f),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho refresher")
-	}
-
-	resolver, err := clortho.NewResolver(
-		clortho.WithConfig(jwtVal.Config),
-		clortho.WithKeyRing(kr),
-		clortho.WithFetcher(f),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho resolver")
-	}
-
-	promReg, ok := registry.(prometheus.Registerer)
-	if !ok {
-		return &alice.Chain{}, errors.New("failed to get prometheus registerer")
-	}
-
-	var (
-		tsConfig touchstone.Config
-		zConfig  sallust.Config
-	)
-	// Get touchstone & zap configurations
-	v.UnmarshalKey("touchstone", &tsConfig)
-	v.UnmarshalKey("zap", &zConfig)
-	zlogger := zap.Must(zConfig.Build())
-	tf := touchstone.NewFactory(tsConfig, zlogger, promReg)
-	// Instantiate a metric listener for refresher and resolver to share
-	cml, err := clorthometrics.NewListener(clorthometrics.WithFactory(tf))
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho metrics listener")
-	}
-
-	// Instantiate a logging listener for refresher and resolver to share
-	czl, err := clorthozap.NewListener(
-		clorthozap.WithLogger(zlogger),
-	)
-	if err != nil {
-		return &alice.Chain{}, emperror.With(err, "failed to create clortho zap logger listener")
-	}
-
-	resolver.AddListener(cml)
-	resolver.AddListener(czl)
-	ref.AddListener(cml)
-	ref.AddListener(czl)
-	ref.AddListener(kr)
-	// context.Background() is for the unused `context.Context` argument in refresher.Start
-	ref.Start(context.Background())
-	// Shutdown refresher's goroutines when SIGTERM
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		// context.Background() is for the unused `context.Context` argument in refresher.Stop
-		ref.Stop(context.Background())
-	}()
-
-	options = append(options, basculehttp.WithTokenFactory("Bearer", basculehttp.BearerTokenFactory{
-		DefaultKeyID: DefaultKeyID,
-		Resolver:     resolver,
-		Parser:       bascule.DefaultJWTParser,
-		Leeway:       jwtVal.Leeway,
-	}))
-	authConstructor := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/"+apiBase+"/", basculehttp.DefaultParseURLFunc)),
-	}, options...)...)
-	authConstructorLegacy := basculehttp.NewConstructor(append([]basculehttp.COption{
-		basculehttp.WithParseURLFunc(basculehttp.CreateRemovePrefixURLFunc("/api/"+prevAPIVersion+"/", basculehttp.DefaultParseURLFunc)),
-		basculehttp.WithCErrorHTTPResponseFunc(basculehttp.LegacyOnErrorHTTPResponse),
-	}, options...)...)
-	bearerRules := bascule.Validators{
-		bchecks.NonEmptyPrincipal(),
-		bchecks.NonEmptyType(),
-		bchecks.ValidType([]string{"jwt"}),
-	}
-
-	// only add capability check if the configuration is set
-	var capabilityCheck CapabilityConfig
-	v.UnmarshalKey("capabilityCheck", &capabilityCheck)
-	if capabilityCheck.Type == "enforce" || capabilityCheck.Type == "monitor" {
-		var endpoints []*regexp.Regexp
-		c, err := basculechecks.NewEndpointRegexCheck(capabilityCheck.Prefix, capabilityCheck.AcceptAllMethod)
-		if err != nil {
-			return nil, emperror.With(err, "failed to create capability check")
-		}
-		for _, e := range capabilityCheck.EndpointBuckets {
-			r, err := regexp.Compile(e)
-			if err != nil {
-				logging.Error(logger).Log(logging.MessageKey(), "failed to compile regular expression", "regex", e, logging.ErrorKey(), err.Error())
-				continue
-			}
-			endpoints = append(endpoints, r)
-		}
-		m := basculechecks.MetricValidator{
-			C:         basculechecks.CapabilitiesValidator{Checker: c},
-			Measures:  capabilityCheckMeasures,
-			Endpoints: endpoints,
-		}
-		bearerRules = append(bearerRules, m.CreateValidator(capabilityCheck.Type == "enforce"))
-	}
-
-	authEnforcer := basculehttp.NewEnforcer(
-		basculehttp.WithELogger(getLogger),
-		basculehttp.WithRules("Basic", bascule.Validators{
-			bchecks.AllowAll(),
-		}),
-		basculehttp.WithRules("Bearer", bearerRules),
-		basculehttp.WithEErrorResponseFunc(listener.OnErrorResponse),
-	)
-
-	authChain := alice.New(setLogger(logger), authConstructor, authEnforcer, basculehttp.NewListenerDecorator(listener))
-	authChainLegacy := alice.New(setLogger(logger), authConstructorLegacy, authEnforcer, basculehttp.NewListenerDecorator(listener))
-
-	versionCompatibleAuth := alice.New(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
-			vars := mux.Vars(req)
-			if vars != nil {
-				if vars["version"] == prevAPIVersion {
-					authChainLegacy.Then(next).ServeHTTP(r, req)
-					return
-				}
-			}
-			authChain.Then(next).ServeHTTP(r, req)
-		})
+func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
+	//build validators and webhook handler for previous version that only check loopback.
+	v, err := ancla.BuildValidators(ancla.ValidatorConfig{
+		URL: ancla.URLVConfig{
+			AllowLoopback:        c.Validation.URL.AllowLoopback,
+			AllowIP:              true,
+			AllowSpecialUseHosts: true,
+			AllowSpecialUseIPs:   true,
+		},
+		TTL: c.Validation.TTL,
 	})
-	return &versionCompatibleAuth, nil
+	if err != nil {
+		return ancla.Validators{}, err
+	}
+
+	return v, nil
 }
 
-//nolint:funlen
-func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
-	if getLogger == nil {
-		getLogger = func(_ context.Context) log.Logger {
-			return nil
-		}
+func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
+	// Webhooks (if not configured, handlers are not set up)
+	if !in.V.IsSet(webhookConfigKey) {
+		in.Logger.Info("Webhook service disabled")
+		return
 	}
-	if config.Now == nil {
-		config.Now = time.Now
+
+	webhookConfig := in.WebhookConfigKey
+	webhookConfig.Logger = gokitLogger(in.Logger)
+	listenerMeasures := ancla.ListenerConfig{
+		Measures: *in.Measures,
 	}
-	durationCheck, err := ancla.CheckDuration(config.Max)
+	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
+
+	svc, err := ancla.NewService(webhookConfig, getLogger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create duration check: %v", err)
+		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
-	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
+
+	stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create until check: %v", err)
+		return out, fmt.Errorf("webhook service start listener error: %s", err)
+	}
+	in.Logger.Info("Webhook service enabled")
+
+	defer stopWatches()
+
+	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+		GetLogger: getLogger,
+	})
+
+	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+	if err != nil {
+		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
 	}
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			vars := mux.Vars(r)
-			// if this isn't v2, do nothing.
-			if vars == nil || vars["version"] != prevAPIVersion {
-				next.ServeHTTP(w, r)
-				return
-			}
+	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+		V:                 builtValidators,
+		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		GetLogger:         getLogger,
+	})
 
-			// if this is v2, we need to unmarshal and check the duration.  If
-			// the duration is bad, change it to 5m and add a header. Then use
-			// the v2 handler.
-			logger := getLogger(r.Context())
-			if logger == nil {
-				logger = log.NewNopLogger()
-			}
-			requestPayload, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				v2ErrEncode(w, logger, err, 0)
-				return
-			}
+	v, err := v2WebhookValidators(webhookConfig)
+	if err != nil {
+		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
+	}
 
-			var wr ancla.WebhookRegistration
-			err = json.Unmarshal(requestPayload, &wr)
-			if err != nil {
-				var e *json.UnmarshalTypeError
-				if errors.As(err, &e) {
-					v2ErrEncode(w, logger,
-						fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
-						http.StatusBadRequest)
-					return
-				}
-				v2ErrEncode(w, logger, fmt.Errorf("%w: %v", errFailedWebhookUnmarshal, err),
-					http.StatusBadRequest)
-				return
-			}
+	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+		V:                 v,
+		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		GetLogger:         getLogger,
+	})
 
-			// check to see if the Webhook has a valid until/duration.
-			// If not, set the WebhookRegistration  duration to 5m.
-			webhook := wr.ToWebhook()
-			if webhook.Until.IsZero() {
-				if webhook.Duration == 0 {
-					wr.Duration = ancla.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
-				} else {
-					durationErr := durationCheck(webhook)
-					if durationErr != nil {
-						wr.Duration = ancla.CustomDuration(config.Max)
-						w.Header().Add(v2WarningHeader,
-							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
-					}
-				}
-			} else {
-				untilErr := untilCheck(webhook)
-				if untilErr != nil {
-					wr.Until = time.Time{}
-					wr.Duration = ancla.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
-				}
-			}
-
-			// put the body back in the request
-			body, err := json.Marshal(wr)
-			if err != nil {
-				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
-			}
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-			if v2Handler == nil {
-				v2Handler = next
-			}
-			v2Handler.ServeHTTP(w, r)
-		})
-	}, nil
+	in.Logger.Info("Webhook service enabled")
+	return
 }
 
-func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) {
-	if code == 0 {
-		code = http.StatusInternalServerError
+func provideHandlers() fx.Option {
+	return fx.Options(
+		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
+		fx.Provide(
+			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
+			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
+			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
+			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
+			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
+			func(c JWTValidator) clortho.Config {
+				return c.Config
+			},
+			provideWebhookHandlers,
+		),
+	)
+}
+
+func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
+	xmidtHTTPClient := newHTTPClient(in.XmidtClientTimeout, in.Tracing)
+	// Stat Service configs
+	statOptions := &stat.ServiceOptions{
+		HTTPTransactor: transaction.New(
+			&transaction.Options{
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   gokitLogger(in.Logger),
+						Retries:  in.RequestMaxRetries,
+						Interval: in.RequestRetryInterval,
+					},
+					xmidtHTTPClient.Do),
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
+			}),
+		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.TargetURL),
 	}
-	level.Error(logger).Log(logging.MessageKey(), "sending non-200, non-404 response",
-		logging.ErrorKey(), err, "code", code)
 
-	w.WriteHeader(code)
+	// WRP Service configs
+	translationOptions := &translation.ServiceOptions{
+		XmidtWrpURL: fmt.Sprintf("%s/device", in.TargetURL),
+		WRPSource:   in.WRPSource,
+		T: transaction.New(
+			&transaction.Options{
+				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
+				Do: xhttp.RetryTransactor( //nolint:bodyclose
+					xhttp.RetryOptions{
+						Logger:   gokitLogger(in.Logger),
+						Retries:  in.RequestMaxRetries,
+						Interval: in.RequestRetryInterval,
+					},
+					xmidtHTTPClient.Do),
+			}),
+	}
 
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
-			"message": err.Error(),
-		})
+	return ServiceOptionsOut{
+		StatServiceOptions:        statOptions,
+		TranslationServiceOptions: translationOptions,
+	}
 }

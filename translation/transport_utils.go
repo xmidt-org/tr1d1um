@@ -25,12 +25,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"go.uber.org/zap"
 
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
-	"github.com/xmidt-org/webpa-common/v2/device"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
@@ -108,7 +108,7 @@ func getCommandForParams(params []setParam) (command string) {
 
 // wrp merges different values from a WDMP request into a WRP message
 func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (*wrp.Message, error) {
-	canonicalDeviceID, err := device.ParseID(pathVars["deviceid"])
+	canonicalDeviceID, err := wrp.ParseDeviceID(pathVars["deviceid"])
 	if err != nil {
 		return nil, transaction.NewBadRequestError(err)
 	}
@@ -156,22 +156,22 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 
 func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
 	nctx = ctx
+	logger := sallust.Get(ctx)
 
 	if r.Method == http.MethodPatch {
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		r.Body.Close()
 
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+		if e == nil {
 
-		if wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC)); e == nil {
-			if transactionInfoLogger, ok := ctx.Value(transaction.ContextKeyTransactionInfoLogger).(kitlog.Logger); ok {
-				transactionInfoLogger = kitlog.WithPrefix(transactionInfoLogger,
-					"command", wdmp.Command,
-					"parameters", getParamNames(wdmp.Parameters),
-				)
+			logger = logger.With(
+				zap.Reflect("command", wdmp.Command),
+				zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
+			)
 
-				nctx = context.WithValue(ctx, transaction.ContextKeyTransactionInfoLogger, transactionInfoLogger)
-			}
+			nctx = sallust.With(ctx, logger)
 		}
 	}
 

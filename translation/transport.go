@@ -26,13 +26,14 @@ import (
 	"net/http"
 	"strings"
 
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
@@ -52,7 +53,7 @@ type Options struct {
 	APIRouter *mux.Router
 
 	Authenticate                *alice.Chain
-	Log                         kitlog.Logger
+	Log                         *zap.Logger
 	ValidServices               []string
 	ReducedLoggingResponseCodes []int
 }
@@ -60,7 +61,7 @@ type Options struct {
 // ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(transaction.Capture(c.Log), captureWDMPParameters),
+		kithttp.ServerBefore(captureWDMPParameters),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Log(c.Log, c.ReducedLoggingResponseCodes)),
 	}
@@ -131,9 +132,15 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		wrpMsg  *wrp.Message
 	)
 	if payload, err = requestPayload(r); err == nil {
-		var tid = ctx.Value(transaction.ContextKeyRequestTID).(string)
+		var tid string
+		ctxtid := ctx.Value(transaction.ContextKeyRequestTID)
+		if ctxtid != nil {
+			tid = ctxtid.(string)
+		}
+
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
-		if wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs); err == nil {
+		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs)
+		if err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
 				AuthHeaderValue: r.Header.Get(authHeaderKey),
@@ -173,7 +180,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
 	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
 		w.WriteHeader(resp.Code)
@@ -208,7 +220,12 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {

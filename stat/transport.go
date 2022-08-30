@@ -23,14 +23,18 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
 
-	"github.com/xmidt-org/webpa-common/v2/device"
-
-	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+)
+
+var (
+	errResponseIsNil = errors.New("response is nil")
 )
 
 // Options wraps the properties needed to set up the stat server
@@ -40,7 +44,7 @@ type Options struct {
 	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
 	APIRouter                   *mux.Router
 	Authenticate                *alice.Chain
-	Log                         kitlog.Logger
+	Log                         *zap.Logger
 	ReducedLoggingResponseCodes []int
 }
 
@@ -48,7 +52,6 @@ type Options struct {
 // That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
 	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(transaction.Capture(c.Log)),
 		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(transaction.GetLogger, encodeError)),
 		kithttp.ServerFinalizer(transaction.Log(c.Log, c.ReducedLoggingResponseCodes)),
 	}
@@ -65,8 +68,8 @@ func ConfigHandler(c *Options) {
 }
 
 func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err error) {
-	var deviceID device.ID
-	if deviceID, err = device.ParseID(mux.Vars(r)["deviceid"]); err == nil {
+	var deviceID wrp.DeviceID
+	if deviceID, err = wrp.ParseDeviceID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
 			AuthHeaderValue: r.Header.Get("Authorization"),
 			DeviceID:        string(deviceID),
@@ -80,7 +83,13 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		// if ce, ok := err.(transaction.CodedError); ok {
@@ -102,16 +111,29 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	resp := response.(*transaction.XmidtResponse)
 
+	if resp == nil || resp.Body == nil {
+		err = errResponseIsNil
+		return
+	}
+
 	if resp.Code == http.StatusOK {
 		w.Header().Set("Content-Type", "application/json")
 	} else {
 		w.Header().Del("Content-Type")
 	}
 
-	w.Header().Set(transaction.HeaderWPATID, ctx.Value(transaction.ContextKeyRequestTID).(string))
+	var ctxKeyReqTID string
+	c := ctx.Value(transaction.ContextKeyRequestTID)
+	if c != nil {
+		ctxKeyReqTID = c.(string)
+	}
+
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
+
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	w.WriteHeader(resp.Code)
+
 	_, err = w.Write(resp.Body)
 	return
 }
