@@ -79,17 +79,38 @@ servers:
 #   Logging Related Configuration
 ########################################
 
-# log configures the logging details
 logging:
+  # OutputPaths is a list of URLs or file paths to write logging output to.
+  outputPaths:
+    - stdout
+    # - /var/log/tr1d1um/tr1d1um.log
+
+  # Level is the minimum enabled logging level. Note that this is a dynamic
+  # level, so calling Config.Level.SetLevel will atomically change the log
+  # level of all loggers descended from this config.
   level: debug
-  development: true
+
+  # EncoderConfig sets options for the chosen encoder. See
+  # zapcore.EncoderConfig for details.
+  errorOutputPaths:
+    - stderr
+    - denopink-tr1d1um.log
+
+  # EncoderConfig sets options for the chosen encoder. See
+  # zapcore.EncoderConfig for details.
   encoderConfig:
-    messageKey: msg
-    levelKey: level
+    messageKey: message
+    levelKey: key
+    levelEncoder: lowercase
   # reducedLoggingResponseCodes allows disabling verbose transaction logs for 
   # benign responses from the target server given HTTP status codes.
   # (Optional)
   # reducedLoggingResponseCodes: [200, 504]
+
+  # Encoding sets the logger's encoding. Valid values are "json" and
+  # "console", as well as any third-party encodings registered via
+  # RegisterEncoder.
+  encoding: json
 
 ##############################################################################
 # Webhooks Related Configuration 

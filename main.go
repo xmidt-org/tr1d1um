@@ -189,8 +189,7 @@ func exitIfError(logger *zap.Logger, err error) {
 
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
-
-	v, logger, f, err := setup(arguments)
+	v, l, f, err := setup(arguments)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -199,13 +198,13 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// This allows us to communicate the version of the binary upon request.
 	if done, parseErr := printVersion(f, arguments); done {
 		// if we're done, we're exiting no matter what
-		exitIfError(logger, emperror.Wrap(parseErr, "failed to parse arguments"))
+		exitIfError(l, emperror.Wrap(parseErr, "failed to parse arguments"))
 		os.Exit(0)
 	}
 
 	app := fx.New(
-		arrange.LoggerFunc(logger.Sugar().Infof),
-		fx.Supply(logger),
+		arrange.LoggerFunc(l.Sugar().Infof),
+		fx.Supply(l),
 		fx.Supply(v),
 		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),

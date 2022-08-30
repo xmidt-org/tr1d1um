@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 )
@@ -34,16 +33,11 @@ func setupFlagSet(fs *pflag.FlagSet) {
 }
 
 func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
-	l, err := zap.NewDevelopment() // initial value
-	if err != nil {
-		return nil, l, nil, fmt.Errorf("failed to create zap logger: %w", err)
-	}
-
 	fs := pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 	setupFlagSet(fs)
-	err = fs.Parse(args)
+	err := fs.Parse(args)
 	if err != nil {
-		return nil, l, fs, fmt.Errorf("failed to create parse args: %w", err)
+		return nil, nil, fs, fmt.Errorf("failed to create parse args: %w", err)
 	}
 
 	v := viper.New()
@@ -62,7 +56,7 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 		err = v.ReadInConfig()
 	}
 	if err != nil {
-		return v, l, fs, fmt.Errorf("failed to read config file: %w", err)
+		return v, nil, fs, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	if debug, _ := fs.GetBool("debug"); debug {
@@ -70,13 +64,7 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	}
 
 	var c sallust.Config
-	err = v.UnmarshalKey("logging", &c, arrange.ComposeDecodeHooks(sallust.DecodeHook))
-	if err != nil {
-		return v, l, fs, err
-	}
-	l.Info("configurationFile", zap.String("configurationFile", v.ConfigFileUsed()))
-
-	l, err = c.Build()
-
+	v.UnmarshalKey("logging", &c)
+	l := zap.Must(c.Build())
 	return v, l, fs, err
 }
