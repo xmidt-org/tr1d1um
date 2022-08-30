@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.7.7]
+- Uber fx integration
+  - https://github.com/xmidt-org/tr1d1um/issues/288
+  - https://github.com/xmidt-org/tr1d1um/issues/291
+
 ## [v0.7.6]
 - Dependency update
   - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
@@ -160,7 +165,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.6...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.7...HEAD
+[v0.7.7]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.6...v0.7.7
 [v0.7.6]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.4...v0.7.6
 [v0.7.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.3...v0.7.4
 [v0.7.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.2...v0.7.3
