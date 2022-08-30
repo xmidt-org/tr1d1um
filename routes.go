@@ -95,6 +95,11 @@ type PrimaryMMIn struct {
 	Primary alice.Chain `name:"middleware_primary_metrics"`
 }
 
+type AlternateMMIn struct {
+	fx.In
+	Primary alice.Chain `name:"middleware_alternate_metrics"`
+}
+
 type HealthMMIn struct {
 	fx.In
 	Health alice.Chain `name:"middleware_health_metrics"`
@@ -102,8 +107,9 @@ type HealthMMIn struct {
 
 type MetricMiddlewareOut struct {
 	fx.Out
-	Primary alice.Chain `name:"middleware_primary_metrics"`
-	Health  alice.Chain `name:"middleware_health_metrics"`
+	Primary   alice.Chain `name:"middleware_primary_metrics"`
+	Alternate alice.Chain `name:"middleware_alternate_metrics"`
+	Health    alice.Chain `name:"middleware_health_metrics"`
 }
 
 func provideServers() fx.Option {
@@ -135,6 +141,13 @@ func provideServers() fx.Option {
 			Key:  "servers.primary",
 			Inject: arrange.Inject{
 				PrimaryMMIn{},
+			},
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_alternate",
+			Key:  "servers.alternate",
+			Inject: arrange.Inject{
+				AlternateMMIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
@@ -228,6 +241,12 @@ func metricMiddleware() (out MetricMiddlewareOut) {
 				),
 			},
 			fx.Annotated{
+				Name: "server_alternate",
+				Target: bundle.NewInstrumenter(
+					touchhttp.ServerLabel, "server_alternate",
+				),
+			},
+			fx.Annotated{
 				Name: "server_health",
 				Target: bundle.NewInstrumenter(
 					touchhttp.ServerLabel, "server_health",
@@ -243,9 +262,15 @@ func metricMiddleware() (out MetricMiddlewareOut) {
 			),
 			fx.Annotate(
 				func(si touchhttp.ServerInstrumenter) {
-					out.Primary = alice.New(si.Then)
+					out.Alternate = alice.New(si.Then)
 				},
 				fx.ParamTags(`name:"server_health"`),
+			),
+			fx.Annotate(
+				func(si touchhttp.ServerInstrumenter) {
+					out.Primary = alice.New(si.Then)
+				},
+				fx.ParamTags(`name:"server_alternate"`),
 			),
 		),
 	)
