@@ -31,6 +31,8 @@ import (
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/clortho"
+	"github.com/xmidt-org/touchstone"
+	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -222,6 +224,11 @@ func provideHandlers() fx.Option {
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
+			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
+			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
+			func(c JWTValidator) clortho.Config {
+				return c.Config
+			},
 			provideWebhookHandlers,
 		),
 	)
