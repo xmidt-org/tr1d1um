@@ -5,12 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Add support for an alternate server
+
+## [v0.7.8]
+- Add support for an alternate server https://github.com/xmidt-org/tr1d1um/pull/297
 
 ## [v0.7.7]
 - Uber fx integration
   - https://github.com/xmidt-org/tr1d1um/issues/288
   - https://github.com/xmidt-org/tr1d1um/issues/291
+  - hub.com/xmidt-org/tr1d1um/issues/246
 - Major changes to server config, sections changed
   - `primary` => `servers.primary`
   - `alternate ` => `servers.alternate`
@@ -174,7 +177,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.7...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.8...HEAD
+[v0.7.8]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.7...v0.7.8
 [v0.7.7]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.6...v0.7.7
 [v0.7.6]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.4...v0.7.6
 [v0.7.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.3...v0.7.4
