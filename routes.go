@@ -53,7 +53,7 @@ var (
 	v2WarningHeader = "X-Xmidt-Warning"
 )
 
-type PrimaryEndpointIn struct {
+type primaryEndpointIn struct {
 	fx.In
 	V                           *viper.Viper
 	Router                      *mux.Router `name:"server_primary"`
@@ -68,7 +68,7 @@ type PrimaryEndpointIn struct {
 	TranslationServices         []string           `name:"supportedServices"`
 }
 
-type HandleWebhookRoutesIn struct {
+type handleWebhookRoutesIn struct {
 	fx.In
 	Logger                *zap.Logger
 	APIRouter             *mux.Router  `name:"api_router"`
@@ -79,31 +79,37 @@ type HandleWebhookRoutesIn struct {
 	WebhookConfigKey      ancla.Config
 }
 
-type APIRouterIn struct {
+type apiRouterIn struct {
 	fx.In
 	PrimaryRouter *mux.Router `name:"server_primary"`
 	URLPrefix     string      `name:"url_prefix"`
 }
 
-type ProvideURLPrefixIn struct {
+type provideURLPrefixIn struct {
 	fx.In
 	PrevVerSupport bool `name:"previousVersionSupport"`
 }
 
-type PrimaryMMIn struct {
+type primaryMetricMiddlewareIn struct {
 	fx.In
 	Primary alice.Chain `name:"middleware_primary_metrics"`
 }
 
-type HealthMMIn struct {
+type alternateMetricMiddlewareIn struct {
+	fx.In
+	Primary alice.Chain `name:"middleware_alternate_metrics"`
+}
+
+type healthMetricMiddlewareIn struct {
 	fx.In
 	Health alice.Chain `name:"middleware_health_metrics"`
 }
 
-type MetricMiddlewareOut struct {
+type metricMiddlewareOut struct {
 	fx.Out
-	Primary alice.Chain `name:"middleware_primary_metrics"`
-	Health  alice.Chain `name:"middleware_health_metrics"`
+	Primary   alice.Chain `name:"middleware_primary_metrics"`
+	Alternate alice.Chain `name:"middleware_alternate_metrics"`
+	Health    alice.Chain `name:"middleware_health_metrics"`
 }
 
 func provideServers() fx.Option {
@@ -134,14 +140,21 @@ func provideServers() fx.Option {
 			Name: "server_primary",
 			Key:  "servers.primary",
 			Inject: arrange.Inject{
-				PrimaryMMIn{},
+				primaryMetricMiddlewareIn{},
+			},
+		}.Provide(),
+		arrangehttp.Server{
+			Name: "server_alternate",
+			Key:  "servers.alternate",
+			Inject: arrange.Inject{
+				alternateMetricMiddlewareIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_health",
 			Key:  "servers.health",
 			Inject: arrange.Inject{
-				HealthMMIn{},
+				healthMetricMiddlewareIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
@@ -159,7 +172,7 @@ func provideServers() fx.Option {
 	)
 }
 
-func handlePrimaryEndpoint(in PrimaryEndpointIn) {
+func handlePrimaryEndpoint(in primaryEndpointIn) {
 	otelMuxOptions := []otelmux.Option{
 		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
 		otelmux.WithPropagators(in.Tracing.Propagator()),
@@ -201,7 +214,7 @@ func handlePrimaryEndpoint(in PrimaryEndpointIn) {
 	})
 }
 
-func handleWebhookRoutes(in HandleWebhookRoutesIn) error {
+func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
 		fixV2Middleware, err := fixV2Duration(getLogger, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
@@ -214,11 +227,9 @@ func handleWebhookRoutes(in HandleWebhookRoutesIn) error {
 	return nil
 }
 
-func metricMiddleware() (out MetricMiddlewareOut) {
-
+func metricMiddleware() (out metricMiddlewareOut) {
 	var bundle touchhttp.ServerBundle
 	fx.New(
-		// QUESTION is this touchstone.Provide() needed even tho we provided 1 at main.go
 		touchstone.Provide(),
 		fx.Provide(
 			fx.Annotated{
@@ -228,36 +239,52 @@ func metricMiddleware() (out MetricMiddlewareOut) {
 				),
 			},
 			fx.Annotated{
+				Name: "server_alternate",
+				Target: bundle.NewInstrumenter(
+					touchhttp.ServerLabel, "server_alternate",
+				),
+			},
+			fx.Annotated{
 				Name: "server_health",
 				Target: bundle.NewInstrumenter(
 					touchhttp.ServerLabel, "server_health",
 				),
 			},
+			fx.Annotated{
+				Name:   "metric_middleware_out",
+				Target: out,
+			},
 		),
 		fx.Invoke(
 			fx.Annotate(
-				func(si touchhttp.ServerInstrumenter) {
-					out.Health = alice.New(si.Then)
+				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
+					o.Health = alice.New(si.Then)
 				},
-				fx.ParamTags(`name:"server_primary"`),
+				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_primary"`),
 			),
 			fx.Annotate(
-				func(si touchhttp.ServerInstrumenter) {
-					out.Primary = alice.New(si.Then)
+				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
+					o.Alternate = alice.New(si.Then)
 				},
-				fx.ParamTags(`name:"server_health"`),
+				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_health"`),
+			),
+			fx.Annotate(
+				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
+					o.Primary = alice.New(si.Then)
+				},
+				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_alternate"`),
 			),
 		),
 	)
 	return
 }
 
-func provideAPIRouter(in APIRouterIn) *mux.Router {
+func provideAPIRouter(in apiRouterIn) *mux.Router {
 	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
 	return APIRouter
 }
 
-func provideURLPrefix(in ProvideURLPrefixIn) string {
+func provideURLPrefix(in provideURLPrefixIn) string {
 	// if we want to support the previous API version, then include it in the
 	// api base.
 	urlPrefix := fmt.Sprintf("/%s", apiBase)

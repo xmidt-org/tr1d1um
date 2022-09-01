@@ -69,7 +69,7 @@ servers:
     disableHTTPKeepAlives: true
     header:
       X-Midt-Server:
-        - argus
+        - tr1d1um
       X-Midt-Version:
         - development
   pprof:
