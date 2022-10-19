@@ -15,7 +15,7 @@ require (
 	github.com/xmidt-org/ancla v0.3.10
 	github.com/xmidt-org/arrange v0.3.0
 	github.com/xmidt-org/bascule v0.11.0
-	github.com/xmidt-org/candlelight v0.0.11
+	github.com/xmidt-org/candlelight v0.0.12
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/sallust v0.1.6
 	github.com/xmidt-org/touchstone v0.1.2
@@ -28,5 +28,4 @@ require (
 	go.uber.org/fx v1.18.2
 	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d // indirect
-	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 )
