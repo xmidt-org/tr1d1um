@@ -274,7 +274,7 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger sallust.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if getLogger == nil {
 		getLogger = func(_ context.Context) *zap.Logger {
 			return nil

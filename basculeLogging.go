@@ -21,9 +21,10 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/xmidt-org/webpa-common/v2/logging"
+	"github.com/xmidt-org/sallust"
+	"go.uber.org/zap"
 )
 
 func sanitizeHeaders(headers http.Header) (filtered http.Header) {
@@ -38,7 +39,6 @@ func sanitizeHeaders(headers http.Header) (filtered http.Header) {
 	return
 }
 
-func getLogger(ctx context.Context) log.Logger {
-	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC)
-	return logger
+func getLogger(ctx context.Context) *zap.Logger {
+	return sallust.Get(ctx).With(zap.Duration("ts", time.Now().UTC()))
 }

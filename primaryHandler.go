@@ -31,12 +31,12 @@ import (
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/clortho"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -179,7 +179,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
 
-	stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
+	stopWatches, err := svc.StartListener(listenerMeasures, sallust.With)
 	if err != nil {
 		return out, fmt.Errorf("webhook service start listener error: %s", err)
 	}

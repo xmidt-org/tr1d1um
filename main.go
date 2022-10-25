@@ -34,7 +34,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/candlelight"
@@ -113,7 +112,7 @@ func consts() ConstOut {
 	}
 }
 
-func gokitLogger(l *zap.Logger) log.Logger {
+func gokitLogger(l *zap.Logger) *zap.Logger {
 	return sallustkit.Logger{
 		Zap: l,
 	}

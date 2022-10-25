@@ -96,3 +96,7 @@ require (
 )
 
 replace github.com/xmidt-org/ancla => /Users/odc/Documents/GitHub/xmidt-org/ancla
+
+replace github.com/xmidt-org/sallust => /Users/odc/Documents/GitHub/xmidt-org/sallust
+
+replace github.com/xmidt-org/argus => /Users/odc/Documents/GitHub/xmidt-org/argus
