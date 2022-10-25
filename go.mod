@@ -56,7 +56,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.6 // indirect
 	github.com/lestrrat-go/option v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/openzipkin/zipkin-go v0.4.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
@@ -75,7 +75,6 @@ require (
 	github.com/xmidt-org/argus v0.9.2 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
 	github.com/xmidt-org/themis v0.4.9 // indirect
-	github.com/xmidt-org/webpa-common v1.11.9 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.11.1 // indirect
