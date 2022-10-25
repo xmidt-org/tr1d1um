@@ -28,8 +28,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
@@ -38,11 +36,12 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/httpaux"
+	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -277,7 +276,7 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 //nolint:funlen
 func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) log.Logger {
+		getLogger = func(_ context.Context) *zap.Logger {
 			return nil
 		}
 	}
@@ -305,9 +304,9 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Han
 			// if this is v2, we need to unmarshal and check the duration.  If
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
-			logger := getLogger(r.Context())
+			logger := sallusthttp.Get(r)
 			if logger == nil {
-				logger = log.NewNopLogger()
+				logger = sallust.Default()
 			}
 			requestPayload, err := ioutil.ReadAll(r.Body)
 			if err != nil {
@@ -371,12 +370,12 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Han
 	}, nil
 }
 
-func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) {
+func v2ErrEncode(w http.ResponseWriter, logger *zap.Logger, err error, code int) {
 	if code == 0 {
 		code = http.StatusInternalServerError
 	}
-	level.Error(logger).Log(logging.MessageKey(), "sending non-200, non-404 response",
-		logging.ErrorKey(), err, "code", code)
+	logger.Error("sending non-200, non-404 response",
+		zap.Error(err), zap.Int("code", code))
 
 	w.WriteHeader(code)
 
