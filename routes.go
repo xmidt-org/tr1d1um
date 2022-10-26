@@ -223,7 +223,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(getLogger, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
+		fixV2Middleware, err := fixV2Duration(sallust.With, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err

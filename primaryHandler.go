@@ -174,7 +174,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	}
 	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
-	svc, err := ancla.NewService(webhookConfig, getLogger)
+	svc, err := ancla.NewService(webhookConfig, sallust.With)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
@@ -188,7 +188,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	defer stopWatches()
 
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-		GetLogger: getLogger,
+		GetLogger: sallust.With,
 	})
 
 	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
@@ -199,7 +199,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 		V:                 builtValidators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         getLogger,
+		GetLogger:         sallust.With,
 	})
 
 	v, err := v2WebhookValidators(webhookConfig)
@@ -210,7 +210,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 		V:                 v,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         getLogger,
+		GetLogger:         sallust.With,
 	})
 
 	in.Logger.Info("Webhook service enabled")

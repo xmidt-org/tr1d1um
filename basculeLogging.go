@@ -18,13 +18,8 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"strings"
-	"time"
-
-	"github.com/xmidt-org/sallust"
-	"go.uber.org/zap"
 )
 
 func sanitizeHeaders(headers http.Header) (filtered http.Header) {
@@ -37,8 +32,4 @@ func sanitizeHeaders(headers http.Header) (filtered http.Header) {
 		}
 	}
 	return
-}
-
-func getLogger(ctx context.Context) *zap.Logger {
-	return sallust.Get(ctx).With(zap.Duration("ts", time.Now().UTC()))
 }
