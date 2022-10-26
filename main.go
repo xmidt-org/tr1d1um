@@ -26,6 +26,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/go-kit/log"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
@@ -112,7 +114,7 @@ func consts() ConstOut {
 	}
 }
 
-func gokitLogger(l *zap.Logger) *zap.Logger {
+func gokitLogger(l *zap.Logger) log.Logger {
 	return sallustkit.Logger{
 		Zap: l,
 	}

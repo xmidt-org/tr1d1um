@@ -168,13 +168,13 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	}
 
 	webhookConfig := in.WebhookConfigKey
-	webhookConfig.Logger = gokitLogger(in.Logger)
+	webhookConfig.Logger = in.Logger
 	listenerMeasures := ancla.ListenerConfig{
 		Measures: *in.Measures,
 	}
 	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
-	svc, err := ancla.NewService(webhookConfig, sallust.With)
+	svc, err := ancla.NewService(webhookConfig, sallust.Get)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
@@ -188,7 +188,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	defer stopWatches()
 
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-		GetLogger: sallust.With,
+		GetLogger: sallust.Get,
 	})
 
 	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
@@ -199,7 +199,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 		V:                 builtValidators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         sallust.With,
+		GetLogger:         sallust.Get,
 	})
 
 	v, err := v2WebhookValidators(webhookConfig)
@@ -210,7 +210,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 		V:                 v,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         sallust.With,
+		GetLogger:         sallust.Get,
 	})
 
 	in.Logger.Info("Webhook service enabled")
