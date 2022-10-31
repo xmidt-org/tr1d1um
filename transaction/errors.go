@@ -63,9 +63,7 @@ func NewCodedError(e error, code int) CodedError {
 // errors are logged with their corresponding unique request identifier
 func ErrorLogEncoder(getLogger sallust.GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) *zap.Logger {
-			return nil
-		}
+		getLogger = sallust.GetNilLogger
 	}
 
 	return func(ctx context.Context, e error, w http.ResponseWriter) {

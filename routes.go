@@ -19,7 +19,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -276,9 +275,7 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 //nolint:funlen
 func fixV2Duration(getLogger sallust.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) *zap.Logger {
-			return nil
-		}
+		getLogger = sallust.GetNilLogger
 	}
 	if config.Now == nil {
 		config.Now = time.Now
