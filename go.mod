@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/go-kit/kit v0.12.0
+	github.com/go-kit/log v0.2.1
 	github.com/goph/emperror v0.17.3-0.20190703203600-60a8d9faa17b
 	github.com/gorilla/mux v1.8.0
 	github.com/justinas/alice v1.2.0
@@ -38,7 +39,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -72,9 +72,10 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	github.com/xmidt-org/argus v0.9.2 // indirect
+	github.com/xmidt-org/argus v0.9.3 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
-	github.com/xmidt-org/themis v0.4.9 // indirect
+	github.com/xmidt-org/themis v0.4.10 // indirect
+	github.com/xmidt-org/webpa-common v1.11.9 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.11.1 // indirect
@@ -94,9 +95,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/xmidt-org/ancla => /Users/odc/Documents/GitHub/xmidt-org/ancla
-
-replace github.com/xmidt-org/sallust => /Users/odc/Documents/GitHub/xmidt-org/sallust
-
-replace github.com/xmidt-org/argus => /Users/odc/Documents/GitHub/xmidt-org/argus
