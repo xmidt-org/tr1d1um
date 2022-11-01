@@ -72,10 +72,8 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	github.com/xmidt-org/argus v0.9.3 // indirect
+	github.com/xmidt-org/argus v0.9.4 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
-	github.com/xmidt-org/themis v0.4.10 // indirect
-	github.com/xmidt-org/webpa-common v1.11.9 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.11.1 // indirect

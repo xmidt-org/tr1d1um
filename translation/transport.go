@@ -33,10 +33,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 )

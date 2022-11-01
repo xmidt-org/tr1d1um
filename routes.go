@@ -303,8 +303,9 @@ func fixV2Duration(getLogger sallust.GetLoggerFunc, config ancla.TTLVConfig, v2H
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
 			if logger == nil {
-				logger = sallust.Default()
+				panic("no logger supplied")
 			}
+
 			requestPayload, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				v2ErrEncode(w, logger, err, 0)
