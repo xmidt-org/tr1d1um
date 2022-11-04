@@ -33,6 +33,11 @@ import (
 	"github.com/justinas/alice"
 )
 
+const (
+	contentTypeHeaderKey = "Content-Type"
+	authHeaderKey        = "Authorization"
+)
+
 var (
 	errResponseIsNil = errors.New("response is nil")
 )
@@ -71,7 +76,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 	var deviceID wrp.DeviceID
 	if deviceID, err = wrp.ParseDeviceID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
-			AuthHeaderValue: r.Header.Get("Authorization"),
+			AuthHeaderValue: r.Header.Get(authHeaderKey),
 			DeviceID:        string(deviceID),
 		}
 	} else {
@@ -82,20 +87,22 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 }
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
 	var ctxKeyReqTID string
 	c := ctx.Value(transaction.ContextKeyRequestTID)
 	if c != nil {
 		ctxKeyReqTID = c.(string)
 	}
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
-		// if ce, ok := err.(transaction.CodedError); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
+
+		//the real error is logged into our system before encodeError() is called
+		//the idea behind masking it is to not send the external API consumer internal error messages
 		err = transaction.ErrTr1d1umInternal
 	}
 

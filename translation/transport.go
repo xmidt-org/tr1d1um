@@ -225,8 +225,8 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	if c != nil {
 		ctxKeyReqTID = c.(string)
 	}
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		w.WriteHeader(ce.StatusCode())
