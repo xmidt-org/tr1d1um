@@ -177,7 +177,7 @@ func provideServers() fx.Option {
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_metrics",
-			Key:  "servers.metric",
+			Key:  "servers.metrics",
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
