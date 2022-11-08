@@ -87,7 +87,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 }
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
+	w.Header().Set(contentTypeHeaderKey, "application/json")
 	var ctxKeyReqTID string
 	c := ctx.Value(transaction.ContextKeyRequestTID)
 	if c != nil {

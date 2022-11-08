@@ -202,7 +202,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			StatusCode int `json:"statusCode"`
 		}
 
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Content-Type", "application/json")
 
 		// if possible, use the device response status code
 		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
@@ -220,7 +220,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 /* Error Encoding */
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
+	w.Header().Set(contentTypeHeaderKey, "application/json")
 	var ctxKeyReqTID string
 	c := ctx.Value(transaction.ContextKeyRequestTID)
 	if c != nil {
