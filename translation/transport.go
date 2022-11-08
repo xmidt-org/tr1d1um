@@ -187,7 +187,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	}
 	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
 
-	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
+	if resp.Code != http.StatusOK || len(resp.Body) == 0 { //just forward the XMiDT cluster response
 		w.WriteHeader(resp.Code)
 		_, err = w.Write(resp.Body)
 		return
