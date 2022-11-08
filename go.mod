@@ -9,7 +9,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.13.0
+	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/xmidt-org/ancla v0.3.10
 	github.com/xmidt-org/arrange v0.3.0

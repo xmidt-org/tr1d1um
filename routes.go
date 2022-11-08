@@ -113,6 +113,12 @@ type metricMiddlewareOut struct {
 	Health    alice.Chain `name:"middleware_health_metrics"`
 }
 
+type metricsRoutesIn struct {
+	fx.In
+	Router  *mux.Router `name:"server_metrics"`
+	Handler touchhttp.Handler
+}
+
 func provideServers() fx.Option {
 	return fx.Options(
 		arrange.ProvideKey(reqMaxRetriesKey, 0),
@@ -171,11 +177,12 @@ func provideServers() fx.Option {
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_metrics",
-			Key:  "servers.metric",
+			Key:  "servers.metrics",
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
+			buildMetricsRoutes,
 		),
 	)
 }
@@ -384,4 +391,10 @@ func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) 
 		map[string]interface{}{
 			"message": err.Error(),
 		})
+}
+
+func buildMetricsRoutes(in metricsRoutesIn) {
+	if in.Router != nil && in.Handler != nil {
+		in.Router.Handle("/metrics", in.Handler).Methods("GET")
+	}
 }
