@@ -295,7 +295,7 @@ authx:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: http://scytale:6300/api/v3
+targetURL: http://localhost:6300/api/v3
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"
@@ -375,14 +375,47 @@ requestMaxRetries: 2
 tracing:
   # provider is the provider name. Currently, stdout, jaegar and zipkin are supported.
   # 'noop' can also be used as provider to explicitly disable tracing.
-  provider: "noop"
+  provider: "otlp"
 
   # skipTraceExport only applies when provider is stdout. Set skipTraceExport to true
   # so that trace information is not written to stdout.
   # skipTraceExport: true
 
   # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
-  # endpoint: "http://localhost:9411/api/v2/spans"
+  #endpoint: "https://api.datadoghq.com"
+  applicationName: "tr1d1um"
+
+  otel-collector-config: 
+    receivers:
+      otlp:
+        # Protocols defines the protocols enabled for this receiver. At least one protocol of choice must
+        # be enabled.
+        protocols:
+          # The presence of the http section enables the HTTP server on the default port (4318)
+          http:
+          # The presence of the gRPC section enables the gRPC server on the default port (4317)
+          grpc:
+
+    processors:
+      batch:
+        timeout: 10s
+
+    exporters:
+      datadog/api:
+        env: local
+        service: tr1d1um
+        tags:
+          - env:testlocal
+      api:
+        site: datadoghq.com
+
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [datadog/api]
 
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,

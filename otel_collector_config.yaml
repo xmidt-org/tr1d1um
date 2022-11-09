@@ -1,0 +1,31 @@
+receivers:
+    otlp:
+      # Protocols defines the protocols enabled for this receiver. At least one protocol of choice must
+      # be enabled.
+      protocols:
+        # The presence of the http section enables the HTTP server on the default port (4318)
+        http:
+        # The presence of the gRPC section enables the gRPC server on the default port (4317)
+        grpc:
+
+  processors:
+    batch:
+      timeout: 10s
+
+  exporters:
+    datadog/api:
+      env: local
+      service: tr1d1um
+      tags:
+        - env:testlocal
+    api:
+      key: 
+      site: datadoghq.com
+
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [datadog/api]
