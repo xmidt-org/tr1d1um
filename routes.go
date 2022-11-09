@@ -37,6 +37,7 @@ import (
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/httpaux"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
@@ -112,6 +113,12 @@ type metricMiddlewareOut struct {
 	Health    alice.Chain `name:"middleware_health_metrics"`
 }
 
+type metricsRoutesIn struct {
+	fx.In
+	Router  *mux.Router `name:"server_metrics"`
+	Handler touchhttp.Handler
+}
+
 func provideServers() fx.Option {
 	return fx.Options(
 		arrange.ProvideKey(reqMaxRetriesKey, 0),
@@ -156,6 +163,13 @@ func provideServers() fx.Option {
 			Inject: arrange.Inject{
 				healthMetricMiddlewareIn{},
 			},
+			Invoke: arrange.Invoke{
+				func(r *mux.Router) {
+					r.Handle("/health", httpaux.ConstantHandler{
+						StatusCode: http.StatusOK,
+					}).Methods("GET")
+				},
+			},
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_pprof",
@@ -163,11 +177,12 @@ func provideServers() fx.Option {
 		}.Provide(),
 		arrangehttp.Server{
 			Name: "server_metrics",
-			Key:  "servers.metric",
+			Key:  "servers.metrics",
 		}.Provide(),
 		fx.Invoke(
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
+			buildMetricsRoutes,
 		),
 	)
 }
@@ -227,55 +242,27 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	return nil
 }
 
-func metricMiddleware() (out metricMiddlewareOut) {
+func metricMiddleware(f *touchstone.Factory) (out metricMiddlewareOut) {
 	var bundle touchhttp.ServerBundle
-	fx.New(
-		touchstone.Provide(),
-		fx.Provide(
-			fx.Annotated{
-				Name: "server_primary",
-				Target: bundle.NewInstrumenter(
-					touchhttp.ServerLabel, "server_primary",
-				),
-			},
-			fx.Annotated{
-				Name: "server_alternate",
-				Target: bundle.NewInstrumenter(
-					touchhttp.ServerLabel, "server_alternate",
-				),
-			},
-			fx.Annotated{
-				Name: "server_health",
-				Target: bundle.NewInstrumenter(
-					touchhttp.ServerLabel, "server_health",
-				),
-			},
-			fx.Annotated{
-				Name:   "metric_middleware_out",
-				Target: out,
-			},
-		),
-		fx.Invoke(
-			fx.Annotate(
-				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
-					o.Health = alice.New(si.Then)
-				},
-				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_primary"`),
-			),
-			fx.Annotate(
-				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
-					o.Alternate = alice.New(si.Then)
-				},
-				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_health"`),
-			),
-			fx.Annotate(
-				func(o metricMiddlewareOut, si touchhttp.ServerInstrumenter) {
-					o.Primary = alice.New(si.Then)
-				},
-				fx.ParamTags(`name:"metric_middleware_out"`, `name:"server_alternate"`),
-			),
-		),
-	)
+
+	primary, err1 := bundle.NewInstrumenter(
+		touchhttp.ServerLabel, "server_primary",
+	)(f)
+	alternate, err2 := bundle.NewInstrumenter(
+		touchhttp.ServerLabel, "server_alternate",
+	)(f)
+	health, err3 := bundle.NewInstrumenter(
+		touchhttp.ServerLabel, "server_health",
+	)(f)
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		return
+	}
+
+	out.Primary = alice.New(primary.Then)
+	out.Alternate = alice.New(alternate.Then)
+	out.Health = alice.New(health.Then)
+
 	return
 }
 
@@ -404,4 +391,10 @@ func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) 
 		map[string]interface{}{
 			"message": err.Error(),
 		})
+}
+
+func buildMetricsRoutes(in metricsRoutesIn) {
+	if in.Router != nil && in.Handler != nil {
+		in.Router.Handle("/metrics", in.Handler).Methods("GET")
+	}
 }
