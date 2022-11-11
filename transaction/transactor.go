@@ -19,6 +19,8 @@ package transaction
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -173,8 +175,25 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 func Welcome(delegate http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			var ctx = r.Context()
+			var tid string
+
+			if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
+				tid = genTID()
+			}
+
+			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
+}
+
+// genTID generates a 16-byte long string
+// it returns "N/A" in the extreme case the random string could not be generated
+func genTID() (tid string) {
+	buf := make([]byte, 16)
+	tid = ""
+	if _, err := rand.Read(buf); err == nil {
+		tid = base64.RawURLEncoding.EncodeToString(buf)
+	}
+	return
 }

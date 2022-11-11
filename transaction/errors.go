@@ -76,12 +76,13 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 		if errors.As(e, &sc) {
 			code = sc.StatusCode()
 		}
-		logger := getLogger(ctx)
-		if logger != nil && code != http.StatusNotFound {
-			logger.Info("sending non-200, non-404 response", zap.String("error", e.Error()),
-				zap.Reflect("tid", ctx.Value(ContextKeyRequestTID)),
+
+		if l := getLogger(ctx); l != nil && code != http.StatusNotFound {
+			l.Error("sending non-200, non-404 response", zap.String("error", e.Error()),
+				zap.Any("tid", ctx.Value(ContextKeyRequestTID)),
 			)
 		}
+
 		ee(ctx, e, w)
 	}
 }
