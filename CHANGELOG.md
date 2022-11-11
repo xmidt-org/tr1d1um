@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ## [v0.7.12]
-- [`/api/v2/device/ 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
+- [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
 - [Remove nonstandard charset for media type JSON encodings #336](https://github.com/xmidt-org/tr1d1um/issues/336)
 - [Create TransactionUUID if not provided #334](https://github.com/xmidt-org/tr1d1um/issues/334)
 
