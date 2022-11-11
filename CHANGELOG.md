@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- [`/api/v2/device/ 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
+- [Remove nonstandard charset for media type JSON encodings #336](https://github.com/xmidt-org/tr1d1um/issues/336)
+- [Create TransactionUUID if not provided #334](https://github.com/xmidt-org/tr1d1um/issues/334)
 
 ## [v0.7.11]
 - [No Prom Metrics Being Produced #329](https://github.com/xmidt-org/tr1d1um/issues/329)
@@ -14,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [v0.7.9]
 - Patch [#320](https://github.com/xmidt-org/tr1d1um/issues/320)
+- [CVE-2022-32149 (High) detected in golang.org/x/text-v0.3.7](https://github.com/xmidt-org/tr1d1um/issues/317)
 
 ## [v0.7.8]
 - Add support for an alternate server https://github.com/xmidt-org/tr1d1um/pull/297
