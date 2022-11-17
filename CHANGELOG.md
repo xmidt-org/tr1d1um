@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- [8090 support has been removed xmidt-org/tr1d1um#343](https://github.com/xmidt-org/tr1d1um/issues/343)
+- [v2 & v3 endpoints are not enforcing capabilities xmidt-org/tr1d1um#342](https://github.com/xmidt-org/tr1d1um/issues/342)
+- [https://github.com/xmidt-org/tr1d1um/issues/341](https://github.com/xmidt-org/tr1d1um/issues/341)
 
 ## [v0.7.12]
 - [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
