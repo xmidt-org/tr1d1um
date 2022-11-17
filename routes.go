@@ -55,8 +55,8 @@ var (
 type primaryEndpointIn struct {
 	fx.In
 	V                           *viper.Viper
-	Router                      *mux.Router `name:"server_primary"`
-	APIRouter                   *mux.Router `name:"api_router"`
+	PrimaryRouter               *mux.Router `name:"server_primary"`
+	AltRouter                   *mux.Router `name:"server_alternate"`
 	AuthChain                   alice.Chain `name:"auth_chain"`
 	Tracing                     candlelight.Tracing
 	Logger                      *zap.Logger
@@ -70,18 +70,13 @@ type primaryEndpointIn struct {
 type handleWebhookRoutesIn struct {
 	fx.In
 	Logger                *zap.Logger
-	APIRouter             *mux.Router  `name:"api_router"`
+	PrimaryRouter         *mux.Router  `name:"server_primary"`
+	AltRouter             *mux.Router  `name:"server_alternate"`
 	AuthChain             alice.Chain  `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 	WebhookConfig         ancla.Config
-}
-
-type apiRouterIn struct {
-	fx.In
-	PrimaryRouter *mux.Router `name:"server_primary"`
-	URLPrefix     string      `name:"url_prefix"`
 }
 
 type provideURLPrefixIn struct {
@@ -132,10 +127,6 @@ func provideServers() fx.Option {
 				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
 			},
 			fx.Annotated{
-				Name:   "api_router",
-				Target: provideAPIRouter,
-			},
-			fx.Annotated{
 				Name:   "url_prefix",
 				Target: provideURLPrefix,
 			},
@@ -178,9 +169,6 @@ func provideServers() fx.Option {
 			Key:  "servers.metrics",
 		}.Provide(),
 		fx.Invoke(
-			handlePrimaryEndpoint,
-			handleWebhookRoutes,
-			buildMetricsRoutes,
 			fx.Annotate(
 				provideAPIRouter,
 				fx.ParamTags(`name:"server_alternate"`, `name:"url_prefix"`),
@@ -189,6 +177,9 @@ func provideServers() fx.Option {
 				provideAPIRouter,
 				fx.ParamTags(`name:"server_primary"`, `name:"url_prefix"`),
 			),
+			handlePrimaryEndpoint,
+			handleWebhookRoutes,
+			buildMetricsRoutes,
 		),
 	)
 }
@@ -199,8 +190,12 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		otelmux.WithPropagators(in.Tracing.Propagator()),
 	}
 
-	in.Router.Use(
+	in.PrimaryRouter.Use(
 		otelmux.Middleware("mainSpan", otelMuxOptions...),
+		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
+	)
+	in.AltRouter.Use(
+		otelmux.Middleware("alternateSpan", otelMuxOptions...),
 		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
@@ -220,14 +215,29 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
 	stat.ConfigHandler(&stat.Options{
 		S:                           ss,
-		APIRouter:                   in.APIRouter,
+		APIRouter:                   in.PrimaryRouter,
 		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
-		APIRouter:                   in.APIRouter,
+		APIRouter:                   in.PrimaryRouter,
+		Authenticate:                &in.AuthChain,
+		Log:                         in.Logger,
+		ValidServices:               in.TranslationServices,
+		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+	})
+	stat.ConfigHandler(&stat.Options{
+		S:                           ss,
+		APIRouter:                   in.AltRouter,
+		Authenticate:                &in.AuthChain,
+		Log:                         in.Logger,
+		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+	})
+	translation.ConfigHandler(&translation.Options{
+		S:                           ts,
+		APIRouter:                   in.AltRouter,
 		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
@@ -242,8 +252,10 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+		in.PrimaryRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
+		in.PrimaryRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+		in.AltRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
+		in.PrimaryRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
 	}
 	return nil
 }
@@ -272,9 +284,8 @@ func metricMiddleware(f *touchstone.Factory) (out metricMiddlewareOut) {
 	return
 }
 
-func provideAPIRouter(in apiRouterIn) *mux.Router {
-	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
-	return APIRouter
+func provideAPIRouter(r *mux.Router, URLPrefix string) {
+	*r = *r.PathPrefix(URLPrefix).Subrouter()
 }
 
 func provideURLPrefix(in provideURLPrefixIn) string {
