@@ -56,6 +56,13 @@ servers:
         - tr1d1um
       X-Midt-Version:
         - development
+  alternate:
+    address: :8090
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
   metrics:
     address: :6101
     disableHTTPKeepAlives: true
