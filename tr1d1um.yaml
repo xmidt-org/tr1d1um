@@ -56,13 +56,6 @@ servers:
         - tr1d1um
       X-Midt-Version:
         - development
-  alternate:
-    address: :8090
-    header:
-      X-Midt-Server:
-        - tr1d1um
-      X-Midt-Version:
-        - development
   metrics:
     address: :6101
     disableHTTPKeepAlives: true
@@ -302,7 +295,7 @@ authx:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: "https://api-cd.xmidt.comcast.net:443/api/v3"
+targetURL: http://scytale:6300/api/v3
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"
