@@ -85,8 +85,8 @@ type provideWebhookHandlersIn struct {
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
 	Measures           *ancla.Measures
-	MeasuresIn         ancla.MeasuresIn
 	Tracing            candlelight.Tracing
+	Tf                 *touchstone.Factory
 }
 
 type provideWebhookHandlersOut struct {
