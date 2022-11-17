@@ -72,12 +72,13 @@ func ErrorLogEncoder(getLogger sallust.GetLoggerFunc, ee kithttp.ErrorEncoder) k
 		if errors.As(e, &sc) {
 			code = sc.StatusCode()
 		}
-		logger := getLogger(ctx)
-		if logger != nil && code != http.StatusNotFound {
-			logger.Info("sending non-200, non-404 response", zap.String("error", e.Error()),
+
+		if l := getLogger(ctx); l != nil && code != http.StatusNotFound {
+			l.Error("sending non-200, non-404 response", zap.String("error", e.Error()),
 				zap.Any("tid", ctx.Value(ContextKeyRequestTID)),
 			)
 		}
+
 		ee(ctx, e, w)
 	}
 }

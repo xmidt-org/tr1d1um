@@ -162,7 +162,7 @@ func TestRequestPayload(t *testing.T) {
 		_, e := requestPayload(r)
 		var err transaction.CodedError
 		assert.True(errors.As(e, &err))
-		assert.Contains(e.Error(), "Invalid WDMP structure")
+		assert.Contains(e.Error(), "invalid WDMP structure")
 		assert.EqualValues(http.StatusBadRequest, err.StatusCode())
 
 	})
