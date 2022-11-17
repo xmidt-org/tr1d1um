@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- [https://github.com/xmidt-org/tr1d1um/issues/340](https://github.com/xmidt-org/tr1d1um/issues/340)
 
 ## [v0.7.12]
 - [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
