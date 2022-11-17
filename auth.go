@@ -23,14 +23,27 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/xmidt-org/arrange"
+	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
+	"github.com/xmidt-org/clortho"
 	"go.uber.org/fx"
 )
 
 var possiblePrefixURLs = []string{
 	"/" + apiBase,
 	"/" + prevAPIBase,
+}
+
+// JWTValidator provides a convenient way to define jwt validator through config files
+type JWTValidator struct {
+	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
+	Config clortho.Config
+
+	// Leeway is used to set the amount of time buffer should be given to JWT
+	// time values, such as nbf
+	Leeway bascule.Leeway
 }
 
 func provideAuthChain(configKey string) fx.Option {
@@ -41,10 +54,14 @@ func provideAuthChain(configKey string) fx.Option {
 			func() basculehttp.ParseURL {
 				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
+			arrange.UnmarshalKey(fmt.Sprintf("%s.jwtValidator", configKey), JWTValidator{}),
+			func(c JWTValidator) clortho.Config {
+				return c.Config
+			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory(configKey+".jwtValidator", false),
-		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilities", configKey)),
+		basculehttp.ProvideBearerTokenFactory(fmt.Sprintf("%s.jwtValidator", configKey), false),
+		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilityCheck", configKey)),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)

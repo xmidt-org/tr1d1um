@@ -27,10 +27,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
@@ -61,27 +59,10 @@ type authAcquirerConfig struct {
 	Basic string
 }
 
-type CapabilityConfig struct {
-	Type            string
-	Prefix          string
-	AcceptAllMethod string
-	EndpointBuckets []string
-}
-
-// JWTValidator provides a convenient way to define jwt validator through config files
-type JWTValidator struct {
-	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
-	Config clortho.Config
-
-	// Leeway is used to set the amount of time buffer should be given to JWT
-	// time values, such as nbf
-	Leeway bascule.Leeway
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
 	V                  *viper.Viper
-	WebhookConfigKey   ancla.Config
+	WebhookConfig      ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
 	Measures           *ancla.Measures
@@ -167,7 +148,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		return
 	}
 
-	webhookConfig := in.WebhookConfigKey
+	webhookConfig := in.WebhookConfig
 	webhookConfig.Logger = in.Logger
 	listenerMeasures := ancla.ListenerConfig{
 		Measures: *in.Measures,
@@ -202,13 +183,13 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		GetLogger:         sallust.Get,
 	})
 
-	v, err := v2WebhookValidators(webhookConfig)
+	v2Validators, err := v2WebhookValidators(webhookConfig)
 	if err != nil {
 		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
 	}
 
 	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 v,
+		V:                 v2Validators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})
@@ -222,13 +203,8 @@ func provideHandlers() fx.Option {
 		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 		fx.Provide(
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
-			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
-			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
 			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
-			func(c JWTValidator) clortho.Config {
-				return c.Config
-			},
 			provideWebhookHandlers,
 		),
 	)

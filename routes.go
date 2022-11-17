@@ -75,7 +75,7 @@ type handleWebhookRoutesIn struct {
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
-	WebhookConfigKey      ancla.Config
+	WebhookConfig         ancla.Config
 }
 
 type apiRouterIn struct {
@@ -181,6 +181,14 @@ func provideServers() fx.Option {
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
 			buildMetricsRoutes,
+			fx.Annotate(
+				provideAPIRouter,
+				fx.ParamTags(`name:"server_alternate"`, `name:"url_prefix"`),
+			),
+			fx.Annotate(
+				provideAPIRouter,
+				fx.ParamTags(`name:"server_primary"`, `name:"url_prefix"`),
+			),
 		),
 	)
 }
@@ -229,12 +237,12 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
+		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.GetAllWebhooksHandler))).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
 	}
 	return nil
