@@ -373,7 +373,7 @@ requestMaxRetries: 2
 # tracing provides configuration around traces using OpenTelemetry.
 # (Optional). By default, a 'noop' tracer provider is used and tracing is disabled.
 tracing:
-  # provider is the provider name. Currently, stdout, jaegar and zipkin are supported.
+  # provider is the provider name. Currently, stdout, jaeger and zipkin are supported.
   # 'noop' can also be used as provider to explicitly disable tracing.
   provider: "otlp"
 
@@ -382,40 +382,9 @@ tracing:
   # skipTraceExport: true
 
   # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
-  #endpoint: "https://api.datadoghq.com"
+  endpoint: "localhost:4317"
+
   applicationName: "tr1d1um"
-
-  otel-collector-config: 
-    receivers:
-      otlp:
-        # Protocols defines the protocols enabled for this receiver. At least one protocol of choice must
-        # be enabled.
-        protocols:
-          # The presence of the http section enables the HTTP server on the default port (4318)
-          http:
-          # The presence of the gRPC section enables the gRPC server on the default port (4317)
-          grpc:
-
-    processors:
-      batch:
-        timeout: 10s
-
-    exporters:
-      datadog/api:
-        env: local
-        service: tr1d1um
-        tags:
-          - env:testlocal
-      api:
-        site: datadoghq.com
-
-
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: [batch]
-          exporters: [datadog/api]
 
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,
