@@ -61,9 +61,9 @@ func NewCodedError(e error, code int) CodedError {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(getLogger sallust.GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
+func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	if getLogger == nil {
-		getLogger = sallust.GetNilLogger
+		getLogger = sallust.Get
 	}
 
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
