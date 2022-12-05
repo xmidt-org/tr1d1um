@@ -385,9 +385,6 @@ tracing:
   # OTLP/HTTP uses port 4318 by default.
   # endpoint: "localhost:4317"
 
-  # applicationName is the name for this application.
-  applicationName: "tr1d1um"
-
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,
 # tr1d1um will support both "/v2" and "/v3" endpoints.  When false, only "/v3"
