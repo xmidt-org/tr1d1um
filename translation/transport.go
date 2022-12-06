@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/webpa-common/v2/basculechecks"
 	"github.com/xmidt-org/wrp-go/v3"
@@ -125,6 +127,16 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	return partnerIDs
 }
 
+func getTID(ctx context.Context) string {
+	t, ok := ctx.Value(transaction.ContextKeyRequestTID).(string)
+	if !ok {
+		sallust.Get(ctx).Warn(fmt.Sprintf("tid not found in header `%s` or generated", candlelight.HeaderWPATIDKeyName))
+		return ""
+	}
+
+	return t
+}
+
 /* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
@@ -132,12 +144,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		wrpMsg  *wrp.Message
 	)
 	if payload, err = requestPayload(r); err == nil {
-		var tid string
-		ctxtid := ctx.Value(transaction.ContextKeyRequestTID)
-		if ctxtid != nil {
-			tid = ctxtid.(string)
-		}
-
+		tid := getTID(ctx)
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
 		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs)
 		if err == nil {
@@ -172,7 +179,6 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 }
 
 /* Response Encoding */
-
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
 	var resp = response.(*transaction.XmidtResponse)
 
@@ -180,14 +186,14 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
-	var ctxKeyReqTID string
-	c := ctx.Value(transaction.ContextKeyRequestTID)
-	if c != nil {
-		ctxKeyReqTID = c.(string)
-	}
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
-
-	if resp.Code != http.StatusOK { //just forward the XMiDT cluster response {
+	tid := getTID(ctx)
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, tid)
+	// just forward the XMiDT cluster response
+	if len(resp.Body) == 0 && resp.Code == http.StatusOK {
+		sallust.Get(ctx).Warn("sending 200 with an empty body")
+		w.WriteHeader(resp.Code)
+		return
+	} else if resp.Code != http.StatusOK {
 		w.WriteHeader(resp.Code)
 		_, err = w.Write(resp.Body)
 		return
@@ -201,7 +207,7 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 			StatusCode int `json:"statusCode"`
 		}
 
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Content-Type", "application/json")
 
 		// if possible, use the device response status code
 		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
@@ -219,14 +225,9 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 /* Error Encoding */
 
 func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set(contentTypeHeaderKey, "application/json; charset=utf-8")
-	var ctxKeyReqTID string
-	c := ctx.Value(transaction.ContextKeyRequestTID)
-	if c != nil {
-		ctxKeyReqTID = c.(string)
-	}
-	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
-
+	tid := getTID(ctx)
+	w.Header().Set(contentTypeHeaderKey, "application/json")
+	w.Header().Set(candlelight.HeaderWPATIDKeyName, tid)
 	var ce transaction.CodedError
 	if errors.As(err, &ce) {
 		w.WriteHeader(ce.StatusCode())
