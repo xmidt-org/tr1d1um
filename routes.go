@@ -181,14 +181,6 @@ func provideServers() fx.Option {
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
 			buildMetricsRoutes,
-			fx.Annotate(
-				provideAPIRouter,
-				fx.ParamTags(`name:"server_alternate"`, `name:"url_prefix"`),
-			),
-			fx.Annotate(
-				provideAPIRouter,
-				fx.ParamTags(`name:"server_primary"`, `name:"url_prefix"`),
-			),
 		),
 	)
 }
