@@ -78,6 +78,13 @@ type handleWebhookRoutesIn struct {
 	WebhookConfig         ancla.Config
 }
 
+type apiAltRouterIn struct {
+	fx.In
+	APIRouter       *mux.Router `name:"api_router"`
+	AlternateRouter *mux.Router `name:"server_alternate"`
+	URLPrefix       string      `name:"url_prefix"`
+}
+
 type apiRouterIn struct {
 	fx.In
 	PrimaryRouter *mux.Router `name:"server_primary"`
@@ -96,7 +103,7 @@ type primaryMetricMiddlewareIn struct {
 
 type alternateMetricMiddlewareIn struct {
 	fx.In
-	Primary alice.Chain `name:"middleware_alternate_metrics"`
+	Alternate alice.Chain `name:"middleware_alternate_metrics"`
 }
 
 type healthMetricMiddlewareIn struct {
@@ -181,6 +188,7 @@ func provideServers() fx.Option {
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
 			buildMetricsRoutes,
+			buildAPIAltRouter,
 		),
 	)
 }
@@ -265,8 +273,16 @@ func metricMiddleware(f *touchstone.Factory) (out metricMiddlewareOut) {
 }
 
 func provideAPIRouter(in apiRouterIn) *mux.Router {
-	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
-	return APIRouter
+	return in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
+}
+
+func buildAPIAltRouter(in apiAltRouterIn) {
+	apiAltRouter := in.AlternateRouter.PathPrefix(in.URLPrefix).Subrouter()
+	apiAltRouter.Handle("/device/{deviceid}/{service}", in.APIRouter)
+	apiAltRouter.Handle("/device/{deviceid}/{service}/{parameter}", in.APIRouter)
+	apiAltRouter.Handle("/device/{deviceid}/stat", in.APIRouter)
+	apiAltRouter.Handle("/hook", in.APIRouter)
+	apiAltRouter.Handle("/hooks", in.APIRouter)
 }
 
 func provideURLPrefix(in provideURLPrefixIn) string {
