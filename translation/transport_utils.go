@@ -139,7 +139,7 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 	err := json.Unmarshal(encodedWDMP, wdmp)
 
 	if err != nil && len(encodedWDMP) > 0 { //len(encodedWDMP) == 0 is ok as it is used for TEST_SET
-		return nil, transaction.NewBadRequestError(fmt.Errorf("Invalid WDMP structure. %s", err.Error()))
+		return nil, transaction.NewBadRequestError(fmt.Errorf("invalid WDMP structure: %s", err))
 	}
 
 	err = deduceSET(wdmp, newCID, oldCID, syncCMC)

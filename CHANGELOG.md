@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - Updated tracing configuration documentation in tr1d1um.yaml to reflect changes in Candlelight [#346](https://github.com/xmidt-org/tr1d1um/pull/346)
 
+## [v0.7.12]
+- [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
+- [Remove nonstandard charset for media type JSON encodings #336](https://github.com/xmidt-org/tr1d1um/issues/336)
+- [Create TransactionUUID if not provided #334](https://github.com/xmidt-org/tr1d1um/issues/334)
+
 ## [v0.7.11]
 - [No Prom Metrics Being Produced #329](https://github.com/xmidt-org/tr1d1um/issues/329)
 
@@ -15,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [v0.7.9]
 - Patch [#320](https://github.com/xmidt-org/tr1d1um/issues/320)
+- [CVE-2022-32149 (High) detected in golang.org/x/text-v0.3.7](https://github.com/xmidt-org/tr1d1um/issues/317)
 
 ## [v0.7.8]
 - Add support for an alternate server https://github.com/xmidt-org/tr1d1um/pull/297
@@ -187,8 +193,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.11...HEAD
-[v0.7.10]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.10...v0.7.11
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.12...HEAD
+[v0.7.12]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.11...v0.7.12
+[v0.7.11]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.10...v0.7.11
 [v0.7.10]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.9...v0.7.10
 [v0.7.9]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.8...v0.7.9
 [v0.7.8]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.7...v0.7.8

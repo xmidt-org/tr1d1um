@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/xmidt-org/candlelight"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -130,14 +132,48 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 }
 
 func TestWelcome(t *testing.T) {
-	assert := assert.New(t)
-	var handler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		assert.NotNil(r.Context().Value(ContextKeyRequestArrivalTime))
-	})
+	tests := []struct {
+		description string
+		genReq      func() *http.Request
+		expectedTID string
+	}{
+		{
+			description: "Generated TID",
+			genReq: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+				return
+			},
+		},
+		{
+			description: "Given TID",
+			genReq: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+				r.Header.Set(candlelight.HeaderWPATIDKeyName, "tid01")
+				return
+			},
+			expectedTID: "tid01",
+		},
+	}
 
-	decorated := Welcome(handler)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-	decorated.ServeHTTP(nil, req)
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			assert := assert.New(t)
+			require := require.New(t)
+			handler := http.HandlerFunc(
+				func(_ http.ResponseWriter, r *http.Request) {
+					assert.NotNil(r.Context().Value(ContextKeyRequestArrivalTime))
+					tid := r.Context().Value(ContextKeyRequestTID)
+					require.NotNil(tid)
+					tid = tid.(string)
+					if assert.NotZero(tid) && tc.expectedTID != "" {
+						assert.Equal(tc.expectedTID, tid)
+					}
+				})
+			decorated := Welcome(handler)
+			decorated.ServeHTTP(nil, tc.genReq())
+
+		})
+	}
 }
 
 func TestLog(t *testing.T) {
