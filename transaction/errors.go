@@ -23,7 +23,6 @@ import (
 	"net/http"
 
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 )
 
@@ -61,11 +60,7 @@ func NewCodedError(e error, code int) CodedError {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(getLogger sallust.GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
-	if getLogger == nil {
-		getLogger = sallust.GetNilLogger
-	}
-
+func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
 		code := http.StatusInternalServerError
 		var sc kithttp.StatusCoder
