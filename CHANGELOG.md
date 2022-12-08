@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - [v2 & v3 endpoints are not enforcing capabilities xmidt-org/tr1d1um#342](https://github.com/xmidt-org/tr1d1um/issues/342)
 - [v3 endpoint is not validating webhooks #341](https://github.com/xmidt-org/tr1d1um/issues/341)
+- [8090 support has been removed #343](https://github.com/xmidt-org/tr1d1um/issues/343)
 
 ## [v0.7.12]
 - [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
