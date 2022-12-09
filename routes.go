@@ -323,9 +323,6 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
-			if logger == nil {
-				panic("no logger supplied")
-			}
 
 			requestPayload, err := ioutil.ReadAll(r.Body)
 			if err != nil {
