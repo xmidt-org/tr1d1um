@@ -5,11 +5,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.8.0]
 - Updated tracing configuration documentation in tr1d1um.yaml to reflect changes in Candlelight [#346](https://github.com/xmidt-org/tr1d1um/pull/346)
 - [https://github.com/xmidt-org/tr1d1um/issues/340](https://github.com/xmidt-org/tr1d1um/issues/340)
 - [v2 & v3 endpoints are not enforcing capabilities xmidt-org/tr1d1um#342](https://github.com/xmidt-org/tr1d1um/issues/342)
 - [v3 endpoint is not validating webhooks #341](https://github.com/xmidt-org/tr1d1um/issues/341)
 - [8090 support has been removed #343](https://github.com/xmidt-org/tr1d1um/issues/343)
+- [Remove Deprecated webpa-common #304](https://github.com/xmidt-org/tr1d1um/issues/304)
 
 ## [v0.7.12]
 - [`/api/v2/device/` 500 EOF Error #328](https://github.com/xmidt-org/tr1d1um/issues/328)
@@ -197,7 +200,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.12...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.0...HEAD
+[v0.8.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.12...v0.8.0
 [v0.7.12]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.11...v0.7.12
 [v0.7.11]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.10...v0.7.11
 [v0.7.10]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.9...v0.7.10
