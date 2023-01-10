@@ -301,10 +301,12 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 	if config.Now == nil {
 		config.Now = time.Now
 	}
+
 	durationCheck, err := ancla.CheckDuration(config.Max)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duration check: %v", err)
 	}
+
 	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create until check: %v", err)
