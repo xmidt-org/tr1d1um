@@ -19,6 +19,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,7 +76,14 @@ type handleWebhookRoutesIn struct {
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
 	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
-	WebhookConfigKey      ancla.Config
+	WebhookConfig         ancla.Config
+}
+
+type apiAltRouterIn struct {
+	fx.In
+	APIRouter       *mux.Router `name:"api_router"`
+	AlternateRouter *mux.Router `name:"server_alternate"`
+	URLPrefix       string      `name:"url_prefix"`
 }
 
 type apiRouterIn struct {
@@ -96,7 +104,7 @@ type primaryMetricMiddlewareIn struct {
 
 type alternateMetricMiddlewareIn struct {
 	fx.In
-	Primary alice.Chain `name:"middleware_alternate_metrics"`
+	Alternate alice.Chain `name:"middleware_alternate_metrics"`
 }
 
 type healthMetricMiddlewareIn struct {
@@ -181,6 +189,7 @@ func provideServers() fx.Option {
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
 			buildMetricsRoutes,
+			buildAPIAltRouter,
 		),
 	)
 }
@@ -229,12 +238,12 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
+		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.GetAllWebhooksHandler))).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
 	}
 	return nil
@@ -265,8 +274,16 @@ func metricMiddleware(f *touchstone.Factory) (out metricMiddlewareOut) {
 }
 
 func provideAPIRouter(in apiRouterIn) *mux.Router {
-	APIRouter := in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
-	return APIRouter
+	return in.PrimaryRouter.PathPrefix(in.URLPrefix).Subrouter()
+}
+
+func buildAPIAltRouter(in apiAltRouterIn) {
+	apiAltRouter := in.AlternateRouter.PathPrefix(in.URLPrefix).Subrouter()
+	apiAltRouter.Handle("/device/{deviceid}/{service}", in.APIRouter)
+	apiAltRouter.Handle("/device/{deviceid}/{service}/{parameter}", in.APIRouter)
+	apiAltRouter.Handle("/device/{deviceid}/stat", in.APIRouter)
+	apiAltRouter.Handle("/hook", in.APIRouter)
+	apiAltRouter.Handle("/hooks", in.APIRouter)
 }
 
 func provideURLPrefix(in provideURLPrefixIn) string {
@@ -280,17 +297,16 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger sallust.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
-	if getLogger == nil {
-		getLogger = sallust.GetNilLogger
-	}
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
+
 	durationCheck, err := ancla.CheckDuration(config.Max)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duration check: %v", err)
 	}
+
 	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create until check: %v", err)
@@ -309,9 +325,6 @@ func fixV2Duration(getLogger sallust.GetLoggerFunc, config ancla.TTLVConfig, v2H
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
-			if logger == nil {
-				panic("no logger supplied")
-			}
 
 			requestPayload, err := ioutil.ReadAll(r.Body)
 			if err != nil {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/xmidt-org/sallust"
+	"go.uber.org/zap"
 )
 
 func TestNewCodedError(t *testing.T) {
@@ -46,7 +47,7 @@ func TestBadRequestError(t *testing.T) {
 func TestErrorLogEncoder(t *testing.T) {
 	tcs := []struct {
 		desc      string
-		getLogger sallust.GetLoggerFunc
+		getLogger func(context.Context) *zap.Logger
 	}{
 		{
 			desc:      "nil getlogger",
@@ -66,10 +67,17 @@ func TestErrorLogEncoder(t *testing.T) {
 			}
 			le := ErrorLogEncoder(tc.getLogger, e)
 
-			assert.NotPanics(func() {
-				//assumes TID is context
-				le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
-			})
+			if tc.getLogger == nil {
+				assert.Panics(func() {
+					//assumes TID is context
+					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+				})
+			} else {
+				assert.NotPanics(func() {
+					//assumes TID is context
+					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+				})
+			}
 		})
 	}
 }

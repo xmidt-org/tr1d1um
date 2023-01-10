@@ -56,6 +56,13 @@ servers:
         - tr1d1um
       X-Midt-Version:
         - development
+  alternate:
+    address: :8090
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - development
   metrics:
     address: :6101
     disableHTTPKeepAlives: true
@@ -229,32 +236,31 @@ webhook:
   #      # buffer is the length of time before a token expires to get a new token.
   #      buffer: "2m"
 
+
 ##############################################################################
 # Authorization Credentials
 ##############################################################################
-# jwtValidator provides Bearer auth configuration
-jwtValidator:
-  Config:
-    Resolve:
-      # Template is a URI template used to fetch keys.  This template may
-      # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
-      # This field is required and has no default.
-      Template: "http://localhost/{keyID}"
-    Refresh:
-      Sources:
-        # URI is the location where keys are served.  By default, clortho supports
-        # file://, http://, and https:// URIs, as well as standard file system paths
-        # such as /etc/foo/bar.jwk.
-        #
-        # This field is required and has no default.
-        - URI: "http://localhost/available"
-
 authx:
   inbound:
     # basic is a list of Basic Auth credentials intended to be used for local testing purposes
     # WARNING! Be sure to remove this from your production config
     basic: ["dXNlcjpwYXNz"]
-
+    # jwtValidator provides Bearer auth configuration
+    jwtValidator:
+      config:
+        resolve:
+          # Template is a URI template used to fetch keys.  This template may
+          # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
+          # This field is required and has no default.
+          template: "http://localhost/{keyID}"
+        refresh:
+          sources:
+            # URI is the location where keys are served.  By default, clortho supports
+            # file://, http://, and https:// URIs, as well as standard file system paths
+            # such as /etc/foo/bar.jwk.
+            #
+            # This field is required and has no default.
+            - uri: "http://localhost/available"
 # capabilityCheck provides the details needed for checking an incoming JWT's
 # capabilities.  If the type of check isn't provided, no checking is done.  The 
 # type can be "monitor" or "enforce".  If it is empty or a different value, no 
