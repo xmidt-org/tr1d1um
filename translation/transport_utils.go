@@ -167,8 +167,8 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 		if e == nil {
 
 			logger = logger.With(
-				zap.Reflect("command", wdmp.Command),
-				zap.Reflect("parameters", getParamNames(wdmp.Parameters)),
+				zap.Any("command", wdmp.Command),
+				zap.Any("parameters", getParamNames(wdmp.Parameters)),
 			)
 
 			nctx = sallust.With(ctx, logger)

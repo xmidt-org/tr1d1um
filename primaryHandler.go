@@ -27,16 +27,14 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/clortho"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -61,32 +59,15 @@ type authAcquirerConfig struct {
 	Basic string
 }
 
-type CapabilityConfig struct {
-	Type            string
-	Prefix          string
-	AcceptAllMethod string
-	EndpointBuckets []string
-}
-
-// JWTValidator provides a convenient way to define jwt validator through config files
-type JWTValidator struct {
-	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
-	Config clortho.Config
-
-	// Leeway is used to set the amount of time buffer should be given to JWT
-	// time values, such as nbf
-	Leeway bascule.Leeway
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
 	V                  *viper.Viper
-	WebhookConfigKey   ancla.Config
+	WebhookConfig      ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
 	Measures           *ancla.Measures
-	MeasuresIn         ancla.MeasuresIn
 	Tracing            candlelight.Tracing
+	Tf                 *touchstone.Factory
 }
 
 type provideWebhookHandlersOut struct {
@@ -167,19 +148,19 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		return
 	}
 
-	webhookConfig := in.WebhookConfigKey
-	webhookConfig.Logger = gokitLogger(in.Logger)
+	webhookConfig := in.WebhookConfig
+	webhookConfig.Logger = in.Logger
 	listenerMeasures := ancla.ListenerConfig{
 		Measures: *in.Measures,
 	}
 	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
-	svc, err := ancla.NewService(webhookConfig, getLogger)
+	svc, err := ancla.NewService(webhookConfig, sallust.Get)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
 	}
 
-	stopWatches, err := svc.StartListener(listenerMeasures, logging.WithLogger)
+	stopWatches, err := svc.StartListener(listenerMeasures, sallust.With)
 	if err != nil {
 		return out, fmt.Errorf("webhook service start listener error: %s", err)
 	}
@@ -188,7 +169,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	defer stopWatches()
 
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-		GetLogger: getLogger,
+		GetLogger: sallust.Get,
 	})
 
 	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
@@ -199,18 +180,18 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
 		V:                 builtValidators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         getLogger,
+		GetLogger:         sallust.Get,
 	})
 
-	v, err := v2WebhookValidators(webhookConfig)
+	v2Validators, err := v2WebhookValidators(webhookConfig)
 	if err != nil {
 		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
 	}
 
 	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 v,
+		V:                 v2Validators,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         getLogger,
+		GetLogger:         sallust.Get,
 	})
 
 	in.Logger.Info("Webhook service enabled")
@@ -222,13 +203,8 @@ func provideHandlers() fx.Option {
 		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 		fx.Provide(
 			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
-			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
-			arrange.UnmarshalKey("capabilityCheck", CapabilityConfig{}),
 			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
 			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
-			func(c JWTValidator) clortho.Config {
-				return c.Config
-			},
 			provideWebhookHandlers,
 		),
 	)
