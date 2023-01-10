@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xmidt-org/sallust"
+	"go.uber.org/zap"
 )
 
 func TestNewCodedError(t *testing.T) {
@@ -45,7 +47,7 @@ func TestBadRequestError(t *testing.T) {
 func TestErrorLogEncoder(t *testing.T) {
 	tcs := []struct {
 		desc      string
-		getLogger GetLoggerFunc
+		getLogger func(context.Context) *zap.Logger
 	}{
 		{
 			desc:      "nil getlogger",
@@ -53,7 +55,7 @@ func TestErrorLogEncoder(t *testing.T) {
 		},
 		{
 			desc:      "valid getlogger",
-			getLogger: GetLogger,
+			getLogger: sallust.Get,
 		},
 	}
 

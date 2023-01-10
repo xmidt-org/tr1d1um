@@ -129,7 +129,7 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
 		if !ok {
-			logger = logger.With(zap.Reflect("duration", time.Since(requestArrival)))
+			logger = logger.With(zap.Any("duration", time.Since(requestArrival)))
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
@@ -153,7 +153,7 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
 		}
 
-		logger.Info("response", zap.Reflect("response", response))
+		logger.Info("response", zap.Any("response", response))
 	}
 }
 

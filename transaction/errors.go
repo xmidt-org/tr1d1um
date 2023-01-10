@@ -41,8 +41,6 @@ type codedError struct {
 	statusCode int
 }
 
-type GetLoggerFunc func(context.Context) *zap.Logger
-
 func (c *codedError) StatusCode() int {
 	return c.statusCode
 }
@@ -63,11 +61,9 @@ func NewCodedError(e error, code int) CodedError {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
+func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) *zap.Logger {
-			return nil
-		}
+		getLogger = sallust.Get
 	}
 
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
@@ -85,8 +81,4 @@ func ErrorLogEncoder(getLogger GetLoggerFunc, ee kithttp.ErrorEncoder) kithttp.E
 
 		ee(ctx, e, w)
 	}
-}
-
-func GetLogger(ctx context.Context) *zap.Logger {
-	return sallust.Get(ctx)
 }

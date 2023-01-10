@@ -26,6 +26,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/go-kit/log"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/sallust/sallustkit"
@@ -34,7 +36,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/candlelight"

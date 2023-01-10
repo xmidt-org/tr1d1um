@@ -28,8 +28,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
@@ -38,11 +36,12 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/httpaux"
+	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -231,7 +230,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(getLogger, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
+		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfigKey.Validation.TTL, in.V2AddWebhookHandler)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
@@ -282,19 +281,19 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if getLogger == nil {
-		getLogger = func(_ context.Context) log.Logger {
-			return nil
-		}
+		getLogger = sallust.Get
 	}
 	if config.Now == nil {
 		config.Now = time.Now
 	}
+
 	durationCheck, err := ancla.CheckDuration(config.Max)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duration check: %v", err)
 	}
+
 	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create until check: %v", err)
@@ -312,10 +311,11 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Han
 			// if this is v2, we need to unmarshal and check the duration.  If
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
-			logger := getLogger(r.Context())
+			logger := sallusthttp.Get(r)
 			if logger == nil {
-				logger = log.NewNopLogger()
+				panic("no logger supplied")
 			}
+
 			requestPayload, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				v2ErrEncode(w, logger, err, 0)
@@ -378,12 +378,12 @@ func fixV2Duration(getLogger ancla.GetLoggerFunc, config ancla.TTLVConfig, v2Han
 	}, nil
 }
 
-func v2ErrEncode(w http.ResponseWriter, logger log.Logger, err error, code int) {
+func v2ErrEncode(w http.ResponseWriter, logger *zap.Logger, err error, code int) {
 	if code == 0 {
 		code = http.StatusInternalServerError
 	}
-	level.Error(logger).Log(logging.MessageKey(), "sending non-200, non-404 response",
-		logging.ErrorKey(), err, "code", code)
+	logger.Error("sending non-200, non-404 response",
+		zap.Error(err), zap.Int("code", code))
 
 	w.WriteHeader(code)
 

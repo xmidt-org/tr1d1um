@@ -18,12 +18,8 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"strings"
-
-	"github.com/go-kit/kit/log"
-	"github.com/xmidt-org/webpa-common/v2/logging"
 )
 
 func sanitizeHeaders(headers http.Header) (filtered http.Header) {
@@ -36,9 +32,4 @@ func sanitizeHeaders(headers http.Header) (filtered http.Header) {
 		}
 	}
 	return
-}
-
-func getLogger(ctx context.Context) log.Logger {
-	logger := log.With(logging.GetLogger(ctx), "ts", log.DefaultTimestampUTC)
-	return logger
 }
