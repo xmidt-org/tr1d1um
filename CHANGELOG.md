@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Updated tracing configuration documentation in tr1d1um.yaml to reflect changes in Candlelight [#346](https://github.com/xmidt-org/tr1d1um/pull/346)
 - [https://github.com/xmidt-org/tr1d1um/issues/340](https://github.com/xmidt-org/tr1d1um/issues/340)
 - [v2 & v3 endpoints are not enforcing capabilities xmidt-org/tr1d1um#342](https://github.com/xmidt-org/tr1d1um/issues/342)
 - [v3 endpoint is not validating webhooks #341](https://github.com/xmidt-org/tr1d1um/issues/341)
