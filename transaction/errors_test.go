@@ -67,10 +67,17 @@ func TestErrorLogEncoder(t *testing.T) {
 			}
 			le := ErrorLogEncoder(tc.getLogger, e)
 
-			assert.NotPanics(func() {
-				//assumes TID is context
-				le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
-			})
+			if tc.getLogger == nil {
+				assert.Panics(func() {
+					//assumes TID is context
+					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+				})
+			} else {
+				assert.NotPanics(func() {
+					//assumes TID is context
+					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
+				})
+			}
 		})
 	}
 }
