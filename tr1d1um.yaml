@@ -29,7 +29,7 @@ region: "east"
 flavor: "mint"
 
 prometheus:
-  defaultNamespace: xmidt
+  defaultNamespace: webpa
   defaultSubsystem: tr1d1um
   constLabels:
     development: "true"
