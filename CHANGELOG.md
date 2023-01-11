@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.8.1]
 - [Replace go-kit/kit/log & go-kit/log with zap #356](https://github.com/xmidt-org/tr1d1um/pull/356)
 
 ## [v0.8.0]
@@ -201,7 +203,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.1...HEAD
+[v0.8.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.0...v0.8.1
 [v0.8.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.12...v0.8.0
 [v0.7.12]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.11...v0.7.12
 [v0.7.11]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.10...v0.7.11
