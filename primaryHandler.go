@@ -218,7 +218,7 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 			&transaction.Options{
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   gokitLogger(in.Logger),
+						Logger:   in.Logger,
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},
@@ -237,7 +237,7 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 				Do: xhttp.RetryTransactor( //nolint:bodyclose
 					xhttp.RetryOptions{
-						Logger:   gokitLogger(in.Logger),
+						Logger:   in.Logger,
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
 					},

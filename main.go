@@ -26,11 +26,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/go-kit/log"
-
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/sallust/sallustkit"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"go.uber.org/fx"
@@ -111,12 +108,6 @@ type ConstOut struct {
 func consts() ConstOut {
 	return ConstOut{
 		DefaultKeyID: DefaultKeyID,
-	}
-}
-
-func gokitLogger(l *zap.Logger) log.Logger {
-	return sallustkit.Logger{
-		Zap: l,
 	}
 }
 
@@ -216,7 +207,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 		ancla.ProvideMetrics(),
 		fx.Provide(
 			consts,
-			gokitLogger,
 			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
