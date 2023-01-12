@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.8.2]
 - [Fix jwtValidator & capabilityCheck config unpacking #359](https://github.com/xmidt-org/tr1d1um/issues/359)
 
 ## [v0.8.1]
@@ -204,7 +206,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.2...HEAD
+[v0.8.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.1...v0.8.2
 [v0.8.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.0...v0.8.1
 [v0.8.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.12...v0.8.0
 [v0.7.12]: https://github.com/xmidt-org/tr1d1um/compare/v0.7.11...v0.7.12
