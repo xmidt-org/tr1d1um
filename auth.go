@@ -19,7 +19,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -61,7 +60,7 @@ func provideAuthChain(configKey string) fx.Option {
 		),
 		basculehttp.ProvideBasicAuth(configKey),
 		basculehttp.ProvideBearerTokenFactory("jwtValidator", false),
-		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilityCheck", configKey)),
+		basculechecks.ProvideRegexCapabilitiesValidator("capabilityCheck"),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)
