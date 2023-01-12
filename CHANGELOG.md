@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- [Fix jwtValidator config unpacking #359](https://github.com/xmidt-org/tr1d1um/issues/359)
+- [Fix jwtValidator & capabilityCheck config unpacking #359](https://github.com/xmidt-org/tr1d1um/issues/359)
 
 ## [v0.8.1]
 - [Replace go-kit/kit/log & go-kit/log with zap #356](https://github.com/xmidt-org/tr1d1um/pull/356)
