@@ -54,19 +54,20 @@ func provideAuthChain(configKey string) fx.Option {
 			func() basculehttp.ParseURL {
 				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
-			arrange.UnmarshalKey(fmt.Sprintf("%s.jwtValidator", configKey), JWTValidator{}),
+			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory(fmt.Sprintf("%s.jwtValidator", configKey), false),
+		basculehttp.ProvideBearerTokenFactory("jwtValidator", false),
 		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilityCheck", configKey)),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)
 }
-
+func provideBearerTokenFactory() fx.Option {
+}
 func createRemovePrefixURLFuncLegacy(prefixes []string) basculehttp.ParseURL {
 	return func(u *url.URL) (*url.URL, error) {
 		escapedPath := u.EscapedPath()
