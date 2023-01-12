@@ -66,8 +66,7 @@ func provideAuthChain(configKey string) fx.Option {
 		basculehttp.ProvideServerChain(),
 	)
 }
-func provideBearerTokenFactory() fx.Option {
-}
+
 func createRemovePrefixURLFuncLegacy(prefixes []string) basculehttp.ParseURL {
 	return func(u *url.URL) (*url.URL, error) {
 		escapedPath := u.EscapedPath()
