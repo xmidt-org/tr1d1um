@@ -19,7 +19,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -54,14 +53,14 @@ func provideAuthChain(configKey string) fx.Option {
 			func() basculehttp.ParseURL {
 				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
-			arrange.UnmarshalKey(fmt.Sprintf("%s.jwtValidator", configKey), JWTValidator{}),
+			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory(fmt.Sprintf("%s.jwtValidator", configKey), false),
-		basculechecks.ProvideRegexCapabilitiesValidator(fmt.Sprintf("%v.capabilityCheck", configKey)),
+		basculehttp.ProvideBearerTokenFactory("jwtValidator", false),
+		basculechecks.ProvideRegexCapabilitiesValidator("capabilityCheck"),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)
