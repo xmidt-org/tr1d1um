@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- [Bug: Add ancla watcher to fx lifecycle #361](https://github.com/xmidt-org/tr1d1um/issues/361)
 
 ## [v0.8.2]
 - [Fix jwtValidator & capabilityCheck config unpacking #359](https://github.com/xmidt-org/tr1d1um/issues/359)
