@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -61,6 +62,7 @@ type authAcquirerConfig struct {
 
 type provideWebhookHandlersIn struct {
 	fx.In
+	Lifecycle          fx.Lifecycle
 	V                  *viper.Viper
 	WebhookConfig      ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
@@ -166,7 +168,12 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	}
 	in.Logger.Info("Webhook service enabled")
 
-	defer stopWatches()
+	in.Lifecycle.Append(fx.Hook{
+		OnStop: func(_ context.Context) error {
+			stopWatches()
+			return nil
+		},
+	})
 
 	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
 		GetLogger: sallust.Get,
