@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - [Bug: Add ancla watcher to fx lifecycle #361](https://github.com/xmidt-org/tr1d1um/issues/361)
+- [Tr1d1um Panic: device status code used as the response status code can cause an unrecoverable panic #354](https://github.com/xmidt-org/tr1d1um/issues/354)
 
 ## [v0.8.2]
 - [Fix jwtValidator & capabilityCheck config unpacking #359](https://github.com/xmidt-org/tr1d1um/issues/359)
