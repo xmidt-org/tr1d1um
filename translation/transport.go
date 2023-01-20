@@ -209,7 +209,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		// use the device response status code if it's within 520-599 (inclusive)
 		// https://github.com/xmidt-org/tr1d1um/issues/354
 		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &d); errUnmarshall == nil {
