@@ -203,16 +203,17 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 	if err = wrp.NewDecoderBytes(resp.Body, wrp.Msgpack).Decode(wrpModel); err == nil {
 
-		var deviceResponseModel struct {
+		// device response model
+		var d struct {
 			StatusCode int `json:"statusCode"`
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
-		// if possible, use the device response status code
-		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &deviceResponseModel); errUnmarshall == nil {
-			if deviceResponseModel.StatusCode != 0 && deviceResponseModel.StatusCode != http.StatusInternalServerError {
-				w.WriteHeader(deviceResponseModel.StatusCode)
+		// use the device response status code if it's within 520-599 (inclusive)
+		// https://github.com/xmidt-org/tr1d1um/issues/354
+		if errUnmarshall := json.Unmarshal(wrpModel.Payload, &d); errUnmarshall == nil {
+			if 520 <= d.StatusCode && d.StatusCode <= 599 {
+				w.WriteHeader(d.StatusCode)
 			}
 		}
 

@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -431,20 +432,65 @@ func TestEncodeResponse(t *testing.T) {
 	//XMiDt responds with a 200 (OK) with a well-formatted RDK device response
 	//Tr1d1um returns the status provided by the device
 	t.Run("RDKDeviceResponse", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-
-		response := &transaction.XmidtResponse{
-			Code: http.StatusOK,
-			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
-				Type:    wrp.SimpleRequestResponseMessageType,
-				Payload: []byte(`{"statusCode": 520}`),
-			}, wrp.Msgpack)).Bytes(),
+		tests := []struct {
+			resp               *transaction.XmidtResponse
+			expectedStatusCode int
+			deviceStatusCode   int
+		}{
+			{
+				resp: &transaction.XmidtResponse{
+					Code: http.StatusOK,
+					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+						Type:    wrp.SimpleRequestResponseMessageType,
+						Payload: []byte(`{"statusCode": 520}`),
+					}, wrp.Msgpack)).Bytes(),
+				},
+				expectedStatusCode: 520,
+				deviceStatusCode:   520,
+			},
+			{
+				resp: &transaction.XmidtResponse{
+					Code: http.StatusOK,
+					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+						Type:    wrp.SimpleRequestResponseMessageType,
+						Payload: []byte(`{"statusCode": 599}`),
+					}, wrp.Msgpack)).Bytes(),
+				},
+				expectedStatusCode: 599,
+				deviceStatusCode:   599,
+			},
+			{
+				resp: &transaction.XmidtResponse{
+					Code: http.StatusOK,
+					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+						Type:    wrp.SimpleRequestResponseMessageType,
+						Payload: []byte(`{"statusCode": 1000}`),
+					}, wrp.Msgpack)).Bytes(),
+				},
+				expectedStatusCode: 200,
+				deviceStatusCode:   1000,
+			},
+			{
+				resp: &transaction.XmidtResponse{
+					Code: http.StatusOK,
+					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
+						Type:    wrp.SimpleRequestResponseMessageType,
+						Payload: []byte(`{"statusCode": -1}`),
+					}, wrp.Msgpack)).Bytes(),
+				},
+				expectedStatusCode: 200,
+				deviceStatusCode:   -1,
+			},
 		}
-
-		err := encodeResponse(ctxTID, recorder, response)
-		assert.Nil(err)
-		assert.EqualValues(520, recorder.Code)
-		assert.EqualValues(`{"statusCode": 520}`, recorder.Body.String())
+		for _, tc := range tests {
+			t.Run(fmt.Sprintf("statusCode:%d", tc.expectedStatusCode), func(t *testing.T) {
+				recorder := httptest.NewRecorder()
+				err := encodeResponse(ctxTID, recorder, tc.resp)
+				assert.Nil(err)
+				assert.EqualValues(tc.expectedStatusCode, recorder.Code)
+				assert.EqualValues(fmt.Sprintf(`{"statusCode": %d}`, tc.deviceStatusCode), recorder.Body.String())
+			})
+		}
 	})
 
 	//RDK device is having an internal error and returns 500.
