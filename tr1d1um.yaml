@@ -392,7 +392,7 @@ tracing:
   # endpoint: "localhost:4317"
 
   # sampleLocalTraces defines whether local traces will be created and exported.
-	# sampleLocalTraces = true if you want to create and export local traces.
+  # sampleLocalTraces = true if you want to create and export local traces.
   # sampleLocalTraces = false (default), only spans with remote parents will be sampled.
   sampleLocalTraces: false
 
