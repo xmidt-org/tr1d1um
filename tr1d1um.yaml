@@ -391,6 +391,11 @@ tracing:
   # OTLP/HTTP uses port 4318 by default.
   # endpoint: "localhost:4317"
 
+  # sampleLocalTraces defines whether local traces will be created and exported.
+	# sampleLocalTraces = true if you want to create and export local traces.
+  # sampleLocalTraces = false (default), only spans with remote parents will be sampled.
+  sampleLocalTraces: false
+
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,
 # tr1d1um will support both "/v2" and "/v3" endpoints.  When false, only "/v3"
