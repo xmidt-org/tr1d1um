@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.8.4]
+- Update dependencies
+
 ## [v0.8.3]
 - [Bug: Event related metrics fail to update #361](https://github.com/xmidt-org/tr1d1um/issues/361)
 - [Tr1d1um Panic: device status code used as the response status code can cause an unrecoverable panic #354](https://github.com/xmidt-org/tr1d1um/issues/354)
@@ -210,7 +213,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.4...HEAD
+[v0.8.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.3...v0.8.4
 [v0.8.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.2...v0.8.3
 [v0.8.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.1...v0.8.2
 [v0.8.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.0...v0.8.1
