@@ -391,6 +391,17 @@ tracing:
   # OTLP/HTTP uses port 4318 by default.
   # endpoint: "localhost:4317"
 
+  # ParentBased and NoParent dictate if and when new spans should be created.
+  # ParentBased = "ignore" (default), tracing is effectively turned off and the "NoParent" value is ignored
+  # ParentBased = "honor", the sampling decision is made by the parent of the span
+  parentBased: ignore
+
+  # NoParent decides if a root span should be initiated in the case where there is no existing parent
+  # This value is ignored if ParentBased = "ignore"
+  # NoParent = "never" (default), root spans are not initiated
+  # NoParent = "always", roots spans are initiated
+  noParent: never
+
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,
 # tr1d1um will support both "/v2" and "/v3" endpoints.  When false, only "/v3"
