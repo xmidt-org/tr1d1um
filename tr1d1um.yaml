@@ -392,14 +392,14 @@ tracing:
   endpoint: "localhost:4317"
 
   # ParentBased and NoParent dictate if and when new spans should be created.
-	# ParentBased = "ignore" (default), tracing is effectively turned off and the "NoParent" value is ignored
-	# ParentBased = "honor", the sampling decision is made by the parent of the span
+  # ParentBased = "ignore" (default), tracing is effectively turned off and the "NoParent" value is ignored
+  # ParentBased = "honor", the sampling decision is made by the parent of the span
   parentBased: ignore
 
   # NoParent decides if a root span should be initiated in the case where there is no existing parent
-	# This value is ignored if ParentBased = "ignore"
-	# NoParent = "never" (default), root spans are not initiated
-	# NoParent = "always", roots spans are initiated
+  # This value is ignored if ParentBased = "ignore"
+  # NoParent = "never" (default), root spans are not initiated
+  # NoParent = "always", roots spans are initiated
   noParent: never
 
 # previousVersionSupport allows us to support two different major versions of
