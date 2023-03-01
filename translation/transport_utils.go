@@ -113,6 +113,16 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []stri
 		return nil, transaction.NewBadRequestError(err)
 	}
 
+	if traceHeaders == nil {
+		return &wrp.Message{
+			Type:            wrp.SimpleRequestResponseMessageType,
+			Payload:         WDMP,
+			Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), pathVars["service"]),
+			TransactionUUID: tid,
+			PartnerIDs:      partnerIDs,
+		}, nil
+	}
+
 	return &wrp.Message{
 		Type:            wrp.SimpleRequestResponseMessageType,
 		Payload:         WDMP,
