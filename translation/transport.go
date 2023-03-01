@@ -148,14 +148,14 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
 		var traceHeaders []string
 
-		// If there's a traceparent, add it to traceHeaders string
+		// If there's a traceparent, add it to traceHeaders array
 		tp := r.Header.Get("traceparent")
 		if tp != "" {
 			tp = "traceparent: " + tp
 			traceHeaders = append(traceHeaders, tp)
 		}
 
-		// If there's a tracestatus, add it to traceHeaders string
+		// If there's a tracestatus, add it to traceHeaders array
 		ts := r.Header.Get("tracestatus")
 		if ts != "" {
 			ts = "tracestatus: " + ts
