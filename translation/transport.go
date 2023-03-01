@@ -102,6 +102,18 @@ func getPartnerIDs(h http.Header) []string {
 	return partners
 }
 
+func getTraceParent(h http.Header) string {
+	tp := h.Get("traceparent")
+	tp = "traceparent: " + tp
+	return tp
+}
+
+func getTraceStatus(h http.Header) string {
+	ts := h.Get("tracestatus")
+	ts = "tracestatus: " + ts
+	return ts
+}
+
 // getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
 func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	auth, ok := bascule.FromContext(ctx)
@@ -146,7 +158,11 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 	if payload, err = requestPayload(r); err == nil {
 		tid := getTID(ctx)
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
-		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs)
+		tp := getTraceParent(r.Header)
+		ts := getTraceStatus(r.Header)
+		traceHeaders := []string{tp, ts}
+		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
+
 		if err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
