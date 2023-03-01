@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - [Add Trace info to WRP Message Header #385](https://github.com/xmidt-org/tr1d1um/pull/385)
+- [Update Tracing Configurations #386](https://github.com/xmidt-org/tr1d1um/pull/386)
 
 ## [v0.8.4]
 - Update dependencies
