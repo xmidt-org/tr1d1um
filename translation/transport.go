@@ -162,11 +162,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 			traceHeaders = append(traceHeaders, ts)
 		}
 
-		if len(traceHeaders) > 0 {
-			wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
-		} else {
-			wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, nil)
-		}
+		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
 
 		if err == nil {
 			decodedRequest = &wrpRequest{
