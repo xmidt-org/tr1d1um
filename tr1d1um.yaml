@@ -301,7 +301,7 @@ authx:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: http://localhost:6300/api/v3
+targetURL: http://scytale:6300/api/v3
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
 WRPSource: "dns:tr1d1um.example.com"
@@ -389,7 +389,7 @@ tracing:
 
   # endpoint is where trace information should be routed. Applies to otlp, zipkin, and jaegar. OTLP/gRPC uses port 4317 by default. 
   # OTLP/HTTP uses port 4318 by default.
-  endpoint: "localhost:4317"
+  # endpoint: "localhost:4317"
 
   # ParentBased and NoParent dictate if and when new spans should be created.
   # ParentBased = "ignore" (default), tracing is effectively turned off and the "NoParent" value is ignored
