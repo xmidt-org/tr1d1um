@@ -391,18 +391,16 @@ tracing:
   # OTLP/HTTP uses port 4318 by default.
   endpoint: "localhost:4317"
 
-  # samplingStrategy defines what traces should be sampled. 
-  samplingStrategy:
-    # if this is "ignore", tracing is essentially turned off
-    # if this is "honor", the sampling decision is made by the parent of the span
-    parentBased: ignore # [ignore (default), honor]
+  # ParentBased and NoParent dictate if and when new spans should be created.
+	# ParentBased = "ignore" (default), tracing is effectively turned off and the "NoParent" value is ignored
+	# ParentBased = "honor", the sampling decision is made by the parent of the span
+  parentBased: ignore
 
-    # if the span has no parent, how should the sampling decision be made 
-    noParent: never     # [never (default), always, traceidratio, ...]
-
-    # not yet implemented
-    # traceidratio:            # For each sampler that needs inputs they get enumerated separately.
-    #     percentage: 15.5
+  # NoParent decides if a root span should be initiated in the case where there is no existing parent
+	# This value is ignored if ParentBased = "ignore"
+	# NoParent = "never" (default), root spans are not initiated
+	# NoParent = "always", roots spans are initiated
+  noParent: never
 
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,
