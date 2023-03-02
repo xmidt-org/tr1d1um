@@ -149,7 +149,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		var traceHeaders []string
 
 		// If there's a traceparent, add it to traceHeaders array
-		// Add tracestate to the traceHeaders array (can be empty)
+		// Also, add tracestate to the traceHeaders array (can be empty)
 		// A tracestate will not exist without a traceparent
 		tp := r.Header.Get("traceparent")
 		if tp != "" {
