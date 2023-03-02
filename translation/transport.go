@@ -149,17 +149,14 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 		var traceHeaders []string
 
 		// If there's a traceparent, add it to traceHeaders array
+		// Add tracestate to the traceHeaders array (can be empty)
+		// A tracestate will not exist without a traceparent
 		tp := r.Header.Get("traceparent")
 		if tp != "" {
 			tp = "traceparent: " + tp
-			traceHeaders = append(traceHeaders, tp)
-		}
-
-		// If there's a tracestatus, add it to traceHeaders array
-		ts := r.Header.Get("tracestatus")
-		if ts != "" {
-			ts = "tracestatus: " + ts
-			traceHeaders = append(traceHeaders, ts)
+			ts := r.Header.Get("tracestate")
+			ts = "tracestate: " + ts
+			traceHeaders = append(traceHeaders, tp, ts)
 		}
 
 		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
