@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- [Correct tracestate spelling, pass on empty tracestate if none is provided #389](https://github.com/xmidt-org/tr1d1um/pull/389)
+
+## [v0.9.0]
+- [Tracing working, Correct tracestate spelling, pass on empty tracestate if none is provided #389](https://github.com/xmidt-org/tr1d1um/pull/389)
 
 ## [v0.8.5]
 - [Add Trace info to WRP Message Header #385](https://github.com/xmidt-org/tr1d1um/pull/385)
@@ -218,7 +220,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.0...HEAD
+[v0.9.0]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.5...v0.9.0
 [v0.8.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.4...v0.8.5
 [v0.8.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.3...v0.8.4
 [v0.8.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.8.2...v0.8.3
