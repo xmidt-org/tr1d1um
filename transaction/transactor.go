@@ -22,13 +22,16 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/gorilla/mux"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 )
 
@@ -127,9 +130,18 @@ func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFi
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
 
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
+		logger := sallust.Get(ctx)
 
+		logger = logger.With(
+			zap.Any("deviceid", GetDeviceId(r)),
+		)
+
+		// ctx = sallust.With(ctx, logger)
 		if !ok {
-			logger = logger.With(zap.Any("duration", time.Since(requestArrival)))
+			logger = logger.With(
+				zap.Any("duration", time.Since(requestArrival)),
+				zap.Any("deviceid", GetDeviceId(r)),
+			)
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
@@ -183,6 +195,7 @@ func Welcome(delegate http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
+
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
@@ -196,4 +209,14 @@ func genTID() (tid string) {
 		tid = base64.RawURLEncoding.EncodeToString(buf)
 	}
 	return
+}
+
+func GetDeviceId(r *http.Request) string {
+	vars := mux.Vars(r)
+	id, ok := vars["deviceid"]
+	if !ok {
+		//TODO: edit log statement
+		fmt.Println("id is missing in parameters")
+	}
+	return id
 }
