@@ -107,18 +107,18 @@ func getCommandForParams(params []setParam) (command string) {
 /* Other transport-level helper functions */
 
 // wrp merges different values from a WDMP request into a WRP message
-func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string) (*wrp.Message, error) {
+func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []string, traceHeaders []string) (*wrp.Message, error) {
 	canonicalDeviceID, err := wrp.ParseDeviceID(pathVars["deviceid"])
 	if err != nil {
 		return nil, transaction.NewBadRequestError(err)
 	}
-
 	return &wrp.Message{
 		Type:            wrp.SimpleRequestResponseMessageType,
 		Payload:         WDMP,
 		Destination:     fmt.Sprintf("%s/%s", string(canonicalDeviceID), pathVars["service"]),
 		TransactionUUID: tid,
 		PartnerIDs:      partnerIDs,
+		Headers:         traceHeaders,
 	}, nil
 }
 

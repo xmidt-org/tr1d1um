@@ -146,7 +146,21 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 	if payload, err = requestPayload(r); err == nil {
 		tid := getTID(ctx)
 		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
-		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs)
+		var traceHeaders []string
+
+		// If there's a traceparent, add it to traceHeaders array
+		// Also, add tracestate to the traceHeaders array (can be empty)
+		// A tracestate will not exist without a traceparent
+		tp := r.Header.Get("traceparent")
+		if tp != "" {
+			tp = "traceparent: " + tp
+			ts := r.Header.Get("tracestate")
+			ts = "tracestate: " + ts
+			traceHeaders = append(traceHeaders, tp, ts)
+		}
+
+		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
+
 		if err == nil {
 			decodedRequest = &wrpRequest{
 				WRPMessage:      wrpMsg,
