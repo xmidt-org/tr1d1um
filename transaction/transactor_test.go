@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -180,7 +181,6 @@ func TestLog(t *testing.T) {
 	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
 	tcs := []struct {
 		desc                        string
-		logger                      *zap.Logger
 		reducedLoggingResponseCodes []int
 		ctx                         context.Context
 		code                        int
@@ -222,8 +222,9 @@ func TestLog(t *testing.T) {
 					logCount++
 					return nil
 				})))
-			s := Log(logger, tc.reducedLoggingResponseCodes)
-			s(tc.ctx, tc.code, tc.request)
+			ctx := sallust.With(tc.ctx, logger)
+			s := Log(tc.reducedLoggingResponseCodes)
+			s(ctx, tc.code, tc.request)
 			assert.Equal(tc.expectedLogCount, logCount)
 		})
 	}

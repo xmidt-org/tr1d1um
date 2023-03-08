@@ -22,7 +22,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -125,22 +124,15 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 
 // Log is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
+func Log(reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-
-		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 		logger := sallust.Get(ctx)
+		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
-		logger = logger.With(
-			zap.Any("deviceid", GetDeviceId(r)),
-		)
-
-		// ctx = sallust.With(ctx, logger)
 		if !ok {
 			logger = logger.With(
 				zap.Any("duration", time.Since(requestArrival)),
-				zap.Any("deviceid", GetDeviceId(r)),
 			)
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
@@ -195,7 +187,7 @@ func Welcome(delegate http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
-
+			ctx = updateLogger(ctx, r)
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
@@ -211,12 +203,23 @@ func genTID() (tid string) {
 	return
 }
 
-func GetDeviceId(r *http.Request) string {
+func updateLogger(ctx context.Context, r *http.Request) context.Context {
+	did := getDeviceId(r)
+	f := zap.String("deviceid", did)
+
+	logger := sallust.Get(ctx)
+	logger = logger.With(f)
+	ctx = sallust.With(ctx, logger)
+
+	return ctx
+}
+
+// extracts device id from the request path params
+func getDeviceId(r *http.Request) string {
 	vars := mux.Vars(r)
 	id, ok := vars["deviceid"]
 	if !ok {
-		//TODO: edit log statement
-		fmt.Println("id is missing in parameters")
+		id = "mac:000000000000"
 	}
 	return id
 }
