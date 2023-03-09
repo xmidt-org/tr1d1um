@@ -187,7 +187,7 @@ func Welcome(delegate http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
-			ctx = updateLogger(ctx, r)
+			ctx = addDeviceIdToLog(ctx, r)
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
@@ -203,7 +203,8 @@ func genTID() (tid string) {
 	return
 }
 
-func updateLogger(ctx context.Context, r *http.Request) context.Context {
+// updateLogger updates the logger with a device id field and adds it back into the context.
+func addDeviceIdToLog(ctx context.Context, r *http.Request) context.Context {
 	did := getDeviceId(r)
 	f := zap.String("deviceid", did)
 
@@ -211,14 +212,15 @@ func updateLogger(ctx context.Context, r *http.Request) context.Context {
 	logger = logger.With(f)
 	ctx = sallust.With(ctx, logger)
 
+	// logger.Debug("Device id added to logger.")
 	return ctx
 }
 
-// extracts device id from the request path params
+// getDeviceId extracts device id from the request path params
 func getDeviceId(r *http.Request) string {
 	vars := mux.Vars(r)
-	id, ok := vars["deviceid"]
-	if !ok {
+	id := vars["deviceid"]
+	if id == "" {
 		id = "mac:000000000000"
 	}
 	return id
