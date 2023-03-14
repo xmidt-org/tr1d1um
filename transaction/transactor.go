@@ -28,7 +28,9 @@ import (
 	"time"
 
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/gorilla/mux"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 )
 
@@ -122,14 +124,16 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 
 // Log is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func Log(logger *zap.Logger, reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
+func Log(reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
-
+		logger := sallust.Get(ctx)
 		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
 
 		if !ok {
-			logger = logger.With(zap.Any("duration", time.Since(requestArrival)))
+			logger = logger.With(
+				zap.Any("duration", time.Since(requestArrival)),
+			)
 		} else {
 			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
 			if !ok {
@@ -183,6 +187,7 @@ func Welcome(delegate http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
 			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
+			ctx = addDeviceIdToLog(ctx, r)
 			delegate.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
@@ -196,4 +201,27 @@ func genTID() (tid string) {
 		tid = base64.RawURLEncoding.EncodeToString(buf)
 	}
 	return
+}
+
+// updateLogger updates the logger with a device id field and adds it back into the context.
+func addDeviceIdToLog(ctx context.Context, r *http.Request) context.Context {
+	did := getDeviceId(r)
+	f := zap.String("deviceid", did)
+
+	logger := sallust.Get(ctx)
+	logger = logger.With(f)
+	ctx = sallust.With(ctx, logger)
+
+	return ctx
+}
+
+// getDeviceId extracts device id from the request path params
+func getDeviceId(r *http.Request) string {
+	vars := mux.Vars(r)
+	id := vars["deviceid"]
+	if id == "" {
+		id = "mac:000000000000"
+	}
+	
+	return id
 }

@@ -27,12 +27,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestTransactError(t *testing.T) {
@@ -180,7 +183,6 @@ func TestLog(t *testing.T) {
 	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
 	tcs := []struct {
 		desc                        string
-		logger                      *zap.Logger
 		reducedLoggingResponseCodes []int
 		ctx                         context.Context
 		code                        int
@@ -222,9 +224,90 @@ func TestLog(t *testing.T) {
 					logCount++
 					return nil
 				})))
-			s := Log(logger, tc.reducedLoggingResponseCodes)
-			s(tc.ctx, tc.code, tc.request)
+			ctx := sallust.With(tc.ctx, logger)
+			s := Log(tc.reducedLoggingResponseCodes)
+			s(ctx, tc.code, tc.request)
 			assert.Equal(tc.expectedLogCount, logCount)
+		})
+	}
+}
+
+func TestAddDeviceIdToLog(t *testing.T) {
+	tests := []struct {
+		desc     string
+		ctx      context.Context
+		req      func() (r *http.Request)
+		deviceid string
+	}{
+		{
+			desc: "device id in request",
+			ctx:  context.Background(),
+			req: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
+				return
+			},
+			deviceid: "mac:112233445577",
+		},
+		{
+			desc: "device id added in code",
+			ctx:  context.Background(),
+			req: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				return
+			},
+			deviceid: "mac:000000000000",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			observedZapCore, observedLogs := observer.New(zap.DebugLevel)
+			observedLogger := zap.New(observedZapCore)
+			ctx := sallust.With(tc.ctx, observedLogger)
+			ctx = addDeviceIdToLog(ctx, tc.req())
+
+			logger := sallust.Get(ctx)
+			logger.Debug("test")
+			gotLog := observedLogs.All()[0].Context
+
+			assert.Equal("deviceid", gotLog[0].Key)
+			assert.Equal(tc.deviceid, gotLog[0].String)
+
+		})
+	}
+}
+
+func TestGetDeviceId(t *testing.T) {
+	tests := []struct {
+		desc     string
+		req      func() *http.Request
+		expected string
+	}{
+		{
+			desc: "Request has id",
+			req: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
+				return
+			},
+			expected: "mac:112233445577",
+		},
+		{
+			desc: "no id",
+			req: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				return
+			},
+			expected: "mac:000000000000",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			id := getDeviceId(tc.req())
+			assert.NotNil(id)
+			assert.Equal(tc.expected, id)
 		})
 	}
 }
