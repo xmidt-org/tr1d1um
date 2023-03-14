@@ -222,5 +222,6 @@ func getDeviceId(r *http.Request) string {
 	if id == "" {
 		id = "mac:000000000000"
 	}
+	
 	return id
 }
