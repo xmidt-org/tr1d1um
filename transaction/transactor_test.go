@@ -231,6 +231,7 @@ func TestLog(t *testing.T) {
 		})
 	}
 }
+
 func TestAddDeviceIdToLog(t *testing.T) {
 	tests := []struct {
 		desc     string
