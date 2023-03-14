@@ -212,7 +212,6 @@ func addDeviceIdToLog(ctx context.Context, r *http.Request) context.Context {
 	logger = logger.With(f)
 	ctx = sallust.With(ctx, logger)
 
-	// logger.Debug("Device id added to logger.")
 	return ctx
 }
 
