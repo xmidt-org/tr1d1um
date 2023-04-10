@@ -17,7 +17,7 @@ require (
 	github.com/xmidt-org/candlelight v0.0.15
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/httpaux v0.3.2
-	github.com/xmidt-org/sallust v0.2.1
+	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.2
 	github.com/xmidt-org/webpa-common/v2 v2.1.0
 	github.com/xmidt-org/wrp-go/v3 v3.1.4
@@ -93,10 +93,10 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/dig v1.16.1 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20230222225845-10f96fb3dbec // indirect
 	google.golang.org/grpc v1.53.0 // indirect
