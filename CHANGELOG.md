@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Updated sallust to v0.2.2 to support custom log file permissions
 
 ## [v0.9.1]
 - [Add a structured log field for just the normalized device-id. #391](https://github.com/xmidt-org/tr1d1um/pull/391)
