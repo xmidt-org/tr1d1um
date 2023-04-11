@@ -26,6 +26,7 @@ jobs:
       license-skip:          true
       style-skip:            true
       release-type:          program
+      release-arch-arm64:    false
       release-docker:        true
       release-docker-latest: true
       release-docker-major:  true
