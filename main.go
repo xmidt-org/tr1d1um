@@ -67,9 +67,9 @@ const (
 
 var (
 	// dynamic versioning
-	Version   string
-	BuildTime string
-	GitCommit string
+	Version string
+	Date    string
+	Commit  string
 )
 
 var defaults = map[string]interface{}{
@@ -165,8 +165,8 @@ func printVersionInfo(writer io.Writer) {
 	fmt.Fprintf(writer, "%s:\n", applicationName)
 	fmt.Fprintf(writer, "  version: \t%s\n", Version)
 	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
-	fmt.Fprintf(writer, "  built time: \t%s\n", BuildTime)
-	fmt.Fprintf(writer, "  git commit: \t%s\n", GitCommit)
+	fmt.Fprintf(writer, "  built time: \t%s\n", Date)
+	fmt.Fprintf(writer, "  git commit: \t%s\n", Commit)
 	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
 

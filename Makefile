@@ -9,7 +9,7 @@ VERSION ?= $(shell git describe --tag --always --dirty)
 PROGVER ?= $(shell git describe --tags `git rev-list --tags --max-count=1` | tail -1 | sed 's/v\(.*\)/\1/')
 BUILDTIME = $(shell date -u '+%c')
 GITCOMMIT = $(shell git rev-parse --short HEAD)
-GOBUILDFLAGS = -a -ldflags "-w -s -X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(VERSION)" -o $(APP)
+GOBUILDFLAGS = -a -ldflags "-w -s -X 'main.Date=$(BUILDTIME)' -X main.Commit=$(GITCOMMIT) -X main.Version=$(VERSION)" -o $(APP)
 
 default: build
 
@@ -40,8 +40,8 @@ docker:
 
 binaries: generate
 	mkdir -p ./.ignore
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(VERSION)"
-	CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64 -ldflags "-X 'main.BuildTime=$(BUILDTIME)' -X main.GitCommit=$(GITCOMMIT) -X main.Version=$(VERSION)"
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).darwin-amd64 -ldflags "-X 'main.Date=$(BUILDTIME)' -X main.Commit=$(GITCOMMIT) -X main.Version=$(VERSION)"
+	CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -o ./.ignore/$(APP)-$(PROGVER).linux-amd64 -ldflags "-X 'main.Date=$(BUILDTIME)' -X main.Commit=$(GITCOMMIT) -X main.Version=$(VERSION)"
 
 	upx ./.ignore/$(APP)-$(PROGVER).darwin-amd64
 	upx ./.ignore/$(APP)-$(PROGVER).linux-amd64
