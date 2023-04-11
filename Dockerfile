@@ -2,10 +2,6 @@ FROM docker.io/library/golang:1.19-alpine as builder
 
 WORKDIR /src
 
-ARG VERSION
-ARG GITCOMMIT
-ARG BUILDTIME
-
 RUN apk add --no-cache --no-progress \
     ca-certificates \
     curl
@@ -25,17 +21,17 @@ FROM alpine:latest
 
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
-COPY ./tr1d1um /
-COPY --from=builder /src/.release/docker/entrypoint.sh  /
+COPY tr1d1um /
+COPY .release/docker/entrypoint.sh  /
 
 # Copy over spruce and the spruce template file used to make the actual configuration file.
-COPY --from=builder /src/.release/docker/tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
-COPY --from=builder /go/bin/spruce                            /bin/
+COPY .release/docker/tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
+COPY --from=builder /go/bin/spruce        /bin/
 
 # Include compliance details about the container and what it contains.
-COPY Dockerfile \
-     NOTICE \
-     LICENSE /
+COPY Dockerfile /
+COPY NOTICE     /
+COPY LICENSE    /
 
 # Make the location for the configuration file that will be used.
 RUN     mkdir /etc/tr1d1um/ \
