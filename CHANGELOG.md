@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.9.4]
+- Disable arm64 builds (temporary)
+
 ## [v0.9.3]
 - First release under the new release infrastructure
 - Patch [Device level 403 errors are not properly propagated to HTTP response codes](https://github.com/xmidt-org/tr1d1um/issues/397)
@@ -230,7 +233,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.4...HEAD
+[v0.9.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.3...v0.9.4
 [v0.9.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.2...v0.9.3
 [v0.9.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.1...v0.9.2
 [v0.9.1]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.0...v0.9.1
