@@ -20,7 +20,7 @@ require (
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.2
 	github.com/xmidt-org/webpa-common/v2 v2.1.0
-	github.com/xmidt-org/wrp-go/v3 v3.1.4
+	github.com/xmidt-org/wrp-go/v3 v3.1.6
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.40.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.40.0
 	go.uber.org/fx v1.19.2
@@ -76,7 +76,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/ugorji/go/codec v1.2.8 // indirect
+	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/xmidt-org/argus v0.9.8 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
 	go.opentelemetry.io/otel v1.14.0 // indirect
