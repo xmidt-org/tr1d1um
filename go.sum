@@ -1356,8 +1356,8 @@ github.com/xmidt-org/bascule v0.11.4/go.mod h1:/MKKhwnktnYeQXFChuYqdE81od+BWbdS/
 github.com/xmidt-org/candlelight v0.0.5/go.mod h1:j9Q2tzrOAywm+JvvVJjlOmlPJvdlRrOyFjLz33SaU1Y=
 github.com/xmidt-org/candlelight v0.0.12/go.mod h1:H8cWj+dum/HH5Pxpd2uUv2C0VuDPKZ50nNQ7CRT4iuA=
 github.com/xmidt-org/candlelight v0.0.13/go.mod h1:FelQ+nb3rRuQx50zvp3hjEm2DBUU1rlT17FWxfeXQd0=
-github.com/xmidt-org/candlelight v0.0.15 h1:a9tphsYItewWTP7DUpdU7gppljJOoUsgUPpz1P63Dbs=
-github.com/xmidt-org/candlelight v0.0.15/go.mod h1:yYzrElo3KP1BZ5GAPus7PXehhe7SJYwt7JwCb/+BWQ0=
+github.com/xmidt-org/candlelight v0.0.16 h1:yrkavbxRC+0gOTxzm6aAVqR78HjNtE+aPrCOq9HHCko=
+github.com/xmidt-org/candlelight v0.0.16/go.mod h1:uKs19MQmcrKxFGJhnkVVpEmFJbav5y3jJs30O7204Vo=
 github.com/xmidt-org/chronon v0.1.1 h1:SzOYkT/nmps3jH4sWu6A52ToKvv5Bu0Gb45/ec5Ty9U=
 github.com/xmidt-org/chronon v0.1.1/go.mod h1:8VF1skJAouQihpKfXE8oZZkbQpV1TSR/7QltNxq8T4k=
 github.com/xmidt-org/clortho v0.0.4 h1:4G1uKle0rfm+LwQ3EV7W+jn7kgWnozAoK9DAbz0/etw=
@@ -1473,8 +1473,8 @@ go.opentelemetry.io/otel/exporters/trace/zipkin v0.19.0/go.mod h1:ONsRnXqWLUtdSa
 go.opentelemetry.io/otel/exporters/zipkin v1.11.0/go.mod h1:unWnsLCMYfINP8ue0aXVrB/GYHoXNn/lbTnupvLekGQ=
 go.opentelemetry.io/otel/exporters/zipkin v1.11.1/go.mod h1:T4S6aVwIS1+MHA+dJHCcPROtZe6ORwnv5vMKPRapsFw=
 go.opentelemetry.io/otel/exporters/zipkin v1.11.2/go.mod h1:I60/FdYilVKkuDOzenyp8LqJLryRC/Mr918G5hchvkM=
-go.opentelemetry.io/otel/exporters/zipkin v1.13.0 h1:RqPV1VhJjrx28qOKYFPj3Mso56uaBovur3GZehF9y9s=
-go.opentelemetry.io/otel/exporters/zipkin v1.13.0/go.mod h1:x6S2VkXmdpoYUqQx9FKiMEsndal6xkcwDdV0Oi1RlLM=
+go.opentelemetry.io/otel/exporters/zipkin v1.14.0 h1:reEVE1upBF9tcujgvSqLJS0SrI7JQPaTKP4s4rymnSs=
+go.opentelemetry.io/otel/exporters/zipkin v1.14.0/go.mod h1:RcjvOAcvhzcufQP8aHmzRw1gE9g/VEZufDdo2w+s4sk=
 go.opentelemetry.io/otel/metric v0.19.0/go.mod h1:8f9fglJPRnXuskQmKpnad31lcLJ2VmNNqIsx/uIwBSc=
 go.opentelemetry.io/otel/metric v0.33.0/go.mod h1:QlTYc+EnYNq/M2mNk1qDDMRLpqCOj2f/r5c7Fd5FYaI=
 go.opentelemetry.io/otel/metric v0.34.0/go.mod h1:ZFuI4yQGNCupurTXCwkeD/zHBt+C2bR7bw5JqUm/AP8=
