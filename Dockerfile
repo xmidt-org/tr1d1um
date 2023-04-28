@@ -1,9 +1,12 @@
 FROM docker.io/library/golang:1.19-alpine as builder
 
+COPY . /src
+
 WORKDIR /src
 
 RUN apk add --no-cache --no-progress \
     ca-certificates \
+    make \
     curl
 
 # Download spruce here to eliminate the need for curl in the final image
@@ -11,7 +14,10 @@ RUN mkdir -p /go/bin && \
     curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 && \
     chmod +x /go/bin/spruce
 
-COPY . .
+RUN make build
+
+RUN ls tr1d1um
+
 
 ##########################
 # Build the final image.
@@ -21,7 +27,7 @@ FROM alpine:latest
 
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
-COPY tr1d1um /
+COPY --from=builder /src/tr1d1um /
 COPY .release/docker/entrypoint.sh  /
 
 # Copy over spruce and the spruce template file used to make the actual configuration file.

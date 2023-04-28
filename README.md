@@ -61,8 +61,6 @@ The Makefile has the following options you may find helpful:
 * `make build`: builds the Tr1d1um binary in the tr1d1um/src/tr1d1um folder
 * `make docker`: fetches all dependencies from source and builds a Tr1d1um
    docker image
-* `make local-docker`: vendors dependencies and builds a Tr1d1um docker image
-   (recommended for local testing)
 * `make test`: runs unit tests with coverage for Tr1d1um
 * `make clean`: deletes previously-built binaries and object files
 
@@ -87,7 +85,7 @@ If you'd like to build it without make, follow these instructions based on your 
 - Local testing
 ```bash
 go mod vendor
-docker build -t tr1d1um:local -f deploy/Dockerfile .
+docker build -t tr1d1um:local -f deploy/Dockerfile .  
 ```
 This allows you to test local changes to a dependency. For example, you can build 
 a tr1d1um image with the changes to an upcoming changes to [webpa-common](https://github.com/xmidt-org/webpa-common) by using the [replace](https://golang.org/ref/mod#go) directive in your go.mod file like so:
