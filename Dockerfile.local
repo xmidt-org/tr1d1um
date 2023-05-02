@@ -1,5 +1,7 @@
 FROM docker.io/library/golang:1.19-alpine as builder
 
+ARG arm64
+
 COPY . /src
 
 WORKDIR /src
@@ -10,13 +12,15 @@ RUN apk add --no-cache --no-progress \
     curl
 
 # Download spruce here to eliminate the need for curl in the final image
+ENV spruce_url_amd64=https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 
+ENV spruce_url_arm64=https://github.com/geofffranks/spruce/releases/download/v1.30.2/spruce-linux-arm64
+RUN [ ${arm64}=true ] && (curl -L -o /go/bin/spruce ${spruce_url_arm64}) || (curl -L -o /go/bin/spruce ${spruce_url_amd64})
+
 RUN mkdir -p /go/bin && \
-    curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 && \
     chmod +x /go/bin/spruce
 
 
 RUN make build
-
 
 ##########################
 # Build the final image.

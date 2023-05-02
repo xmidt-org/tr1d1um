@@ -86,6 +86,11 @@ If you'd like to build it without make, follow these instructions based on your 
 ```bash
 docker build -t tr1d1um:local -f Dockerfile.local .  
 ```
+```
+# OR build for am arm64 architecture
+bash
+docker build -t tr1d1um:local --build-arg arm64=true -f Dockerfile.local .  
+```
 This allows you to test local changes to a dependency. For example, you can build 
 a tr1d1um image with the changes to an upcoming changes to [webpa-common](https://github.com/xmidt-org/webpa-common) by using the [replace](https://golang.org/ref/mod#go) directive in your go.mod file like so:
 ```
