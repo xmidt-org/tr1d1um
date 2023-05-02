@@ -84,8 +84,7 @@ If you'd like to build it without make, follow these instructions based on your 
 
 - Local testing
 ```bash
-go mod vendor
-docker build -t tr1d1um:local -f deploy/Dockerfile .  
+docker build -t tr1d1um:local -f Dockerfile.local .  
 ```
 This allows you to test local changes to a dependency. For example, you can build 
 a tr1d1um image with the changes to an upcoming changes to [webpa-common](https://github.com/xmidt-org/webpa-common) by using the [replace](https://golang.org/ref/mod#go) directive in your go.mod file like so:
@@ -97,7 +96,7 @@ replace github.com/xmidt-org/webpa-common v1.10.2 => ../webpa-common
 - Building a specific version
 ```bash
 git checkout v0.5.1
-docker build -t tr1d1um:v0.5.1 -f deploy/Dockerfile .
+docker build -t tr1d1um:v0.5.1 -f Dockerfile.local .
 ```
 
 **Additional Info:** If you'd like to stand up a XMiDT docker-compose cluster, read [this](https://github.com/xmidt-org/xmidt/blob/master/deploy/docker-compose/README.md).
