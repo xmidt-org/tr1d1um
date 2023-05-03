@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.9.5]
+- Update tr1d1um config for docker so themis can be used for jwt auth. 
+
 ## [v0.9.4]
 - Disable arm64 builds (temporary)
 
@@ -233,7 +236,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial creation.
 
-[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.5...HEAD
+[v0.9.5]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.4...v0.9.5
 [v0.9.4]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.3...v0.9.4
 [v0.9.3]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.2...v0.9.3
 [v0.9.2]: https://github.com/xmidt-org/tr1d1um/compare/v0.9.1...v0.9.2
