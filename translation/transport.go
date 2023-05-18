@@ -39,6 +39,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v3/wrpcontext"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 )
 
@@ -140,34 +141,48 @@ func getTID(ctx context.Context) string {
 /* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
-		payload []byte
-		wrpMsg  *wrp.Message
+		payload    []byte
+		wrpMsg     *wrp.Message
+		tid        string
+		partnerIDs []string
 	)
-	if payload, err = requestPayload(r); err == nil {
-		tid := getTID(ctx)
-		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
-		var traceHeaders []string
 
-		// If there's a traceparent, add it to traceHeaders array
-		// Also, add tracestate to the traceHeaders array (can be empty)
-		// A tracestate will not exist without a traceparent
-		tp := r.Header.Get("traceparent")
-		if tp != "" {
-			tp = "traceparent: " + tp
-			ts := r.Header.Get("tracestate")
-			ts = "tracestate: " + ts
-			traceHeaders = append(traceHeaders, tp, ts)
+	m, ok := wrpcontext.Get[wrp.Message](ctx)
+
+	if !ok {
+		if payload, err = requestPayload(r); err == nil {
+			tid = getTID(ctx)
+			partnerIDs = getPartnerIDsDecodeRequest(ctx, r)
+
 		}
+	} else {
+		payload = m.Payload
+		partnerIDs = m.PartnerIDs
+		tid = m.TransactionUUID
+	}
 
-		wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
+	var traceHeaders []string
 
-		if err == nil {
-			decodedRequest = &wrpRequest{
-				WRPMessage:      wrpMsg,
-				AuthHeaderValue: r.Header.Get(authHeaderKey),
-			}
+	// If there's a traceparent, add it to traceHeaders array
+	// Also, add tracestate to the traceHeaders array (can be empty)
+	// A tracestate will not exist without a traceparent
+	tp := r.Header.Get("traceparent")
+	if tp != "" {
+		tp = "traceparent: " + tp
+		ts := r.Header.Get("tracestate")
+		ts = "tracestate: " + ts
+		traceHeaders = append(traceHeaders, tp, ts)
+	}
+
+	wrpMsg, err = wrap(payload, tid, mux.Vars(r), partnerIDs, traceHeaders)
+
+	if err == nil {
+		decodedRequest = &wrpRequest{
+			WRPMessage:      wrpMsg,
+			AuthHeaderValue: r.Header.Get(authHeaderKey),
 		}
 	}
+
 	return
 }
 
