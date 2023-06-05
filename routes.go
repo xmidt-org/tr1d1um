@@ -70,7 +70,9 @@ type primaryEndpointIn struct {
 
 type handleWebhookRoutesIn struct {
 	fx.In
-	Logger                *zap.Logger
+	Logger  *zap.Logger
+	Tracing candlelight.Tracing
+
 	APIRouter             *mux.Router  `name:"api_router"`
 	AuthChain             alice.Chain  `name:"auth_chain"`
 	AddWebhookHandler     http.Handler `name:"add_webhook_handler"`
@@ -202,7 +204,6 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 
 	in.Router.Use(
 		otelmux.Middleware("mainSpan", otelMuxOptions...),
-		candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator()),
 	)
 
 	if in.V.IsSet(authAcquirerKey) {
@@ -243,8 +244,8 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(in.AddWebhookHandler))).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(in.GetAllWebhooksHandler)).Methods(http.MethodGet)
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))
 	}
 	return nil
 }
