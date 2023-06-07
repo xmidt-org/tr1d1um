@@ -273,6 +273,15 @@ authx:
 #     - "hooks\\b"
 #     - "device/.*/stat\\b"
 #     - "device/.*/config\\b"
+capabilityCheck:
+  type: "enforce"
+  prefix: "x1:webpa:api:"
+  acceptAllMethod: "all"
+  endpointBuckets:
+    - "hook\\b"
+    - "hooks\\b"
+    - "device/.*/stat\\b"
+    - "device/.*/config\\b"
 
 
 ##############################################################################
@@ -376,3 +385,13 @@ tracing:
 # tr1d1um will support both "/v2" and "/v3" endpoints.  When false, only "/v3"
 # endpoints will be supported.
 previousVersionSupport: (( grab $PREV_VERSION_SUPPORT || true ))
+
+authAcquirer:
+  JWT:
+    requestHeaders:
+      "X-Client-Id": "na"
+      "X-Client-Secret": "na"
+      "X-Midt-Partner-ID": "comcast"
+    authURL: "http://themis:6501/issue"
+    timeout: "1m"
+    buffer: "2m"
