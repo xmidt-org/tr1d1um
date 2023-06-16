@@ -39,6 +39,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v3/wrpcontext"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 )
 
@@ -75,10 +76,10 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(transaction.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), true)(transaction.Welcome(WRPHandler)))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(transaction.Welcome(WRPHandler))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), true)(transaction.Welcome(WRPHandler)))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -140,12 +141,27 @@ func getTID(ctx context.Context) string {
 /* Request Decoding */
 func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
 	var (
-		payload []byte
-		wrpMsg  *wrp.Message
+		payload    []byte
+		wrpMsg     *wrp.Message
+		tid        string
+		partnerIDs []string
 	)
-	if payload, err = requestPayload(r); err == nil {
-		tid := getTID(ctx)
-		partnerIDs := getPartnerIDsDecodeRequest(ctx, r)
+
+	m, ok := wrpcontext.Get[wrp.Message](ctx)
+
+	if !ok {
+		if payload, err = requestPayload(r); err == nil {
+			tid = getTID(ctx)
+			partnerIDs = getPartnerIDsDecodeRequest(ctx, r)
+
+		}
+	} else {
+		payload = m.Payload
+		partnerIDs = m.PartnerIDs
+		tid = m.TransactionUUID
+	}
+
+	if err == nil {
 		var traceHeaders []string
 
 		// If there's a traceparent, add it to traceHeaders array
@@ -168,6 +184,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 			}
 		}
 	}
+
 	return
 }
 
