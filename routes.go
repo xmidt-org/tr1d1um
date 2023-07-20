@@ -244,7 +244,7 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
 			return err
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.AddWebhookHandler)))).Methods(http.MethodPost)
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))
 	}
 	return nil
