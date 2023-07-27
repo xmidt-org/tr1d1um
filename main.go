@@ -28,6 +28,7 @@ import (
 
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
+	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"go.uber.org/fx"
@@ -205,6 +206,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 		touchstone.Provide(),
 		touchhttp.Provide(),
 		ancla.ProvideMetrics(),
+		arrangepprof.HTTP{
+			RouterName: "server_pprof",
+		}.Provide(),
 		fx.Provide(
 			consts,
 			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
