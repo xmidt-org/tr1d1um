@@ -30,6 +30,7 @@ keys/*.private
 # VSCode
 *.code-workspace
 .vscode/*
+.dev/*
 
 # Vim
 *.swp
