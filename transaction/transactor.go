@@ -31,6 +31,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/wrp-go/v3"
 	"go.uber.org/zap"
 )
 
@@ -222,6 +223,12 @@ func getDeviceId(r *http.Request) string {
 	if id == "" {
 		id = "mac:000000000000"
 	}
-	
+
+	normalized, err := wrp.ParseDeviceID(id)
+	if err != nil {
+		id = "invalid:" + id
+	} else {
+		id = string(normalized)
+	}
 	return id
 }
