@@ -288,10 +288,10 @@ func TestGetDeviceId(t *testing.T) {
 			desc: "Request has id",
 			req: func() (r *http.Request) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
-				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
+				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:11:22:33:44:55:Aa"})
 				return
 			},
-			expected: "mac:112233445577",
+			expected: "mac:1122334455aa",
 		},
 		{
 			desc: "no id",
@@ -300,6 +300,15 @@ func TestGetDeviceId(t *testing.T) {
 				return
 			},
 			expected: "mac:000000000000",
+		},
+		{
+			desc: "invalid id",
+			req: func() (r *http.Request) {
+				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				r = mux.SetURLVars(r, map[string]string{"deviceid": "unsupported:frog"})
+				return
+			},
+			expected: "invalid:unsupported:frog",
 		},
 	}
 	for _, tc := range tests {
