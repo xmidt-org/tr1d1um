@@ -24,14 +24,13 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.43.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.43.0
 	go.uber.org/fx v1.20.0
-	go.uber.org/zap v1.25.0
+	go.uber.org/zap v1.26.0
 )
 
 require (
 	emperror.dev/emperror v0.33.0 // indirect
 	emperror.dev/errors v0.8.1 // indirect
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
-	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
