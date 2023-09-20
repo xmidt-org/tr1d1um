@@ -1,6 +1,6 @@
 module github.com/xmidt-org/tr1d1um
 
-go 1.19
+go 1.21
 
 require (
 	github.com/go-kit/kit v0.13.0
