@@ -1,3 +1,5 @@
+## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
+## SPDX-License-Identifier: Apache-2.0
 apiVersion: v2
 name: tr1d1um
 description: A Helm chart to deploy tr1d1um to Kubernetes
