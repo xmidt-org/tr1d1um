@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/go-kit/kit v0.13.0
 	github.com/goph/emperror v0.17.3-0.20190703203600-60a8d9faa17b
-	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/mux v1.8.1
 	github.com/justinas/alice v1.2.0
 	github.com/spf13/cast v1.5.1
 	github.com/spf13/pflag v1.0.5
