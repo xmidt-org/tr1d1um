@@ -21,7 +21,7 @@ require (
 	github.com/xmidt-org/touchstone v0.1.3
 	github.com/xmidt-org/webpa-common/v2 v2.3.2
 	github.com/xmidt-org/wrp-go/v3 v3.2.3
-	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.44.0
+	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.46.1
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
 	go.uber.org/fx v1.20.1
 	go.uber.org/zap v1.26.0
@@ -36,7 +36,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
