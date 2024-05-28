@@ -22,6 +22,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
+	webhook "github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -111,10 +112,10 @@ func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
+func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
 	//build validators and webhook handler for previous version that only check loopback.
-	v, err := ancla.BuildValidators(ancla.ValidatorConfig{
-		URL: ancla.URLVConfig{
+	v, err := webhook.BuildValidators(webhook.ValidatorConfig{
+		URL: webhook.URLVConfig{
 			AllowLoopback:        c.Validation.URL.AllowLoopback,
 			AllowIP:              true,
 			AllowSpecialUseHosts: true,
@@ -123,7 +124,7 @@ func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
 		TTL: c.Validation.TTL,
 	})
 	if err != nil {
-		return ancla.Validators{}, err
+		return nil, err
 	}
 
 	return v, nil
@@ -165,7 +166,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		GetLogger: sallust.Get,
 	})
 
-	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+	builtValidators, err := webhook.BuildValidators(webhookConfig.Validation)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
 	}

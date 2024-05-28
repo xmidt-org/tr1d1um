@@ -13,12 +13,13 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/xmidt-org/ancla v0.3.12
 	github.com/xmidt-org/arrange v0.4.0
-	github.com/xmidt-org/bascule v0.11.6
+	github.com/xmidt-org/bascule v0.11.7
 	github.com/xmidt-org/candlelight v0.0.21
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/httpaux v0.4.0
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.5
+	github.com/xmidt-org/webhook-schema v0.1.0
 	github.com/xmidt-org/webpa-common/v2 v2.3.2
 	github.com/xmidt-org/wrp-go/v3 v3.5.2
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.49.0
@@ -76,6 +77,7 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xmidt-org/argus v0.9.10 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
+	github.com/xmidt-org/urlegit v0.1.1 // indirect
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.21.0 // indirect
@@ -102,3 +104,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/xmidt-org/ancla => /Users/mforti446/Documents/work/xmidt-repos/ancla
+
+replace github.com/xmidt-org/webhook-schema => /Users/mforti446/Documents/work/xmidt-repos/webhook-schema
