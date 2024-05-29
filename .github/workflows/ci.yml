@@ -33,4 +33,5 @@ jobs:
         .release/docker
         LICENSE
         NOTICE
+      yaml-lint-skip: false
     secrets: inherit
