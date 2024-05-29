@@ -1,7 +1,7 @@
 ## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 ## SPDX-License-Identifier: Apache-2.0
 # Default values for xmitd-talaria.
-
+---
 tr1d1um:
   # docker image used
   image: xmidt/tr1d1um
@@ -27,9 +27,7 @@ control:
 metric:
   address:
     host: ""
-    port: "6104"  
+    port: "6104"
 
 # Pull secret used when images are stored in a private repository
 # imagePullSecretName:
-
-
