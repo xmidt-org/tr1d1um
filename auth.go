@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -39,7 +38,6 @@ func provideAuthChain(configKey string) fx.Option {
 			func() basculehttp.ParseURL {
 				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
-			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},

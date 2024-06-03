@@ -14,20 +14,20 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/httpaux"
+	"github.com/xmidt-org/httpaux/recovery"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/translation"
+	webhook "github.com/xmidt-org/webhook-schema"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -41,9 +41,6 @@ var (
 
 type primaryEndpointIn struct {
 	fx.In
-	V                           *viper.Viper
-	Router                      *mux.Router `name:"server_primary"`
-	APIRouter                   *mux.Router `name:"api_router"`
 	AuthChain                   alice.Chain `name:"auth_chain"`
 	Tracing                     candlelight.Tracing
 	Logger                      *zap.Logger
@@ -113,114 +110,145 @@ type metricsRoutesIn struct {
 	Handler touchhttp.Handler
 }
 
-func provideServers() fx.Option {
-	return fx.Options(
-		arrange.ProvideKey(reqMaxRetriesKey, 0),
-		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
-		arrange.ProvideKey("previousVersionSupport", true),
-		arrange.ProvideKey("targetURL", ""),
-		arrange.ProvideKey("WRPSource", ""),
-		arrange.ProvideKey(translationServicesKey, []string{}),
-		fx.Provide(metricMiddleware),
-		fx.Provide(
-			fx.Annotated{
-				Name:   "reducedLoggingResponseCodes",
-				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
-			},
-			fx.Annotated{
-				Name:   "api_router",
-				Target: provideAPIRouter,
-			},
-			fx.Annotated{
-				Name:   "url_prefix",
-				Target: provideURLPrefix,
-			},
-			provideServiceOptions,
-		),
-		arrangehttp.Server{
-			Name: "server_primary",
-			Key:  "servers.primary",
-			Inject: arrange.Inject{
-				primaryMetricMiddlewareIn{},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_alternate",
-			Key:  "servers.alternate",
-			Inject: arrange.Inject{
-				alternateMetricMiddlewareIn{},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_health",
-			Key:  "servers.health",
-			Inject: arrange.Inject{
-				healthMetricMiddlewareIn{},
-			},
-			Invoke: arrange.Invoke{
-				func(r *mux.Router) {
-					r.Handle("/health", httpaux.ConstantHandler{
-						StatusCode: http.StatusOK,
-					}).Methods("GET")
-				},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_pprof",
-			Key:  "servers.pprof",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_metrics",
-			Key:  "servers.metrics",
-		}.Provide(),
-		fx.Invoke(
-			handlePrimaryEndpoint,
-			handleWebhookRoutes,
-			buildMetricsRoutes,
-			buildAPIAltRouter,
-		),
+func provideServerMetrics() fx.Option {
+	return fx.Provide(
+		fx.Annotated{
+			Name: "servers.primary.metrics",
+			Target: touchhttp.ServerBundle{}.NewInstrumenter(
+				touchhttp.ServerLabel, "primary",
+			),
+		},
+		fx.Annotated{
+			Name: "servers.alternate.metrics",
+			Target: touchhttp.ServerBundle{}.NewInstrumenter(
+				touchhttp.ServerLabel, "alternate",
+			),
+		},
+		fx.Annotated{
+			Name: "servers.health.metrics",
+			Target: touchhttp.ServerBundle{}.NewInstrumenter(
+				touchhttp.ServerLabel, "health",
+			),
+		},
 	)
 }
 
-func handlePrimaryEndpoint(in primaryEndpointIn) {
-	otelMuxOptions := []otelmux.Option{
-		otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
-		otelmux.WithPropagators(in.Tracing.Propagator()),
-	}
-
-	in.Router.Use(
-		otelmux.Middleware("mainSpan", otelMuxOptions...),
+func provideServerOptions() fx.Option {
+	return fx.Provide(
+		func(in primaryEndpointIn) {
+			handlePrimaryEndpoint(in)
+		},
 	)
+	// arrange.ProvideKey(reqMaxRetriesKey, 0),
+	// arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
+	// arrange.ProvideKey("previousVersionSupport", true),
+	// arrange.ProvideKey("targetURL", ""),
+	// arrange.ProvideKey("WRPSource", ""),
+	// arrange.ProvideKey(translationServicesKey, []string{}),
+	// fx.Provide(metricMiddleware),
+	// fx.Provide(
+	// 	// fx.Annotated{
+	// 	// 	Name:   "reducedLoggingResponseCodes",
+	// 	// 	Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
+	// 	// },
+	// 	fx.Annotated{
+	// 		Name:   "api_router",
+	// 		Target: provideAPIRouter,
+	// 	},
+	// 	fx.Annotated{
+	// 		Name:   "url_prefix",
+	// 		Target: provideURLPrefix,
+	// 	},
+	// 	provideServiceOptions,
+	// ),
+	// arrangehttp.Server{
+	// 	Name: "server_primary",
+	// 	Key:  "servers.primary",
+	// 	Inject: arrange.Inject{
+	// 		primaryMetricMiddlewareIn{},
+	// 	},
+	// }.Provide(),
+	// arrangehttp.Server{
+	// 	Name: "server_alternate",
+	// 	Key:  "servers.alternate",
+	// 	Inject: arrange.Inject{
+	// 		alternateMetricMiddlewareIn{},
+	// 	},
+	// }.Provide(),
+	// arrangehttp.Server{
+	// 	Name: "server_health",
+	// 	Key:  "servers.health",
+	// 	Inject: arrange.Inject{
+	// 		healthMetricMiddlewareIn{},
+	// 	},
+	// 	Invoke: arrange.Invoke{
+	// 		func(r *mux.Router) {
+	// 			r.Handle("/health", httpaux.ConstantHandler{
+	// 				StatusCode: http.StatusOK,
+	// 			}).Methods("GET")
+	// 		},
+	// 	},
+	// }.Provide(),
+	// arrangehttp.Server{
+	// 	Name: "server_pprof",
+	// 	Key:  "servers.pprof",
+	// }.Provide(),
+	// arrangehttp.Server{
+	// 	Name: "server_metrics",
+	// 	Key:  "servers.metrics",
+	// }.Provide(),
+	// fx.Invoke(
+	// 	handlePrimaryEndpoint,
+	// 	handleWebhookRoutes,
+	// 	buildMetricsRoutes,
+	// 	buildAPIAltRouter,
+	// ),
+}
 
-	if in.V.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(in.AuthAcquirer)
-		if err != nil {
-			in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
-		} else {
-			in.TranslationOptions.AuthAcquirer = acquirer
-			in.StatServiceOptions.AuthAcquirer = acquirer
-			in.Logger.Info("Outbound request authentication token acquirer enabled")
-		}
-	}
-	ss := stat.NewService(in.StatServiceOptions)
-	ts := translation.NewService(in.TranslationOptions)
+func handlePrimaryEndpoint(in primaryEndpointIn) arrangehttp.Option[http.Server] {
+	return arrangehttp.AsOption[http.Server](
+		func(s *http.Server) {
+			otelMuxOptions := []otelmux.Option{
+				otelmux.WithTracerProvider(in.Tracing.TracerProvider()),
+				otelmux.WithPropagators(in.Tracing.Propagator()),
+			}
 
-	// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
-	stat.ConfigHandler(&stat.Options{
-		S:                           ss,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                &in.AuthChain,
-		Log:                         in.Logger,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
-	translation.ConfigHandler(&translation.Options{
-		S:                           ts,
-		APIRouter:                   in.APIRouter,
-		Authenticate:                &in.AuthChain,
-		Log:                         in.Logger,
-		ValidServices:               in.TranslationServices,
-		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-	})
+			mux := chi.NewMux()
+			mux.Use(recovery.Middleware(recovery.WithStatusCode(555)))
+			// TODO: should probably customize things a bit
+			mux.Use(otelmux.Middleware("mainSpan", otelMuxOptions...),
+				candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false))
+
+			//TODO create if check for this
+			acquirer, err := createAuthAcquirer(in.AuthAcquirer)
+			if err != nil {
+				in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
+			} else {
+				in.TranslationOptions.AuthAcquirer = acquirer
+				in.StatServiceOptions.AuthAcquirer = acquirer
+				in.Logger.Info("Outbound request authentication token acquirer enabled")
+			}
+
+			ss := stat.NewService(in.StatServiceOptions)
+			ts := translation.NewService(in.TranslationOptions)
+
+			// Must be called before translation.ConfigHandler due to mux path specificity (https://github.com/gorilla/mux#matching-routes).
+			stat.ConfigHandler(&stat.Options{
+				S:                           ss,
+				APIRouter:                   mux,
+				Authenticate:                &in.AuthChain,
+				Log:                         in.Logger,
+				ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+			})
+			translation.ConfigHandler(&translation.Options{
+				S:                           ts,
+				Authenticate:                &in.AuthChain,
+				Log:                         in.Logger,
+				ValidServices:               in.TranslationServices,
+				ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+			})
+		},
+	)
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
@@ -284,20 +312,14 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config webhook.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
-	durationCheck, err := ancla.CheckDuration(config.Max)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create duration check: %v", err)
-	}
+	durationOpt := webhook.ValidateRegistrationDuration(config.Max)
 
-	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create until check: %v", err)
-	}
+	untilOpt := webhook.Until(config.Jitter, config.Max, config.Now)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -319,7 +341,7 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 				return
 			}
 
-			var wr ancla.WebhookRegistration
+			var wr webhook.RegistrationV1
 			err = json.Unmarshal(requestPayload, &wr)
 			if err != nil {
 				var e *json.UnmarshalTypeError
@@ -336,25 +358,24 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 
 			// check to see if the Webhook has a valid until/duration.
 			// If not, set the WebhookRegistration  duration to 5m.
-			webhook := wr.ToWebhook()
-			if webhook.Until.IsZero() {
-				if webhook.Duration == 0 {
-					wr.Duration = ancla.CustomDuration(config.Max)
+			if wr.Until.IsZero() {
+				if wr.Duration == 0 {
+					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
 				} else {
-					durationErr := durationCheck(webhook)
+					durationErr := durationOpt.Validate(&wr)
 					if durationErr != nil {
-						wr.Duration = ancla.CustomDuration(config.Max)
+						wr.Duration = webhook.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
 					}
 				}
 			} else {
-				untilErr := untilCheck(webhook)
+				untilErr := untilOpt.Validate(&wr)
 				if untilErr != nil {
 					wr.Until = time.Time{}
-					wr.Duration = ancla.CustomDuration(config.Max)
+					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 				}

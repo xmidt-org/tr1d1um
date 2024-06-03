@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
@@ -34,7 +35,7 @@ type Options struct {
 	S Service
 
 	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
-	APIRouter                   *mux.Router
+	APIRouter                   *chi.Mux
 	Authenticate                *alice.Chain
 	Log                         *zap.Logger
 	ReducedLoggingResponseCodes []int
@@ -55,8 +56,7 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(statHandler)))).
-		Methods(http.MethodGet)
+	c.APIRouter.Method("GET", "/device/{deviceid}/stat", c.Authenticate.Then(transaction.Welcome(statHandler)))
 }
 
 func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err error) {

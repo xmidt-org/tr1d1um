@@ -3,20 +3,21 @@ module github.com/xmidt-org/tr1d1um
 go 1.21
 
 require (
+	github.com/alecthomas/kong v0.9.0
+	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-kit/kit v0.13.0
-	github.com/goph/emperror v0.17.3-0.20190703203600-60a8d9faa17b
 	github.com/gorilla/mux v1.8.1
+	github.com/goschtalt/goschtalt v0.25.0
 	github.com/justinas/alice v1.2.0
 	github.com/spf13/cast v1.6.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
 	github.com/xmidt-org/ancla v0.3.12
-	github.com/xmidt-org/arrange v0.4.0
+	github.com/xmidt-org/arrange v0.5.1-0.20230914215531-f02b8651b631
 	github.com/xmidt-org/bascule v0.11.7
 	github.com/xmidt-org/candlelight v0.0.21
 	github.com/xmidt-org/clortho v0.0.4
-	github.com/xmidt-org/httpaux v0.4.0
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.5
 	github.com/xmidt-org/webhook-schema v0.1.0
@@ -26,6 +27,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 	go.uber.org/fx v1.21.0
 	go.uber.org/zap v1.27.0
+	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 
 require (
@@ -51,6 +53,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
 	github.com/jtacoma/uritemplates v1.0.0 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.5 // indirect
@@ -77,6 +80,7 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xmidt-org/argus v0.9.10 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
+	github.com/xmidt-org/httpaux v0.4.0 // indirect
 	github.com/xmidt-org/urlegit v0.1.1 // indirect
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
@@ -108,3 +112,5 @@ require (
 replace github.com/xmidt-org/ancla => /Users/mforti446/Documents/work/xmidt-repos/ancla
 
 replace github.com/xmidt-org/webhook-schema => /Users/mforti446/Documents/work/xmidt-repos/webhook-schema
+
+replace github.com/xmidt-org/argus => /Users/mforti446/Documents/work/xmidt-repos/argus

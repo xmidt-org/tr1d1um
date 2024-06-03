@@ -6,23 +6,24 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	_ "net/http/pprof"
 	"os"
-	"runtime"
 	"time"
 
+	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/ancla"
-	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/arrange/arrangepprof"
+	"github.com/xmidt-org/arrange/arrangehttp"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 
-	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/xmidt-org/candlelight"
+
+	"github.com/alecthomas/kong"
 )
 
 // convenient global values
@@ -37,39 +38,35 @@ const (
 )
 
 const (
-	translationServicesKey            = "supportedServices"
-	targetURLKey                      = "targetURL"
-	netDialerTimeoutKey               = "netDialerTimeout"
-	clientTimeoutKey                  = "clientTimeout"
-	reqTimeoutKey                     = "respWaitTimeout"
-	reqRetryIntervalKey               = "requestRetryInterval"
-	reqMaxRetriesKey                  = "requestMaxRetries"
-	wrpSourceKey                      = "WRPSource"
-	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
-	authAcquirerKey                   = "authAcquirer"
-	webhookConfigKey                  = "webhook"
-	tracingConfigKey                  = "tracing"
+	translationServicesKey = "supportedServices"
+	targetURLKey           = "targetURL"
+	netDialerTimeoutKey    = "netDialerTimeout"
+	clientTimeoutKey       = "clientTimeout"
+	reqTimeoutKey          = "respWaitTimeout"
+	reqRetryIntervalKey    = "requestRetryInterval"
+	reqMaxRetriesKey       = "requestMaxRetries"
+	wrpSourceKey           = "WRPSource"
+	hooksSchemeKey         = "hooksScheme"
+	authAcquirerKey        = "authAcquirer"
+	webhookConfigKey       = "webhook"
 )
 
 var (
-	// dynamic versioning
-	Version string
-	Date    string
-	Commit  string
+	commit  = "undefined"
+	version = "undefined"
+	date    = "undefined"
+	builtBy = "undefined"
 )
 
-var defaults = map[string]interface{}{
-	translationServicesKey: []string{}, // no services allowed by the default
-	targetURLKey:           "localhost:6000",
-	netDialerTimeoutKey:    "5s",
-	clientTimeoutKey:       "50s",
-	reqTimeoutKey:          "40s",
-	reqRetryIntervalKey:    "2s",
-	reqMaxRetriesKey:       2,
-	wrpSourceKey:           "dns:localhost",
-	hooksSchemeKey:         "https",
+type CLI struct {
+	Dev   bool     `optional:"" short:"d" help:"Run in development mode."`
+	Show  bool     `optional:"" short:"s" help:"Show the configuration and exit."`
+	Graph string   `optional:"" short:"g" help:"Output the dependency graph to the specified file."`
+	Files []string `optional:"" short:"f" help:"Specific configuration files or directories."`
 }
+
+// Provides a named type so it's a bit easier to flow through & use in fx.
+type cliArgs []string
 
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
@@ -125,38 +122,6 @@ func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeou
 	return act
 }
 
-func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
-	traceConfig := in.TracingConfig
-	traceConfig.ApplicationName = applicationName
-	tracing, err := candlelight.New(traceConfig)
-	if err != nil {
-		return candlelight.Tracing{}, err
-	}
-	in.Logger.Info("tracing status", zap.Bool("enabled", !tracing.IsNoop()))
-	return tracing, nil
-}
-
-func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
-	if err := f.Parse(arguments); err != nil {
-		return true, err
-	}
-
-	if pVersion, _ := f.GetBool("version"); pVersion {
-		printVersionInfo(os.Stdout)
-		return true, nil
-	}
-	return false, nil
-}
-
-func printVersionInfo(writer io.Writer) {
-	fmt.Fprintf(writer, "%s:\n", applicationName)
-	fmt.Fprintf(writer, "  version: \t%s\n", Version)
-	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
-	fmt.Fprintf(writer, "  built time: \t%s\n", Date)
-	fmt.Fprintf(writer, "  git commit: \t%s\n", Commit)
-	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
-}
-
 func exitIfError(logger *zap.Logger, err error) {
 	if err != nil {
 		if logger != nil {
@@ -169,35 +134,57 @@ func exitIfError(logger *zap.Logger, err error) {
 
 //nolint:funlen
 func tr1d1um(arguments []string) (exitCode int) {
-	v, l, f, err := setup(arguments)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
+	var (
+		gscfg *goschtalt.Config
 
-	// This allows us to communicate the version of the binary upon request.
-	if done, parseErr := printVersion(f, arguments); done {
-		// if we're done, we're exiting no matter what
-		exitIfError(l, emperror.Wrap(parseErr, "failed to parse arguments"))
-		os.Exit(0)
-	}
+		// Capture the dependency tree in case we need to debug something.
+		g fx.DotGraph
+
+		// Capture the command line arguments.
+		cli *CLI
+	)
 
 	app := fx.New(
-		arrange.LoggerFunc(l.Sugar().Infof),
-		fx.Supply(l),
-		fx.Supply(v),
-		arrange.ForViper(v),
-		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
-		touchstone.Provide(),
-		touchhttp.Provide(),
-		ancla.ProvideMetrics(),
-		arrangepprof.HTTP{
-			RouterName: "server_pprof",
-		}.Provide(),
+		fx.Supply(cliArgs(arguments)),
+		fx.Populate(&g),
+		fx.Populate(&gscfg),
+		fx.Populate(&cli),
+
+		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: log}
+		}),
+
 		fx.Provide(
+			provideCLI,
+			provideLogger,
+			provideConfig,
+			provideWebhookHandlers,
+			goschtalt.UnmarshalFunc[sallust.Config]("logging"),
+			goschtalt.UnmarshalFunc[candlelight.Config]("tracing"),
+			goschtalt.UnmarshalFunc[touchstone.Config]("prometheus"),
+			goschtalt.UnmarshalFunc[JWTValidator]("jwtValidator"),
+			goschtalt.UnmarshalFunc[[]int]("logging.reducedLoggingResponseCodes"),
+			goschtalt.UnmarshalFunc[bool]("previousVersionSupport"),
+			goschtalt.UnmarshalFunc[int]("requestMaxRetries"),
+			goschtalt.UnmarshalFunc[time.Duration]("requestRetryInterval"),
+			goschtalt.UnmarshalFunc[[]string]("supportedServices"),
 			consts,
-			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
+			fx.Annotated{
+				Name:   "WRPSource",
+				Target: goschtalt.UnmarshalFunc[string]("wrpSource"),
+			},
+			fx.Annotated{
+				Name:   "targetURL",
+				Target: goschtalt.UnmarshalFunc[string]("targetUrl"),
+			},
+			fx.Annotated{
+				Name:   "argusClientTimeout",
+				Target: goschtalt.UnmarshalFunc[httpClientTimeout]("argusClientTimeout"),
+			},
+			fx.Annotated{
+				Name:   "xmidtClientTimeout",
+				Target: goschtalt.UnmarshalFunc[httpClientTimeout]("xmidtClientTimeout"),
+			},
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
 				Target: configureXmidtClientTimeout,
@@ -206,12 +193,58 @@ func tr1d1um(arguments []string) (exitCode int) {
 				Name:   "argus_client_timeout",
 				Target: configureArgusClientTimeout,
 			},
-			loadTracing,
+			fx.Annotated{
+				Name:   "server",
+				Target: goschtalt.UnmarshalFunc[string]("server"),
+			},
+			fx.Annotated{
+				Name:   "build",
+				Target: goschtalt.UnmarshalFunc[string]("build"),
+			},
+			fx.Annotated{
+				Name:   "flavor",
+				Target: goschtalt.UnmarshalFunc[string]("flavor"),
+			},
+			fx.Annotated{
+				Name:   "region",
+				Target: goschtalt.UnmarshalFunc[string]("region"),
+			},
+			fx.Annotated{
+				Name:   "servers.health.config",
+				Target: goschtalt.UnmarshalFunc[arrangehttp.ServerConfig]("servers.health.http"),
+			},
+			fx.Annotated{
+				Name:   "servers.metrics.config",
+				Target: goschtalt.UnmarshalFunc[arrangehttp.ServerConfig]("servers.metrics.http"),
+			},
+			fx.Annotated{
+				Name:   "servers.pprof.config",
+				Target: goschtalt.UnmarshalFunc[arrangehttp.ServerConfig]("servers.pprof.http"),
+			},
+			fx.Annotated{
+				Name:   "servers.primary.config",
+				Target: goschtalt.UnmarshalFunc[arrangehttp.ServerConfig]("servers.primary.http"),
+			},
+			fx.Annotated{
+				Name:   "servers.alternate.config",
+				Target: goschtalt.UnmarshalFunc[arrangehttp.ServerConfig]("servers.alternate.http"),
+			},
+			candlelight.New,
 			newHTTPClient,
 		),
+
+		arrangehttp.ProvideServer("servers.health"),
+		arrangehttp.ProvideServer("servers.metrics"),
+		arrangehttp.ProvideServer("servers.pprof"),
+		arrangehttp.ProvideServer("servers.primary"),
+		arrangehttp.ProvideServer("servers.alternate"),
+
+		touchstone.Provide(),
+		touchhttp.Provide(),
+		ancla.ProvideMetrics(),
 		provideAuthChain("authx.inbound"),
-		provideServers(),
-		provideHandlers(),
+		provideServerOptions(),
+		provideServerMetrics(),
 	)
 
 	switch err := app.Err(); {
@@ -229,4 +262,49 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 func main() {
 	os.Exit(tr1d1um(os.Args))
+}
+
+func provideCLI(args cliArgs) (*CLI, error) {
+	return provideCLIWithOpts(args, false)
+}
+
+func provideCLIWithOpts(args cliArgs, testOpts bool) (*CLI, error) {
+	var cli CLI
+
+	// Create a no-op option to satisfy the kong.New() call.
+	var opt kong.Option = kong.OptionFunc(
+		func(*kong.Kong) error {
+			return nil
+		},
+	)
+
+	if testOpts {
+		opt = kong.Writers(nil, nil)
+	}
+
+	parser, err := kong.New(&cli,
+		kong.Name(applicationName),
+		kong.Description("The cpe agent for Xmidt service.\n"+
+			fmt.Sprintf("\tVersion:  %s\n", version)+
+			fmt.Sprintf("\tDate:     %s\n", date)+
+			fmt.Sprintf("\tCommit:   %s\n", commit)+
+			fmt.Sprintf("\tBuilt By: %s\n", builtBy),
+		),
+		kong.UsageOnError(),
+		opt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if testOpts {
+		parser.Exit = func(_ int) { panic("exit") }
+	}
+
+	_, err = parser.Parse(args)
+	if err != nil {
+		parser.FatalIfErrorf(err)
+	}
+
+	return &cli, nil
 }

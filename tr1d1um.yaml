@@ -302,10 +302,10 @@ authx:
 ##############################################################################
 
 # targetURL is the base URL of the XMiDT cluster 
-targetURL: http://scytale:6300/api/v3
+targetUrl: http://scytale:6300/api/v3
 
 # WRPSource is used as 'source' field for all outgoing WRP Messages
-WRPSource: "dns:tr1d1um.example.com"
+wrpSource: "dns:tr1d1um.example.com"
 
 # supportedServices is a list of endpoints we support for the WRP producing endpoints 
 # we will soon drop this configuration 

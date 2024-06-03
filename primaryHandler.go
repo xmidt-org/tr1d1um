@@ -13,12 +13,10 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
-	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -70,10 +68,10 @@ type ServiceOptionsIn struct {
 	fx.In
 	Logger               *zap.Logger
 	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
-	RequestMaxRetries    int               `name:"requestMaxRetries"`
-	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
-	TargetURL            string            `name:"targetURL"`
-	WRPSource            string            `name:"WRPSource"`
+	RequestMaxRetries    int
+	RequestRetryInterval time.Duration
+	TargetURL            string `name:"targetURL"`
+	WRPSource            string `name:"WRPSource"`
 	Tracing              candlelight.Tracing
 }
 
@@ -190,18 +188,6 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 
 	in.Logger.Info("Webhook service enabled")
 	return
-}
-
-func provideHandlers() fx.Option {
-	return fx.Options(
-		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
-		fx.Provide(
-			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
-			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
-			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
-			provideWebhookHandlers,
-		),
-	)
 }
 
 func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
