@@ -108,3 +108,5 @@ require (
 replace github.com/xmidt-org/ancla => /Users/mforti446/Documents/work/xmidt-repos/ancla
 
 replace github.com/xmidt-org/webhook-schema => /Users/mforti446/Documents/work/xmidt-repos/webhook-schema
+
+replace github.com/xmidt-org/argus => /Users/mforti446/Documents/work/xmidt-repos/argus

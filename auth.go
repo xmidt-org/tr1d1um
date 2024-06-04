@@ -36,6 +36,17 @@ func provideAuthChain(configKey string) fx.Option {
 		basculehttp.ProvideMetrics(),
 		basculechecks.ProvideMetrics(),
 		fx.Provide(
+			fx.Annotated{
+				Name:   "encoded_basic_auths",
+				Target: arrange.UnmarshalKey("authx.inbound", basculehttp.EncodedBasicKeys{}),
+			},
+			fx.Annotated{
+				Name: "key_resolver",
+				Target: func() clortho.Resolver {
+					r := new(MockResolver)
+					return r
+				},
+			},
 			func() basculehttp.ParseURL {
 				return createRemovePrefixURLFuncLegacy(possiblePrefixURLs)
 			},
