@@ -10,5 +10,5 @@ on:
 
 jobs:
   release:
-    uses: xmidt-org/shared-go/.github/workflows/auto-releaser.yml@dba5224b851866142a89af515639b26a8bceb5f0 # v4.4.9
+    uses: xmidt-org/shared-go/.github/workflows/auto-releaser.yml@d52bea35df8d25bee912f0161344cbc3a949a416 # v4.4.10
     secrets: inherit
