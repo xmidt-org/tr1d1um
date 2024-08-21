@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -285,14 +286,14 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config webhook.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
 	durationOpt := webhook.ValidateRegistrationDuration(config.Max)
 
-	untilOpt := webhook.Until(config.Jitter, config.Max, config.Now)
+	untilOpt := webhook.Until(config.Now, config.Max, config.Jitter)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -308,14 +309,58 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config webhook.T
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
 
-			requestPayload, err := ioutil.ReadAll(r.Body)
+			requestPayload, err := io.ReadAll(r.Body)
 			if err != nil {
 				v2ErrEncode(w, logger, err, 0)
 				return
 			}
 
-			var wr webhook.RegistrationV1
-			err = json.Unmarshal(requestPayload, &wr)
+			var v1 webhook.RegistrationV1
+			var v2 webhook.RegistrationV2
+			err = json.Unmarshal(requestPayload, &v1)
+			// check to see if the Webhook has a valid until/duration.
+			// If not, set the WebhookRegistration  duration to 5m.
+			if err == nil {
+				if v1.Until.IsZero() {
+					if v1.Duration == 0 {
+						v1.Duration = webhook.CustomDuration(config.Max)
+						w.Header().Add(v2WarningHeader,
+							fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
+					} else {
+						durationErr := durationOpt.Validate(&v1)
+						if durationErr != nil {
+							v1.Duration = webhook.CustomDuration(config.Max)
+							w.Header().Add(v2WarningHeader,
+								fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
+						}
+					}
+				} else {
+					untilErr := untilOpt.Validate(&v1)
+					if untilErr != nil {
+						v1.Until = time.Time{}
+						v1.Duration = webhook.CustomDuration(config.Max)
+						w.Header().Add(v2WarningHeader,
+							fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
+					}
+				}
+
+				body, err := json.Marshal(v1)
+				if err != nil {
+					v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+				}
+				r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+			} else {
+				err = json.Unmarshal(requestPayload, &v2)
+				if err == nil {
+					body, err := json.Marshal(v2)
+					if err != nil {
+						v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+					}
+					r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+				}
+			}
+
 			if err != nil {
 				var e *json.UnmarshalTypeError
 				if errors.As(err, &e) {
@@ -328,38 +373,6 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config webhook.T
 					http.StatusBadRequest)
 				return
 			}
-
-			// check to see if the Webhook has a valid until/duration.
-			// If not, set the WebhookRegistration  duration to 5m.
-			if wr.Until.IsZero() {
-				if wr.Duration == 0 {
-					wr.Duration = webhook.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
-				} else {
-					durationErr := durationOpt.Validate(&wr)
-					if durationErr != nil {
-						wr.Duration = webhook.CustomDuration(config.Max)
-						w.Header().Add(v2WarningHeader,
-							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
-					}
-				}
-			} else {
-				untilErr := untilOpt.Validate(&wr)
-				if untilErr != nil {
-					wr.Until = time.Time{}
-					wr.Duration = webhook.CustomDuration(config.Max)
-					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
-				}
-			}
-
-			// put the body back in the request
-			body, err := json.Marshal(wr)
-			if err != nil {
-				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
-			}
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 			if v2Handler == nil {
 				v2Handler = next

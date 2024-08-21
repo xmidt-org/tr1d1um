@@ -114,20 +114,24 @@ func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
 
 func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
 	//build validators and webhook handler for previous version that only check loopback.
-	v, err := webhook.BuildValidators(webhook.ValidatorConfig{
-		URL: webhook.URLVConfig{
-			AllowLoopback:        c.Validation.URL.AllowLoopback,
-			AllowIP:              true,
-			AllowSpecialUseHosts: true,
-			AllowSpecialUseIPs:   true,
+	validatorConfig := ancla.ValidatorConfig{
+		URL: ancla.URLVConfig{
+			AllowLoopback: c.Validation.URL.AllowLoopback,
 		},
 		TTL: c.Validation.TTL,
-	})
+		Domain: ancla.DomainConfig{
+			AllowSpecialUseDomains: true,
+		},
+		IP: ancla.IPConfig{
+			Allow: true,
+		},
+	}
+	checker, err := validatorConfig.BuildURLChecker()
 	if err != nil {
 		return nil, err
 	}
 
-	return v, nil
+	return validatorConfig.BuildOptions(checker), nil
 }
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
@@ -166,13 +170,14 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		GetLogger: sallust.Get,
 	})
 
-	builtValidators, err := webhook.BuildValidators(webhookConfig.Validation)
+	checker, err := webhookConfig.Validation.BuildURLChecker()
 	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
+		return out, fmt.Errorf("failed to initialize url checker for validation: %s", err)
 	}
+	opts := webhookConfig.Validation.BuildOptions(checker)
 
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 builtValidators,
+		V:                 opts,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})
