@@ -113,19 +113,11 @@ func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
 }
 
 func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
-	//build validators and webhook handler for previous version that only check loopback.
-	v, err := webhook.BuildValidators(webhook.ValidatorConfig{
-		URL: webhook.URLVConfig{
-			AllowLoopback:        c.Validation.URL.AllowLoopback,
-			AllowIP:              true,
-			AllowSpecialUseHosts: true,
-			AllowSpecialUseIPs:   true,
-		},
-		TTL: c.Validation.TTL,
-	})
+	checker, err := c.Validation.BuildURLChecker()
 	if err != nil {
 		return nil, err
 	}
+	v := c.Validation.BuildOptions(checker)
 
 	return v, nil
 }
@@ -166,13 +158,14 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		GetLogger: sallust.Get,
 	})
 
-	builtValidators, err := webhook.BuildValidators(webhookConfig.Validation)
+	checker, err := webhookConfig.Validation.BuildURLChecker()
 	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
+		return out, fmt.Errorf("failed to set up url checker for validation: %s", err)
 	}
+	validationOpts := webhookConfig.Validation.BuildOptions(checker)
 
 	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 builtValidators,
+		V:                 validationOpts,
 		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})

@@ -63,6 +63,7 @@ cpuprofile
 tr1d1um
 .ignore
 .vscode
+.yaml
 
 # helm 
 !deploy/helm/tr1d1um

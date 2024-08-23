@@ -285,14 +285,14 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config webhook.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
 	durationOpt := webhook.ValidateRegistrationDuration(config.Max)
 
-	untilOpt := webhook.Until(config.Jitter, config.Max, config.Now)
+	untilOpt := webhook.Until(config.Now, config.Jitter, config.Max)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
