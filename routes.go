@@ -66,6 +66,7 @@ type handleWebhookRoutesIn struct {
 	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 	WebhookConfig         ancla.Config
+	PreviousVersion       bool `name:"previousVersionSupport"`
 }
 
 type apiAltRouterIn struct {
@@ -177,6 +178,7 @@ func provideServers() fx.Option {
 		fx.Invoke(
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
+			// handleKafkaRoutes,
 			buildMetricsRoutes,
 			buildAPIAltRouter,
 		),
@@ -225,13 +227,18 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
-	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
-			return err
+	if in.PreviousVersion {
+		if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
+			fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
+				return err
+			}
+			in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.AddWebhookHandler)))).Methods(http.MethodPost)
+			in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))
 		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.AddWebhookHandler)))).Methods(http.MethodPost)
+	} else {
+		in.APIRouter.Handle("/hook", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.AddWebhookHandler))).Methods(http.MethodPost)
 		in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing.Propagator(), false)(in.GetAllWebhooksHandler)))
 	}
 	return nil
