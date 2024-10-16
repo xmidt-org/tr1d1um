@@ -38,7 +38,7 @@ func deduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
 
 // isValidSetWDMP helps verify a given Set WDMP object is valid for its context
 func isValidSetWDMP(wdmp *setWDMP) (isValid bool) {
-	if emptyParams := wdmp.Parameters == nil || len(wdmp.Parameters) == 0; emptyParams {
+	if len(wdmp.Parameters) == 0 {
 		return wdmp.Command == CommandTestSet //TEST_AND_SET can have empty parameters
 	}
 
