@@ -1,28 +1,20 @@
 ## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 ## SPDX-License-Identifier: Apache-2.0
-FROM docker.io/library/golang:1.19-alpine as builder
-
-ARG arm64
-
-COPY . /src
+FROM docker.io/library/golang:1.23.2-alpine as builder
 
 WORKDIR /src
 
 RUN apk add --no-cache --no-progress \
     ca-certificates \
-    make \
     curl
 
 # Download spruce here to eliminate the need for curl in the final image
-ENV spruce_url_amd64=https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 
-ENV spruce_url_arm64=https://github.com/geofffranks/spruce/releases/download/v1.30.2/spruce-linux-arm64
-RUN [ ${arm64}=true ] && (curl -L -o /go/bin/spruce ${spruce_url_arm64}) || (curl -L -o /go/bin/spruce ${spruce_url_amd64})
-
 RUN mkdir -p /go/bin && \
+    curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 && \
     chmod +x /go/bin/spruce
 
-
-RUN make build
+COPY . .
+RUN go build -o /go/bin/tr1d1um .
 
 ##########################
 # Build the final image.
@@ -32,7 +24,7 @@ FROM alpine:latest
 
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
-COPY --from=builder /src/tr1d1um /
+COPY --from=builder /go/bin/tr1d1um /
 COPY .release/docker/entrypoint.sh  /
 
 # Copy over spruce and the spruce template file used to make the actual configuration file.

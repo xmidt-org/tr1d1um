@@ -14,14 +14,14 @@ require (
 	github.com/xmidt-org/ancla v0.3.13-0.20241009144151-4779e9548d9e
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
-	github.com/xmidt-org/candlelight v0.1.18
+	github.com/xmidt-org/candlelight v0.1.19
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/httpaux v0.4.0
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.7
 	github.com/xmidt-org/webhook-schema v0.1.1-0.20240718124820-b8c1ba1f19a9
 	github.com/xmidt-org/webpa-common/v2 v2.3.2
-	github.com/xmidt-org/wrp-go/v3 v3.5.2
+	github.com/xmidt-org/wrp-go/v3 v3.6.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.54.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0
 	go.uber.org/fx v1.23.0
@@ -62,7 +62,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.3 // indirect
+	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.59.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
