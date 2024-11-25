@@ -10,7 +10,7 @@ require (
 	github.com/spf13/cast v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/xmidt-org/ancla v0.3.12
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
