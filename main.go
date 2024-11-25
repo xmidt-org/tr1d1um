@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/anclafx"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
@@ -191,7 +191,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		touchstone.Provide(),
 		touchhttp.Provide(),
-		ancla.ProvideMetrics(),
+		anclafx.Provide(),
 		arrangepprof.HTTP{
 			RouterName: "server_pprof",
 		}.Provide(),
