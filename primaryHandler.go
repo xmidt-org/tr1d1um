@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/chrysom"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
@@ -54,7 +55,7 @@ type provideWebhookHandlersIn struct {
 	WebhookConfig      ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
-	Measures           *ancla.Measures
+	Measures           *chrysom.Measures
 	Tracing            candlelight.Tracing
 	Tf                 *touchstone.Factory
 }
