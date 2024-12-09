@@ -202,11 +202,9 @@ webhook:
   # (Optional). Defaults to 'simple'.
   JWTParserType: "raw"
   BasicClientConfig:
-    # listen is the subsection that configures the listening feature of the argus client
+    # pullInterval provides how often the current webhooks list gets refreshed.
     # (Optional)
-    listen:
-      # pullInterval provides how often the current webhooks list gets refreshed.
-      pullInterval: 5s
+    pullInterval: 5s
 
     # bucket is the partition name where webhooks will be stored.
     bucket: "webhooks"
@@ -218,7 +216,7 @@ webhook:
     auth:
       # basic configures basic authentication for argus.
       # Must be of form: 'Basic xyz=='
-      basic: "Basic dXNlcjpwYXNz"
+      # basic: "Basic dXNlcjpwYXNz"
   #
   #    # jwt configures jwt style authentication for argus.
   #    JWT:
