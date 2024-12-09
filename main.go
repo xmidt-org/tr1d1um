@@ -49,6 +49,7 @@ const (
 	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
+	anclaClientConfigKey              = "webhook.BasicClientConfig"
 	tracingConfigKey                  = "tracing"
 )
 
@@ -182,6 +183,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		os.Exit(0)
 	}
 
+	l = l.With(zap.Time("ts", time.Now().UTC()), zap.Any("caller", zap.WithCaller(true)))
 	app := fx.New(
 		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(l),
@@ -207,7 +209,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 				Target: configureArgusClientTimeout,
 			},
 			loadTracing,
-			newHTTPClient,
+			provideAnclaHTTPClient,
 		),
 		provideAuthChain("authx.inbound"),
 		provideServers(),
