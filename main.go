@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/anclafx"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
@@ -49,6 +49,7 @@ const (
 	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
+	anclaClientConfigKey              = "webhook.BasicClientConfig"
 	tracingConfigKey                  = "tracing"
 )
 
@@ -182,6 +183,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		os.Exit(0)
 	}
 
+	l = l.With(zap.Time("ts", time.Now().UTC()), zap.Any("caller", zap.WithCaller(true)))
 	app := fx.New(
 		arrange.LoggerFunc(l.Sugar().Infof),
 		fx.Supply(l),
@@ -191,7 +193,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		touchstone.Provide(),
 		touchhttp.Provide(),
-		ancla.ProvideMetrics(),
+		anclafx.Provide(),
 		arrangepprof.HTTP{
 			RouterName: "server_pprof",
 		}.Provide(),
@@ -207,7 +209,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 				Target: configureArgusClientTimeout,
 			},
 			loadTracing,
-			newHTTPClient,
+			provideAnclaHTTPClient,
 		),
 		provideAuthChain("authx.inbound"),
 		provideServers(),
