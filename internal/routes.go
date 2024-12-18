@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package tr1d1um
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -26,8 +26,8 @@ import (
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
-	"github.com/xmidt-org/tr1d1um/stat"
-	"github.com/xmidt-org/tr1d1um/translation"
+	"github.com/xmidt-org/tr1d1um/internal/stat"
+	"github.com/xmidt-org/tr1d1um/internal/translation"
 	webhook "github.com/xmidt-org/webhook-schema"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
@@ -115,7 +115,7 @@ type metricsRoutesIn struct {
 	Handler touchhttp.Handler
 }
 
-func provideServers() fx.Option {
+func ProvideServers() fx.Option {
 	return fx.Options(
 		arrange.ProvideKey(reqMaxRetriesKey, 0),
 		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
@@ -315,7 +315,7 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
 
-			requestPayload, err := ioutil.ReadAll(r.Body)
+			requestPayload, err := io.ReadAll(r.Body)
 			if err != nil {
 				v2ErrEncode(w, logger, err, 0)
 				return
@@ -366,7 +366,7 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 			if err != nil {
 				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
 			}
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 			if v2Handler == nil {
 				v2Handler = next

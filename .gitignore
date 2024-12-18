@@ -60,7 +60,7 @@ _testmain.go
 *.prof
 cpuprofile
 
-tr1d1um
+./tr1d1um
 .ignore
 .vscode
 .yaml

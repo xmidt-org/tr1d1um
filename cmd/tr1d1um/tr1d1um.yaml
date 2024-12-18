@@ -91,7 +91,6 @@ logging:
   # OutputPaths is a list of URLs or file paths to write logging output to.
   outputPaths:
     - stdout
-    # - /var/log/tr1d1um/tr1d1um.log
 
   # Level is the minimum enabled logging level. Note that this is a dynamic
   # level, so calling Config.Level.SetLevel will atomically change the log
@@ -102,7 +101,6 @@ logging:
   # zapcore.EncoderConfig for details.
   errorOutputPaths:
     - stderr
-    - denopink-tr1d1um.log
 
   # EncoderConfig sets options for the chosen encoder. See
   # zapcore.EncoderConfig for details.

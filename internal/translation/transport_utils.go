@@ -12,7 +12,7 @@ import (
 	"net/http"
 
 	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 	"go.uber.org/zap"
 
 	kithttp "github.com/go-kit/kit/transport/http"

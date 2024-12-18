@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/stretchr/testify/assert"
-	transaction "github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
