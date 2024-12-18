@@ -17,6 +17,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	tr1d1um "github.com/xmidt-org/tr1d1um/internal"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -25,32 +26,8 @@ import (
 	"github.com/xmidt-org/candlelight"
 )
 
-// convenient global values
 const (
-	DefaultKeyID       = "current"
-	apiVersion         = "v3"
-	prevAPIVersion     = "v2"
-	applicationName    = "tr1d1um"
-	apiBase            = "api/" + apiVersion
-	prevAPIBase        = "api/" + prevAPIVersion
-	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
-)
-
-const (
-	translationServicesKey            = "supportedServices"
-	targetURLKey                      = "targetURL"
-	netDialerTimeoutKey               = "netDialerTimeout"
-	clientTimeoutKey                  = "clientTimeout"
-	reqTimeoutKey                     = "respWaitTimeout"
-	reqRetryIntervalKey               = "requestRetryInterval"
-	reqMaxRetriesKey                  = "requestMaxRetries"
-	wrpSourceKey                      = "WRPSource"
-	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
-	authAcquirerKey                   = "authAcquirer"
-	webhookConfigKey                  = "webhook"
-	anclaClientConfigKey              = "webhook.BasicClientConfig"
-	tracingConfigKey                  = "tracing"
+	tracingConfigKey = "tracing"
 )
 
 var (
@@ -60,26 +37,14 @@ var (
 	Commit  string
 )
 
-var defaults = map[string]interface{}{
-	translationServicesKey: []string{}, // no services allowed by the default
-	targetURLKey:           "localhost:6000",
-	netDialerTimeoutKey:    "5s",
-	clientTimeoutKey:       "50s",
-	reqTimeoutKey:          "40s",
-	reqRetryIntervalKey:    "2s",
-	reqMaxRetriesKey:       2,
-	wrpSourceKey:           "dns:localhost",
-	hooksSchemeKey:         "https",
-}
-
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
-	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
+	XmidtClientTimeout tr1d1um.HttpClientTimeout `name:"xmidtClientTimeout"`
 }
 
 type ArgusClientTimeoutConfigIn struct {
 	fx.In
-	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
+	ArgusClientTimeout tr1d1um.HttpClientTimeout `name:"argusClientTimeout"`
 }
 
 type TracingConfigIn struct {
@@ -95,11 +60,11 @@ type ConstOut struct {
 
 func consts() ConstOut {
 	return ConstOut{
-		DefaultKeyID: DefaultKeyID,
+		DefaultKeyID: tr1d1um.DefaultKeyID,
 	}
 }
 
-func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
+func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) tr1d1um.HttpClientTimeout {
 	xct := in.XmidtClientTimeout
 
 	if xct.ClientTimeout == 0 {
@@ -114,7 +79,7 @@ func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeou
 	return xct
 }
 
-func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
+func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) tr1d1um.HttpClientTimeout {
 	act := in.ArgusClientTimeout
 
 	if act.ClientTimeout == 0 {
@@ -128,7 +93,7 @@ func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeou
 
 func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
 	traceConfig := in.TracingConfig
-	traceConfig.ApplicationName = applicationName
+	traceConfig.ApplicationName = tr1d1um.ApplicationName
 	tracing, err := candlelight.New(traceConfig)
 	if err != nil {
 		return candlelight.Tracing{}, err
@@ -150,7 +115,7 @@ func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
 }
 
 func printVersionInfo(writer io.Writer) {
-	fmt.Fprintf(writer, "%s:\n", applicationName)
+	fmt.Fprintf(writer, "%s:\n", tr1d1um.ApplicationName)
 	fmt.Fprintf(writer, "  version: \t%s\n", Version)
 	fmt.Fprintf(writer, "  go version: \t%s\n", runtime.Version())
 	fmt.Fprintf(writer, "  built time: \t%s\n", Date)
@@ -169,8 +134,8 @@ func exitIfError(logger *zap.Logger, err error) {
 }
 
 //nolint:funlen
-func tr1d1um(arguments []string) (exitCode int) {
-	v, l, f, err := setup(arguments)
+func Tr1d1um(arguments []string) (exitCode int) {
+	v, l, f, err := tr1d1um.Setup(arguments)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -189,8 +154,8 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fx.Supply(l),
 		fx.Supply(v),
 		arrange.ForViper(v),
-		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		arrange.ProvideKey("xmidtClientTimeout", tr1d1um.HttpClientTimeout{}),
+		arrange.ProvideKey("argusClientTimeout", tr1d1um.HttpClientTimeout{}),
 		touchstone.Provide(),
 		touchhttp.Provide(),
 		anclafx.Provide(),
@@ -209,11 +174,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 				Target: configureArgusClientTimeout,
 			},
 			loadTracing,
-			provideAnclaHTTPClient,
+			tr1d1um.ProvideAnclaHTTPClient,
 		),
-		provideAuthChain("authx.inbound"),
-		provideServers(),
-		provideHandlers(),
+		tr1d1um.ProvideAuthChain("authx.inbound"),
+		tr1d1um.ProvideServers(),
+		tr1d1um.ProvideHandlers(),
 	)
 
 	switch err := app.Err(); {
@@ -230,5 +195,5 @@ func tr1d1um(arguments []string) (exitCode int) {
 }
 
 func main() {
-	os.Exit(tr1d1um(os.Args))
+	os.Exit(Tr1d1um(os.Args))
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package tr1d1um
 
 import (
 	"errors"
@@ -18,9 +18,9 @@ import (
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
-	"github.com/xmidt-org/tr1d1um/stat"
-	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/tr1d1um/translation"
+	"github.com/xmidt-org/tr1d1um/internal/stat"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/translation"
 	webhook "github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -28,8 +28,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// httpClientTimeout contains timeouts for an HTTP client and its requests.
-type httpClientTimeout struct {
+// HttpClientTimeout contains timeouts for an HTTP client and its requests.
+type HttpClientTimeout struct {
 	// ClientTimeout is HTTP Client Timeout.
 	ClientTimeout time.Duration
 
@@ -60,7 +60,7 @@ type provideWebhookHandlersIn struct {
 type provideAnclaHTTPClientIn struct {
 	fx.In
 
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
+	ArgusClientTimeout HttpClientTimeout `name:"argus_client_timeout"`
 	Tracing            candlelight.Tracing
 }
 
@@ -74,7 +74,7 @@ type provideWebhookHandlersOut struct {
 type ServiceOptionsIn struct {
 	fx.In
 	Logger               *zap.Logger
-	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
+	XmidtClientTimeout   HttpClientTimeout `name:"xmidt_client_timeout"`
 	RequestMaxRetries    int               `name:"requestMaxRetries"`
 	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
 	TargetURL            string            `name:"targetURL"`
@@ -88,11 +88,11 @@ type ServiceOptionsOut struct {
 	TranslationServiceOptions *translation.ServiceOptions
 }
 
-func provideAnclaHTTPClient(in provideAnclaHTTPClientIn) chrysom.HTTPClient {
+func ProvideAnclaHTTPClient(in provideAnclaHTTPClientIn) chrysom.HTTPClient {
 	return newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 }
 
-func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *http.Client {
+func newHTTPClient(timeouts HttpClientTimeout, tracing candlelight.Tracing) *http.Client {
 	var transport http.RoundTripper = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: timeouts.NetDialerTimeout,
@@ -162,7 +162,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	return
 }
 
-func provideHandlers() fx.Option {
+func ProvideHandlers() fx.Option {
 	return fx.Options(
 		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 		fx.Provide(

@@ -6,7 +6,7 @@ package translation
 import (
 	"errors"
 
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 )
 
 // Error values definitions for the translation service

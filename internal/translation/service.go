@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/xmidt-org/bascule/acquire"
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 
 	"github.com/xmidt-org/wrp-go/v3"
 )

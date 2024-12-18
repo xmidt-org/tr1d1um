@@ -10,7 +10,7 @@ import (
 
 	"github.com/xmidt-org/bascule/acquire"
 
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 )
 
 // Service defines the behavior of the device statistics Tr1d1um Service.

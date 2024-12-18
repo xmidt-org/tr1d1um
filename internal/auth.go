@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package tr1d1um
 
 import (
 	"errors"
@@ -31,7 +31,7 @@ type JWTValidator struct {
 	Leeway bascule.Leeway
 }
 
-func provideAuthChain(configKey string) fx.Option {
+func ProvideAuthChain(configKey string) fx.Option {
 	return fx.Options(
 		basculehttp.ProvideMetrics(),
 		basculechecks.ProvideMetrics(),

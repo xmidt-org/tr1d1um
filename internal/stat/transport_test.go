@@ -13,7 +13,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
 
 	"github.com/gorilla/mux"

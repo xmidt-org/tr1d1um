@@ -23,7 +23,7 @@ import (
 	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/tr1d1um/transaction"
+	"github.com/xmidt-org/tr1d1um/internal/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 )
