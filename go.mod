@@ -14,13 +14,13 @@ require (
 	github.com/xmidt-org/ancla v0.3.12
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
-	github.com/xmidt-org/candlelight v0.1.22
+	github.com/xmidt-org/candlelight v0.1.23
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/httpaux v0.4.0
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.7
 	github.com/xmidt-org/webpa-common/v2 v2.4.4
-	github.com/xmidt-org/wrp-go/v3 v3.6.0
+	github.com/xmidt-org/wrp-go/v3 v3.7.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.54.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0
 	go.uber.org/fx v1.23.0
