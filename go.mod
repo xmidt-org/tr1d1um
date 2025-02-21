@@ -8,19 +8,19 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/justinas/alice v1.2.0
 	github.com/spf13/cast v1.7.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/xmidt-org/ancla v0.3.12
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
-	github.com/xmidt-org/candlelight v0.1.22
+	github.com/xmidt-org/candlelight v0.1.23
 	github.com/xmidt-org/clortho v0.0.4
 	github.com/xmidt-org/httpaux v0.4.0
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.7
-	github.com/xmidt-org/webpa-common/v2 v2.4.4
-	github.com/xmidt-org/wrp-go/v3 v3.6.0
+	github.com/xmidt-org/webpa-common/v2 v2.5.0
+	github.com/xmidt-org/wrp-go/v3 v3.7.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.54.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0
 	go.uber.org/fx v1.23.0
