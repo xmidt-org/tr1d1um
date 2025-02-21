@@ -2,15 +2,17 @@
 ## SPDX-License-Identifier: Apache-2.0
 FROM docker.io/library/golang:1.19-alpine as builder
 
+ARG ARCH
+
 WORKDIR /src
 
-RUN apk add --no-cache --no-progress \
+RUN apk update && apk add --no-cache --no-progress \
     ca-certificates \
     curl
 
 # Download spruce here to eliminate the need for curl in the final image
 RUN mkdir -p /go/bin && \
-    curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-amd64 && \
+    curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-${ARCH}; \
     chmod +x /go/bin/spruce
 
 COPY . .
