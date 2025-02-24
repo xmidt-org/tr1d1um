@@ -1,6 +1,6 @@
 ## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 ## SPDX-License-Identifier: Apache-2.0
-FROM --platform=$TARGETPLATFORM docker.io/library/golang:1.19-alpine as builder
+FROM --platform=linux/$ARCH docker.io/library/golang:1.19-alpine as builder
 
 ARG ARCH
 
@@ -21,7 +21,7 @@ COPY . .
 # Build the final image.
 ##########################
 
-FROM --platform=$TARGETPLATFORM alpine:latest
+FROM --platform=linux/$ARCH alpine:latest
 
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
