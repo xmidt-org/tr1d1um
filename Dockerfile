@@ -1,8 +1,8 @@
 ## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 ## SPDX-License-Identifier: Apache-2.0
-FROM --platform=linux/$ARCH docker.io/library/golang:1.19-alpine as builder
-
 ARG ARCH
+
+FROM --platform=linux/$ARCH docker.io/library/golang:1.19-alpine as builder
 
 WORKDIR /src
 
