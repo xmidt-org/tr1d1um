@@ -24,7 +24,7 @@ jobs:
     with:
       license-skip:          true
       release-type:          program
-      release-docker:        true
+      release-docker:        false
       release-docker-latest: true
       release-docker-major:  true
       release-docker-minor:  true
