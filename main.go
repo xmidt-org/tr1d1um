@@ -191,6 +191,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
 		touchstone.Provide(),
 		touchhttp.Provide(),
+		provideMetrics(),
 		ancla.ProvideMetrics(),
 		arrangepprof.HTTP{
 			RouterName: "server_pprof",

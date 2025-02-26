@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"time"
 
+	gokitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
@@ -67,13 +69,15 @@ type provideWebhookHandlersOut struct {
 
 type ServiceOptionsIn struct {
 	fx.In
-	Logger               *zap.Logger
-	XmidtClientTimeout   httpClientTimeout `name:"xmidt_client_timeout"`
-	RequestMaxRetries    int               `name:"requestMaxRetries"`
-	RequestRetryInterval time.Duration     `name:"requestRetryInterval"`
-	TargetURL            string            `name:"targetURL"`
-	WRPSource            string            `name:"WRPSource"`
-	Tracing              candlelight.Tracing
+	Logger                *zap.Logger
+	XmidtClientTimeout    httpClientTimeout      `name:"xmidt_client_timeout"`
+	RequestMaxRetries     int                    `name:"requestMaxRetries"`
+	RequestRetryInterval  time.Duration          `name:"requestRetryInterval"`
+	TargetURL             string                 `name:"targetURL"`
+	WRPSource             string                 `name:"WRPSource"`
+	ServiceConfigsRetries *prometheus.CounterVec `name:"service_configs_retries"`
+
+	Tracing candlelight.Tracing
 }
 
 type ServiceOptionsOut struct {
@@ -203,8 +207,12 @@ func provideHandlers() fx.Option {
 	)
 }
 
-func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
+func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
+	var errs error
+
 	xmidtHTTPClient := newHTTPClient(in.XmidtClientTimeout, in.Tracing)
+	stat_retries_counter, err := in.ServiceConfigsRetries.CurryWith(prometheus.Labels{apiLabel: stat_api})
+	errs = errors.Join(errs, err)
 	// Stat Service configs
 	statOptions := &stat.ServiceOptions{
 		HTTPTransactor: transaction.New(
@@ -214,6 +222,7 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 						Logger:   in.Logger,
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
+						Counter:  gokitprometheus.NewCounter(stat_retries_counter),
 					},
 					xmidtHTTPClient.Do),
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
@@ -221,6 +230,8 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.TargetURL),
 	}
 
+	device_retries_counter, err := in.ServiceConfigsRetries.CurryWith(prometheus.Labels{apiLabel: device_api})
+	errs = errors.Join(errs, err)
 	// WRP Service configs
 	translationOptions := &translation.ServiceOptions{
 		XmidtWrpURL: fmt.Sprintf("%s/device", in.TargetURL),
@@ -233,6 +244,7 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 						Logger:   in.Logger,
 						Retries:  in.RequestMaxRetries,
 						Interval: in.RequestRetryInterval,
+						Counter:  gokitprometheus.NewCounter(device_retries_counter),
 					},
 					xmidtHTTPClient.Do),
 			}),
@@ -241,5 +253,5 @@ func provideServiceOptions(in ServiceOptionsIn) ServiceOptionsOut {
 	return ServiceOptionsOut{
 		StatServiceOptions:        statOptions,
 		TranslationServiceOptions: translationOptions,
-	}
+	}, errs
 }
