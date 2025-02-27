@@ -1,6 +1,7 @@
 module github.com/xmidt-org/tr1d1um
 
 go 1.21
+toolchain go1.22.5
 
 require (
 	github.com/go-kit/kit v0.13.0
@@ -13,11 +14,11 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/xmidt-org/ancla v0.3.12
-	github.com/xmidt-org/arrange v0.4.0
+	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/bascule v0.11.6
 	github.com/xmidt-org/candlelight v0.1.23
 	github.com/xmidt-org/clortho v0.0.4
-	github.com/xmidt-org/httpaux v0.4.0
+	github.com/xmidt-org/httpaux v0.4.1
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/touchstone v0.1.7
 	github.com/xmidt-org/webpa-common/v2 v2.5.0
