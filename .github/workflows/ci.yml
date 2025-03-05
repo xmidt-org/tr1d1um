@@ -20,7 +20,7 @@ on:
 
 jobs:
   ci:
-    uses: xmidt-org/shared-go/.github/workflows/ci.yml@c05c6cf93422fc9ea8046bb39f7f428edf8ebabd # v4.7.6
+    uses: xmidt-org/shared-go/.github/workflows/ci.yml@796cdc42c6d8343c7bbc4b5de16387e9955a9b0d # v4.7.7
     with:
       license-skip:          true
       release-type:          program
