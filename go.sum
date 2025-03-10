@@ -1683,8 +1683,9 @@ github.com/xmidt-org/argus v0.10.18 h1:RtGqPTGkBrs2k+NpWJ671sfpXVIvsW1HW7NvYZPfH
 github.com/xmidt-org/argus v0.10.18/go.mod h1:s2sdHp5LkTPqplwSdf4+9C1eybWGDoLHkgUMMRbrXGQ=
 github.com/xmidt-org/arrange v0.1.9/go.mod h1:PRA8iEZ11L93NsEkDP56x1mZyfDcWxzDULgHj56TaEk=
 github.com/xmidt-org/arrange v0.3.0/go.mod h1:pCHeb93OFA0QnEJ//Mmly7QqUt7y/w3xllK0VQ3Bigo=
-github.com/xmidt-org/arrange v0.4.0 h1:DmJJTK58C44B4efyBV78SmMH0mn0G54n3caVn5BopUU=
 github.com/xmidt-org/arrange v0.4.0/go.mod h1:MA1eKUZYxaSMIKJL3D/iJEMQruiefmhq+s5E9J4UJv0=
+github.com/xmidt-org/arrange v0.5.1 h1:JHoU8C03ZQfZAG9Vpudj7RQj97pAHblwm6Co8mepU9A=
+github.com/xmidt-org/arrange v0.5.1/go.mod h1:zeJWY01z21ihPiAnGNF+bELbJANWwsahGE2bzGyyPIs=
 github.com/xmidt-org/bascule v0.8.0/go.mod h1:dPxlbNT3lCwYAtOq2zbzyzTEKgM+azLSbKKcVmgSHBY=
 github.com/xmidt-org/bascule v0.8.1/go.mod h1:dPxlbNT3lCwYAtOq2zbzyzTEKgM+azLSbKKcVmgSHBY=
 github.com/xmidt-org/bascule v0.9.0/go.mod h1:C64nSBtUTTK/f2/mCvvp/qJhav5raD0T+by68DCp/gU=
@@ -1706,8 +1707,9 @@ github.com/xmidt-org/clortho v0.0.4/go.mod h1:1YypMcDmHVrSqSzpMp4fvwloSKc5PQnHmo
 github.com/xmidt-org/httpaux v0.1.2/go.mod h1:qZnH2uObGPwHnOz8HcPNlbcd3gKEvdmxbIK3rgbQhto=
 github.com/xmidt-org/httpaux v0.2.1/go.mod h1:mviIlg5fHGb3lAv3l0sbiwVG/q9rqvXaudEYxVrzXdE=
 github.com/xmidt-org/httpaux v0.3.2/go.mod h1:qmlPisXf80FTi3y4gX43eYbCVruSQyvu+FPx1jzvQG8=
-github.com/xmidt-org/httpaux v0.4.0 h1:cAL/MzIBpSsv4xZZeq/Eu1J5M3vfNe49xr41mP3COKU=
 github.com/xmidt-org/httpaux v0.4.0/go.mod h1:UypqZwuZV1nn8D6+K1JDb+im9IZrLNg/2oO/Bgiybxc=
+github.com/xmidt-org/httpaux v0.4.1 h1:hvI4lZ7RacQRA/jMqUgwEQGcYm85125P4s7Y1imn6KY=
+github.com/xmidt-org/httpaux v0.4.1/go.mod h1:tZJ+SBoGNCxDOLopuSqrxaCkIVAQ+aPjNRf2XfMVwJA=
 github.com/xmidt-org/sallust v0.1.5/go.mod h1:azcKBypudADIeZ3Em8zGjVq3yQ7n4ueSvM/degHMIxo=
 github.com/xmidt-org/sallust v0.2.0/go.mod h1:HCQQn7po8czynjxtNVyZ5vzWuTqJyJwnPWkQoqBX67s=
 github.com/xmidt-org/sallust v0.2.1/go.mod h1:68C0DLwD5xlhRznXTWmfUhx0etyrFpSOzYGU7jzmpzs=
