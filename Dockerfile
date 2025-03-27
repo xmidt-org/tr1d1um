@@ -1,9 +1,11 @@
 ## SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 ## SPDX-License-Identifier: Apache-2.0
-ARG ARCH
-ARG PLATFORM
 
-FROM docker.io/library/golang:1.23.2-alpine as builder
+##########################
+# Build an image to download spruce and the ca-certificates.
+##########################
+
+FROM docker.io/library/golang:1.23.2-alpine AS builder
 WORKDIR /src
 
 RUN apk update && \
@@ -29,10 +31,10 @@ FROM alpine:latest
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
 COPY tr1d1um /
-COPY entrypoint.sh  /
+COPY .release/docker/entrypoint.sh  /
 
 # Copy over spruce and the spruce template file used to make the actual configuration file.
-COPY tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
+COPY .release/docker/tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
 COPY --from=builder /go/bin/spruce        /bin/
 
 # Include compliance details about the container and what it contains.
