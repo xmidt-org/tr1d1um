@@ -22,11 +22,10 @@ jobs:
   ci:
     uses: xmidt-org/shared-go/.github/workflows/ci.yml@128a29f4af3425bf20b67f36e2c754d4cf62e400 # v4.8.0
     with:
-      license-skip:          true
       release-type:          program
       release-docker:        true
       release-docker-latest: true
-      release-arch-arm64:    false
+      release-arch-arm64:    true
       release-docker-major:  true
       release-docker-minor:  true
       release-docker-extras: |
