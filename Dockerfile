@@ -24,7 +24,7 @@ COPY . .
 # Build the final image.
 ##########################
 
-FROM --platform=${PLATFORM} alpine:latest
+FROM alpine:latest
 
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
