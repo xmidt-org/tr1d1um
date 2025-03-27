@@ -28,10 +28,10 @@ FROM --platform=${PLATFORM} alpine:latest
 # Copy over the standard things you'd expect.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
 COPY tr1d1um /
-COPY .release/docker/entrypoint.sh  /
+COPY entrypoint.sh  /
 
 # Copy over spruce and the spruce template file used to make the actual configuration file.
-COPY .release/docker/tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
+COPY tr1d1um_spruce.yaml  /tmp/tr1d1um_spruce.yaml
 COPY --from=builder /go/bin/spruce        /bin/
 
 # Include compliance details about the container and what it contains.
