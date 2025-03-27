@@ -3,8 +3,7 @@
 ARG ARCH
 ARG PLATFORM
 
-FROM --platform=${PLATFORM} docker.io/library/golang:1.19-alpine AS builder
-
+FROM docker.io/library/golang:1.23.2-alpine as builder
 WORKDIR /src
 
 RUN apk update && \
@@ -13,9 +12,11 @@ RUN apk update && \
     curl
 
 # Download spruce here to eliminate the need for curl in the final image
-RUN mkdir -p /go/bin && \
-    curl -L -o /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.29.0/spruce-linux-${ARCH}; \
-    chmod +x /go/bin/spruce
+RUN mkdir -p /go/bin
+RUN curl -Lo /go/bin/spruce https://github.com/geofffranks/spruce/releases/download/v1.31.1/spruce-linux-$(go env GOARCH)
+RUN chmod +x /go/bin/spruce
+# Error out if spruce download fails by checking the version
+RUN /go/bin/spruce --version
 
 COPY . .
 
