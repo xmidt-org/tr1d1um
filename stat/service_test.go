@@ -56,7 +56,7 @@ func TestRequestStat(t *testing.T) {
 				a = new(mockAcquirer)
 				options.AuthAcquirer = a
 
-				var err error = testCase.AcquirerReturnError
+				err := testCase.AcquirerReturnError
 				a.On("Acquire").Return(testCase.AcquirerReturnString, err)
 			}
 
