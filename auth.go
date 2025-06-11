@@ -45,8 +45,8 @@ func provideAuthChain(configKey string) fx.Option {
 			},
 		),
 		basculehttp.ProvideBasicAuth(configKey),
-		basculehttp.ProvideBearerTokenFactory("jwtValidator", false),
-		basculechecks.ProvideRegexCapabilitiesValidator("capabilityCheck"),
+		basculehttp.ProvideBearerTokenFactory(false),
+		basculechecks.ProvideRegexCapabilitiesValidator(),
 		basculehttp.ProvideBearerValidator(),
 		basculehttp.ProvideServerChain(),
 	)

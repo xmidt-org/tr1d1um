@@ -61,10 +61,10 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(transaction.Welcome(WRPHandler)))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(transaction.Welcome(WRPHandler)))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
