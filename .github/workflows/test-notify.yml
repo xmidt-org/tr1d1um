@@ -26,6 +26,8 @@ jobs:
 
   Notify:
     needs: release
+    permissions:
+      actions: write
     if: needs.release.result == 'success'
     name: Release-notification-${{ matrix.platform_repo }}
     runs-on: [ubuntu-latest]
