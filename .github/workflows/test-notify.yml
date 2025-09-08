@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: 'test sending release event'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      project_name: ${{ steps.common-go-releaser.outputs.project_name }}
+    runs-on: [ ubuntu-latest ]
+    steps:
+      - name: Testing a intermediate release step
+        id: common-go-releaser
+        run: |
+          project_name=${{ inputs.release-project-name }}
+          if [[ $project_name == "" ]]; then
+            project_name=$(echo ${{ github.repository }} | sed 's:.*/::')
+          fi
+          echo "PROJECT_NAME=${project_name}" >> $GITHUB_ENV
+          echo "project_name=${project_name}" >> $GITHUB_OUTPUT
+          echo "DOne exporting"
+
+  Notify:
+    needs: release
+    permissions:
+      actions: write
+    if: needs.release.result == 'success'
+    name: Release-notification-${{ matrix.platform_repo }}
+    runs-on: [ubuntu-latest]
+    strategy:
+      matrix:
+        platform_repo: [xmidt,webpa,nion,anemoi]
+    env:
+      PROJECT_NAME: ${{ needs.release.outputs.project_name }}
+    steps:
+      - name: Notify Platform repo of new release
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPOSITORY_DISPATCH_TOKEN }}
+          repository: comcast-cl/${{ matrix.platform_repo }}
+          event-type: ${{ env.PROJECT_NAME }}-new-release
+          client-payload: '{"version": "${{ github.ref_name }}"}'
