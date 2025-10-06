@@ -12,7 +12,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	github.com/xmidt-org/ancla v0.3.12
+	github.com/xmidt-org/ancla v0.4.0
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
 	github.com/xmidt-org/candlelight v0.1.23
@@ -29,8 +29,6 @@ require (
 )
 
 require (
-	emperror.dev/emperror v0.33.0 // indirect
-	emperror.dev/errors v0.8.1 // indirect
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -74,8 +72,9 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/xmidt-org/argus v0.10.18 // indirect
 	github.com/xmidt-org/chronon v0.1.1 // indirect
+	github.com/xmidt-org/urlegit v0.1.28 // indirect
+	github.com/xmidt-org/webhook-schema v0.1.1-0.20250408163841-a0762984a7fb // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
