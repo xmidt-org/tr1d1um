@@ -20,12 +20,12 @@ on:
 
 jobs:
   ci:
-    uses: xmidt-org/shared-go/.github/workflows/ci.yml@1b45fc5c0721ffe083dc1d2c6fddc744c6bc0816 # v4.9.2
+    uses: xmidt-org/shared-go/.github/workflows/ci.yml@7c30bbc9c553a4282e562bc404640598a2a9714e # v4.9.3
     with:
       release-type:          program
+      release-arch-arm64:    true
       release-docker:        true
       release-docker-latest: true
-      release-arch-arm64:    true
       release-docker-major:  true
       release-docker-minor:  true
       release-docker-extras: |
