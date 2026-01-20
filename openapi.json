@@ -1,0 +1,1061 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"description": "WebPA provides a cloud API to interact with TR181 data on registered RDK devices.\n\n NA: https://api.webpa.comcast.net/api/v2/ \n\n EU: https://api.webpa-apac.comcast.net \n\n APAC: https://api.webpa-eu.comcast.net",
+		"version": "2.0.0",
+		"title": "WebPA"
+	},
+	"servers": [
+		{
+			"description": "NA",
+			"url": "https://api.webpa.comcast.net/api/v2"
+		},
+		{
+			"description": "EU",
+			"url": "https://api.webpa-eu.comcast.net/api/v2"
+		},
+		{
+			"description": "APAC",
+			"url": "https://api.webpa-apac.comcast.net/api/v2"
+		}
+	],
+	"paths": {
+		"/device/{device_id}/config": {
+			"get": {
+				"summary": "Get multiple parameter values or attributes",
+				"description": "This method is used to get parameter values and types by providing their names. If you provide attributes, you can get the value of the particular attribute. For example, if you want the 'notify' attribute of a particular parameter name, you can get it by providing attributes as 'notify'. You can get multiple parameter values by providing a comma-separated list of parameter names.",
+				"operationId": "getDeviceConfig",
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"description": "ID of the target device (e.g., 'mac:112233445566').",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "names",
+						"in": "query",
+						"description": "Comma-separated list of TR181 parameter names (e.g., 'Device.DeviceInfo.Manufacturer'). Find WiFi parameter index mappings [here](wifiIndex.html).",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "attributes",
+						"in": "query",
+						"description": "Parameter change notify attribute (e.g., 'notify').",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g., 'Bearer [JWT]')",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GetResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/httpStatusCode"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/httpStatusCode"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Device is not connected to WebPA",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/httpStatusCode"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/httpStatusCode"
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"summary": "Set multiple parameter values or attributes",
+				"description": "This method is used to set parameter values or attributes. To set values, you must provide the 'name', 'value' and 'dataType' fields for each parameter and a \"SET\" command will be sent to the device. To set attributes (\"SET_ATTRIBUTES\" command), the required fields are 'name' and 'attributes'. If you provide required fields to set both values and attributes, setting values will take precedence. Specifically, if you provide 'name', 'value', 'dataType' and 'attributes', webpa will send a \"SET\" and not a \"SET_ATTRIBUTES\" command to the device). \n\n You can set multiple values or attributes by providing an array of parameter change objects. Mixed requests are invalid. For example, if you request changing the value for one parameter and the attributes for another, webpa can't determine which command to send to the device. Additionally, a \"TEST_AND_SET\" command can be sent to the device by providing old_cid, new_cid and optional new_cmc header values along with parameter value change objects. \"TEST_AND_SET\" will perform a CID and CMC value check and if there's a match, the parameter value changes will be done. This value setting operation will trigger a notification if the change source is different.",
+				"operationId": "set",
+				"requestBody": [
+					"application/json"
+				],
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"required": true,
+						"description": "Device management MAC address prefixed with 'mac:', E.g. mac:112233445566",
+						"type": "string"
+					},
+					{
+						"name": "X-Webpa-Sync-Old-Cid",
+						"in": "header",
+						"required": false,
+						"description": "XPC Cid value before change to test",
+						"type": "string"
+					},
+					{
+						"name": "X-Webpa-Sync-New-Cid",
+						"in": "header",
+						"required": false,
+						"description": "XPC New Cid value after change",
+						"type": "string"
+					},
+					{
+						"name": "X-Webpa-Sync-Cmc",
+						"in": "header",
+						"description": "XPC Cmc value before change to test",
+						"required": false,
+						"type": "string"
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"in": "body",
+						"name": "SetRequest",
+						"description": "Parameter value or attributes to set. Find datatype mappings <a href=\"datatype.html\">here</a> and WiFi parameter index mappings <a href=\"wifiIndex.html\">here</a>.",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/SetRequest"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"schema": {
+							"$ref": "#/definitions/SetResponse"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"404": {
+						"description": "Device is not connected to webpa",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"520": {
+						"description": "Failure",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					},
+					"530": {
+						"description": "WiFi busy/Webpa not ready",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					},
+					"550": {
+						"description": "CID test failed",
+						"schema": {
+							"$ref": "#/definitions/TestAndSetError"
+						}
+					},
+					"551": {
+						"description": "CMC test failed",
+						"schema": {
+							"$ref": "#/definitions/TestAndSetError"
+						}
+					},
+					"552": {
+						"description": "Atomic GET/SET failed",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					}
+				}
+			}
+		},
+		"/device/{device_id}/config/{table}": {
+			"post": {
+				"summary": "Add entry to table",
+				"description": "This method is used to add new entry to dynamic table by providing table name and their parameter name and value pairs.",
+				"operationId": "addRow",
+				"requestBody": [
+					"application/json"
+				],
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"description": "ID of the target device (e.g. 'mac:112233445566').",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "table",
+						"in": "path",
+						"description": "TR181 Dynamic table object name. Find WiFi parameter index mappings <a href=\"wifiIndex.html\">here</a>.",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"in": "body",
+						"name": "Request",
+						"description": "Parameter name and value pairs",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/Request"
+						}
+					}
+				],
+				"responses": {
+					"201": {
+						"description": "Success",
+						"schema": {
+							"$ref": "#/definitions/PostResponse"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"404": {
+						"description": "Device is not connected to webpa",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"520": {
+						"description": "Failure",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					},
+					"530": {
+						"description": "WiFi busy/Webpa not ready",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					}
+				}
+			},
+			"put": {
+				"summary": "Replace table data",
+				"description": "This method is used to replace all entries in a dynamic table with new entries by providing table name and array of name and value pairs.",
+				"operationId": "replace",
+				"requestBody": [
+					"application/json"
+				],
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"description": "Device management MAC address prefixed with 'mac:', E.g. mac:112233445566",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "table",
+						"in": "path",
+						"description": "Dynamic table name, refer <a href=\"wifiIndex.html\">here</a> for WiFi parameter index mapping.",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"in": "body",
+						"name": "Request",
+						"description": "List of name and value pairs",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/Request"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"schema": {
+							"$ref": "#/definitions/Response"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"404": {
+						"description": "Device is not connected to webpa",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"520": {
+						"description": "Failure",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					},
+					"530": {
+						"description": "WiFi busy/Webpa not ready",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					}
+				}
+			}
+		},
+		"/device/{device_id}/config/{row}": {
+			"delete": {
+				"summary": "Delete entry from table",
+				"description": "This method is used to delete an entry from the dynamic table by providing entry (row) to be deleted.",
+				"operationId": "delete",
+				"requestBody": [
+					"application/json"
+				],
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"description": "Device management MAC address prefixed with 'mac:', E.g. mac:112233445566",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "row",
+						"in": "path",
+						"description": "Row name, row is a table name appending with row number and must end with a '.' (dot) after the row number. Refer <a href=\"wifiIndex.html\">here</a> for WiFi parameter index mapping. E.g. Device.Abc.1.",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"schema": {
+							"$ref": "#/definitions/Response"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"404": {
+						"description": "Device is not connected to webpa",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"520": {
+						"description": "Failure",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					},
+					"530": {
+						"description": "WiFi busy/Webpa not ready",
+						"schema": {
+							"$ref": "#/definitions/ClientError"
+						}
+					}
+				}
+			}
+		},
+		"/device/{device_id}/stat": {
+			"get": {
+				"summary": "Get device connection statistics",
+				"description": "This method is used to determine if device is online/offline. Also we can get online device user agent details and connection statistics like messages sent, messages received, start time and uptime.",
+				"operationId": "getStat",
+				"requestBody": [
+					"application/json"
+				],
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "device_id",
+						"in": "path",
+						"description": "Device management MAC address prefixed with 'mac:', E.g. mac:112233445566",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"schema": {
+							"$ref": "#/definitions/GetStatResponse"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"403": {
+						"description": "Forbidden: Invalid Authorization",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"404": {
+						"description": "Device is not connected to webpa",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"503": {
+						"description": "Error Timeout",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					}
+				}
+			}
+		},
+		"/hook": {
+			"post": {
+				"summary": "WebPA listener registation",
+				"description": "Register a Webpa listener",
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "body",
+						"in": "body",
+						"description": "WebPA listener registration",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/webhook"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Successfully registered listener",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					},
+					"400": {
+						"description": "Bad Request",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					}
+				}
+			}
+		},
+		"/hooks": {
+			"get": {
+				"summary": "Retrieve the registered WebPA listeners",
+				"description": "Returns the list of currently active WebPA listeners",
+				"content": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "Authorization",
+						"in": "header",
+						"description": "Authorization header (e.g. 'Bearer [JWT]')",
+						"required": true,
+						"type": "string"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Successfully produced a list of the current registered listeners",
+						"schema": {
+							"type": "array",
+							"items": {
+								"$ref": "#/definitions/webhook"
+							}
+						}
+					},
+					"500": {
+						"description": "Status Internal Server Error",
+						"schema": {
+							"$ref": "#/definitions/httpStatusCode"
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"GetResponse": {
+				"type": "object",
+				"description": "Get success response model",
+				"required": [
+					"parameters",
+					"statusCode"
+				],
+				"properties": {
+					"statusCode": {
+						"type": "integer",
+						"default": 200
+					},
+					"parameters": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/parametersResponse"
+						}
+					}
+				}
+			},
+			"httpStatusCode": {
+				"type": "object",
+				"properties": {
+					"message": {
+						"type": "string",
+						"description": "HTTP status code description"
+					}
+				}
+			},
+			"parametersResponse": {
+				"type": "object",
+				"required": [
+					"name"
+				],
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"value": {
+						"type": "string"
+					},
+					"dataType": {
+						"type": "integer"
+					},
+					"parameterCount": {
+						"type": "integer"
+					},
+					"attributes": {
+						"$ref": "#/components/schemas/notify"
+					},
+					"message": {
+						"type": "string"
+					}
+				}
+			},
+			"notify": {
+				"type": "object",
+				"properties": {
+					"notify": {
+						"type": "integer"
+					}
+				}
+			}
+		}
+	},
+	"definitions": {
+		"Response": {
+			"type": "object",
+			"required": [
+				"message",
+				"statusCode"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"default": 200
+				},
+				"message": {
+					"type": "string"
+				}
+			},
+			"title": "Response",
+			"description": "Success response model"
+		},
+		"SetResponse": {
+			"type": "object",
+			"required": [
+				"parameters",
+				"statusCode"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"default": 200
+				},
+				"parameters": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/SetResponseParametersItem"
+					}
+				}
+			},
+			"title": "SetResponse",
+			"description": "Success response model for SET"
+		},
+		"httpStatusCode": {
+			"type": "object",
+			"properties": {
+				"message": {
+					"type": "string",
+					"description": "http status code description"
+				}
+			}
+		},
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"value": {
+					"type": "string"
+				},
+				"attributes": {
+					"$ref": "#/definitions/notify"
+				},
+				"dataType": {
+					"type": "integer"
+				}
+			},
+			"required": [
+				"name"
+			]
+		},
+		"SetRequest": {
+			"type": "object",
+			"required": [
+				"parameters"
+			],
+			"properties": {
+				"parameters": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/parameters"
+					}
+				}
+			},
+			"title": "SetRequest",
+			"description": "Request model for SET"
+		},
+		"Request": {
+			"type": "object",
+			"description": "Request model"
+		},
+		"ClientError": {
+			"type": "object",
+			"required": [
+				"message",
+				"statusCode"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"enum": [
+						520,
+						530,
+						552
+					]
+				},
+				"message": {
+					"type": "string"
+				}
+			},
+			"title": "ClientError",
+			"description": "Response error model from client on device"
+		},
+		"syncParameters": {
+			"type": "object",
+			"required": [
+				"name",
+				"value"
+			],
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"value": {
+					"type": "string"
+				}
+			}
+		},
+		"TestAndSetError": {
+			"type": "object",
+			"required": [
+				"message",
+				"statusCode",
+				"parameters"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"enum": [
+						550,
+						551
+					]
+				},
+				"message": {
+					"type": "string"
+				},
+				"parameters": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/syncParameters"
+					}
+				}
+			},
+			"title": "TestAndSetError",
+			"description": "Response error model for XPC Test and Set Request"
+		},
+		"SetResponseParametersItem": {
+			"type": "object",
+			"required": [
+				"name",
+				"status"
+			],
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"status": {
+					"type": "string"
+				}
+			}
+		},
+		"notify": {
+			"type": "object",
+			"properties": {
+				"notify": {
+					"type": "integer"
+				}
+			}
+		},
+		"parametersResponse": {
+			"type": "object",
+			"required": [
+				"name"
+			],
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"value": {
+					"type": "string"
+				},
+				"dataType": {
+					"type": "integer"
+				},
+				"parameterCount": {
+					"type": "integer"
+				},
+				"attributes": {
+					"$ref": "#/definitions/notify"
+				},
+				"message": {
+					"type": "string"
+				}
+			}
+		},
+		"GetResponse": {
+			"type": "object",
+			"description": "Get success response model",
+			"required": [
+				"parameters",
+				"statusCode"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"default": 200
+				},
+				"parameters": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/parametersResponse"
+					}
+				}
+			}
+		},
+		"GetStatResponse": {
+			"type": "object",
+			"description": "Get Stat success response model",
+			"required": [
+				"device_id",
+				"user-agent",
+				"connection"
+			],
+			"properties": {
+				"device_id": {
+					"type": "string"
+				},
+				"user-agent": {
+					"type": "string"
+				},
+				"connection": {
+					"type": "object",
+					"required": [
+						"bytes-received",
+						"bytes-sent",
+						"messages-received",
+						"messages-sent",
+						"start-time",
+						"up-time"
+					],
+					"properties": {
+						"bytes-received": {
+							"type": "integer"
+						},
+						"bytes-sent": {
+							"type": "integer"
+						},
+						"messages-received": {
+							"type": "integer"
+						},
+						"messages-sent": {
+							"type": "integer"
+						},
+						"start-time": {
+							"type": "string"
+						},
+						"up-time": {
+							"type": "string"
+						}
+					}
+				}
+			}
+		},
+		"PostResponse": {
+			"type": "object",
+			"required": [
+				"row",
+				"statusCode"
+			],
+			"properties": {
+				"statusCode": {
+					"type": "integer",
+					"default": 201
+				},
+				"row": {
+					"type": "string"
+				},
+				"message": {
+					"type": "string"
+				}
+			},
+			"title": "PostResponse",
+			"description": "Success response model for POST"
+		},
+		"webhook": {
+			"type": "object",
+			"required": [
+				"config",
+				"events"
+			],
+			"properties": {
+				"config": {
+					"type": "object",
+					"properties": {
+						"url": {
+							"type": "string",
+							"description": "Full url path where events will be sent"
+						},
+						"content_type": {
+							"type": "string",
+							"description": "Content type"
+						},
+						"secret": {
+							"type": "string",
+							"description": "Optional string that is passed back as an X-WebPA-Signature.  The value of this header is the HMAC hex digest of the body using the secret as the key."
+						}
+					},
+					"description": "Listener configuration",
+					"required": [
+						"url",
+						"content_type"
+					]
+				},
+				"matcher": {
+					"type": "object",
+					"properties": {
+						"device_id": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"description": "Regular expression to filter in events from a device.  If not defined, automatically set to filter in all."
+							},
+							"description": "Array of devices"
+						}
+					},
+					"description": "MAC filtering"
+				},
+				"events": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"type": "string",
+						"minLength": 1
+					},
+					"description": "Type of event(s) to receive.  A listener and register for multiple events.  Regular expressions may be used to describe desired event types."
+				},
+				"duration": {
+					"type": "integer",
+					"format": "int64",
+					"description": "Number of seconds the registration event is valid for. Set automatically to 300 (5 mins)."
+				},
+				"until": {
+					"type": "integer",
+					"format": "int64",
+					"description": "Listener expiration.  Set automatically during registration."
+				},
+				"address": {
+					"type": "string",
+					"description": "Remote address of the registered request.  Set automatically during registration."
+				}
+			}
+		}
+	}
+}
