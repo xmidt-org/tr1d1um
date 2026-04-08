@@ -16,7 +16,7 @@ require (
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v0.11.6
 	github.com/xmidt-org/candlelight v0.1.23
-	github.com/xmidt-org/clortho v0.1.0
+	github.com/xmidt-org/clortho v0.1.2
 	github.com/xmidt-org/httpaux v0.4.2
 	github.com/xmidt-org/sallust v0.2.4
 	github.com/xmidt-org/touchstone v0.1.7
@@ -76,7 +76,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xmidt-org/argus v0.10.18 // indirect
-	github.com/xmidt-org/chronon v0.1.4 // indirect
+	github.com/xmidt-org/chronon v0.1.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
