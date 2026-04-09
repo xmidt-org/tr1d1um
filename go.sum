@@ -1687,8 +1687,9 @@ github.com/xmidt-org/argus v0.10.18 h1:RtGqPTGkBrs2k+NpWJ671sfpXVIvsW1HW7NvYZPfH
 github.com/xmidt-org/argus v0.10.18/go.mod h1:s2sdHp5LkTPqplwSdf4+9C1eybWGDoLHkgUMMRbrXGQ=
 github.com/xmidt-org/arrange v0.1.9/go.mod h1:PRA8iEZ11L93NsEkDP56x1mZyfDcWxzDULgHj56TaEk=
 github.com/xmidt-org/arrange v0.3.0/go.mod h1:pCHeb93OFA0QnEJ//Mmly7QqUt7y/w3xllK0VQ3Bigo=
-github.com/xmidt-org/arrange v0.4.0 h1:DmJJTK58C44B4efyBV78SmMH0mn0G54n3caVn5BopUU=
 github.com/xmidt-org/arrange v0.4.0/go.mod h1:MA1eKUZYxaSMIKJL3D/iJEMQruiefmhq+s5E9J4UJv0=
+github.com/xmidt-org/arrange v0.5.2 h1:VFt5sSUbz0ytS8UuPhtGPvbFImV9tuOv0Yenj+mloIQ=
+github.com/xmidt-org/arrange v0.5.2/go.mod h1:3LXJc3KgF7L1KidPc5UrN/pbZLJVvzxocJG0GyfaceM=
 github.com/xmidt-org/bascule v0.8.0/go.mod h1:dPxlbNT3lCwYAtOq2zbzyzTEKgM+azLSbKKcVmgSHBY=
 github.com/xmidt-org/bascule v0.8.1/go.mod h1:dPxlbNT3lCwYAtOq2zbzyzTEKgM+azLSbKKcVmgSHBY=
 github.com/xmidt-org/bascule v0.9.0/go.mod h1:C64nSBtUTTK/f2/mCvvp/qJhav5raD0T+by68DCp/gU=
