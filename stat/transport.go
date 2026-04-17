@@ -38,7 +38,7 @@ type Options struct {
 	Authenticate                *alice.Chain
 	Log                         *zap.Logger
 	ReducedLoggingResponseCodes []int
-	BearerFingerprint             transaction.FingerprintConfig
+	BearerFingerprint           transaction.FingerprintConfig
 }
 
 // ConfigHandler sets up the server that powers the stat service

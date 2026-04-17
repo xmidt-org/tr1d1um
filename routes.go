@@ -53,7 +53,7 @@ type primaryEndpointIn struct {
 	AuthAcquirer                authAcquirerConfig            `name:"authAcquirer"`
 	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string                      `name:"supportedServices"`
-	BearerFingerprint             transaction.FingerprintConfig `name:"bearerFingerprint"`
+	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -218,7 +218,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-		BearerFingerprint:             in.BearerFingerprint,
+		BearerFingerprint:           in.BearerFingerprint,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
@@ -227,7 +227,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
-		BearerFingerprint:             in.BearerFingerprint,
+		BearerFingerprint:           in.BearerFingerprint,
 	})
 }
 

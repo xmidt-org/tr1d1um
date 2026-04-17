@@ -44,7 +44,7 @@ type Options struct {
 	Log                         *zap.Logger
 	ValidServices               []string
 	ReducedLoggingResponseCodes []int
-	BearerFingerprint             transaction.FingerprintConfig
+	BearerFingerprint           transaction.FingerprintConfig
 }
 
 // ConfigHandler sets up the server that powers the translation service
