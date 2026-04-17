@@ -6,6 +6,8 @@ package transaction
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -158,7 +160,7 @@ func TestWelcome(t *testing.T) {
 						assert.Equal(tc.expectedTID, tid)
 					}
 				})
-			decorated := Welcome(handler)
+			decorated := Welcome(FingerprintConfig{})(handler)
 			decorated.ServeHTTP(nil, tc.genReq())
 
 		})
@@ -260,6 +262,110 @@ func TestAddDeviceIdToLog(t *testing.T) {
 			assert.Equal("deviceid", gotLog[0].Key)
 			assert.Equal(tc.deviceid, gotLog[0].String)
 
+		})
+	}
+}
+
+func TestBearerToken(t *testing.T) {
+	tests := []struct {
+		desc     string
+		header   string
+		expected string
+	}{
+		{desc: "no header", header: "", expected: ""},
+		{desc: "basic auth ignored", header: "Basic dXNlcjpwYXNz", expected: ""},
+		{desc: "bearer missing token", header: "Bearer", expected: ""},
+		{desc: "happy path", header: "Bearer abc.def.ghi", expected: "abc.def.ghi"},
+		{desc: "case-insensitive scheme", header: "bearer abc.def.ghi", expected: "abc.def.ghi"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+			if tc.header != "" {
+				r.Header.Set("Authorization", tc.header)
+			}
+			assert.Equal(tc.expected, bearerToken(r))
+		})
+	}
+}
+
+func TestAddBearerFingerprintToLog(t *testing.T) {
+	const token = "header.payload.abcdefghij1234567890"
+	sum := sha256.Sum256([]byte(token))
+	sha := hex.EncodeToString(sum[:])
+	shortSum := sha256.Sum256([]byte("short"))
+	shortSHA := hex.EncodeToString(shortSum[:])
+
+	tests := []struct {
+		desc     string
+		cfg      FingerprintConfig
+		header   string
+		expected map[string]any // contents of the bearerFingerprint object; nil means no field at all
+	}{
+		{
+			desc:     "default cfg logs nothing even with bearer token",
+			cfg:      FingerprintConfig{},
+			header:   "Bearer " + token,
+			expected: nil,
+		},
+		{
+			desc:     "no bearer header logs nothing",
+			cfg:      FingerprintConfig{SHA256: true, LastNDigits: 10},
+			header:   "",
+			expected: nil,
+		},
+		{
+			desc:     "suffix only",
+			cfg:      FingerprintConfig{LastNDigits: 10},
+			header:   "Bearer " + token,
+			expected: map[string]any{"suffix": "1234567890"},
+		},
+		{
+			desc:     "sha only",
+			cfg:      FingerprintConfig{SHA256: true},
+			header:   "Bearer " + token,
+			expected: map[string]any{"sha": sha},
+		},
+		{
+			desc:     "both",
+			cfg:      FingerprintConfig{SHA256: true, LastNDigits: 10},
+			header:   "Bearer " + token,
+			expected: map[string]any{"suffix": "1234567890", "sha": sha},
+		},
+		{
+			desc:     "suffix requested but token too short is skipped",
+			cfg:      FingerprintConfig{LastNDigits: 10},
+			header:   "Bearer short",
+			expected: nil,
+		},
+		{
+			desc:     "sha still logged when token is shorter than requested suffix",
+			cfg:      FingerprintConfig{SHA256: true, LastNDigits: 10},
+			header:   "Bearer short",
+			expected: map[string]any{"sha": shortSHA},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert := assert.New(t)
+			core, observed := observer.New(zap.DebugLevel)
+			ctx := sallust.With(context.Background(), zap.New(core))
+
+			r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+			if tc.header != "" {
+				r.Header.Set("Authorization", tc.header)
+			}
+			ctx = addBearerFingerprintToLog(ctx, r, tc.cfg)
+			sallust.Get(ctx).Debug("test")
+
+			ctxMap := observed.All()[0].ContextMap()
+			if tc.expected == nil {
+				_, present := ctxMap["bearerFingerprint"]
+				assert.False(present, "bearerFingerprint should not be present")
+				return
+			}
+			assert.Equal(tc.expected, ctxMap["bearerFingerprint"])
 		})
 	}
 }

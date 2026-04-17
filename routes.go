@@ -27,6 +27,7 @@ import (
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/stat"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
@@ -49,9 +50,10 @@ type primaryEndpointIn struct {
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	AuthAcquirer                authAcquirerConfig `name:"authAcquirer"`
-	ReducedLoggingResponseCodes []int              `name:"reducedLoggingResponseCodes"`
-	TranslationServices         []string           `name:"supportedServices"`
+	AuthAcquirer                authAcquirerConfig            `name:"authAcquirer"`
+	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
+	TranslationServices         []string                      `name:"supportedServices"`
+	BearerFingerprint             transaction.FingerprintConfig `name:"bearerFingerprint"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -126,6 +128,10 @@ func provideServers() fx.Option {
 			fx.Annotated{
 				Name:   "reducedLoggingResponseCodes",
 				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
+			},
+			fx.Annotated{
+				Name:   "bearerFingerprint",
+				Target: arrange.UnmarshalKey(fingerprintCredsKey, transaction.FingerprintConfig{}),
 			},
 			fx.Annotated{
 				Name:   "api_router",
@@ -212,6 +218,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		Authenticate:                &in.AuthChain,
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+		BearerFingerprint:             in.BearerFingerprint,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
@@ -220,6 +227,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		Log:                         in.Logger,
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
+		BearerFingerprint:             in.BearerFingerprint,
 	})
 }
 

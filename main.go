@@ -50,6 +50,7 @@ const (
 	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
+	fingerprintCredsKey               = "fingerprintCreds"
 )
 
 var (

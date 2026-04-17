@@ -121,6 +121,20 @@ logging:
   encoding: json
 
 ##############################################################################
+# Credential Fingerprinting
+##############################################################################
+# fingerprintCreds controls how inbound Bearer credentials are fingerprinted
+# into per-request log fields for tracing/correlation. Defaults are off; set
+# one or both sub-keys to emit the corresponding field on every request log.
+#   - lastNdigits: when > 0, log the last N characters of the token as
+#     "credSuffix". Tokens shorter than N are not logged.
+#   - sha256: when true, log the hex-encoded sha256 of the token as "credSHA".
+# (Optional)
+# fingerprintCreds:
+#   sha256: false
+#   lastNdigits: 0
+
+##############################################################################
 # Webhooks Related Configuration
 ##############################################################################
 # webhook provides configuration for storing and obtaining webhook

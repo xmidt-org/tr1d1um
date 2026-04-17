@@ -6,7 +6,9 @@ package transaction
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -19,7 +21,25 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+// bearerFingerprint is the nested log object emitted when credential
+// fingerprinting is enabled. Empty sub-fields are omitted.
+type bearerFingerprint struct {
+	Suffix string
+	SHA    string
+}
+
+func (c bearerFingerprint) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	if c.Suffix != "" {
+		enc.AddString("suffix", c.Suffix)
+	}
+	if c.SHA != "" {
+		enc.AddString("sha", c.SHA)
+	}
+	return nil
+}
 
 // XmidtResponse represents the data that a tr1d1um transactor keeps from an HTTP request to
 // the XMiDT API
@@ -160,23 +180,40 @@ func ForwardHeadersByPrefix(p string, from http.Header, to http.Header) {
 	}
 }
 
+// FingerprintConfig controls how incoming Bearer credentials are fingerprinted
+// into request-scoped log fields for tracing/correlation.
+//   - LastNDigits > 0 logs the last N characters of the token as "credSuffix".
+//   - SHA256 true logs the hex-encoded sha256 of the token as "credSHA".
+//
+// When both are set, both fields are logged. When neither is set (zero value),
+// no credential fingerprint is logged.
+type FingerprintConfig struct {
+	SHA256      bool
+	LastNDigits int
+}
+
 // Welcome is an Alice-style constructor that defines necessary request
 // context values assumed to exist by the delegate. These values should
-// be those expected to be used both in and outside the gokit server flow
-func Welcome(delegate http.Handler) http.Handler {
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			var tid string
+// be those expected to be used both in and outside the gokit server flow.
+// The returned constructor also enriches the request-scoped logger with
+// credential fingerprint fields per the provided FingerprintConfig.
+func Welcome(cfg FingerprintConfig) func(http.Handler) http.Handler {
+	return func(delegate http.Handler) http.Handler {
+		return http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				var tid string
 
-			if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
-				tid = genTID()
-			}
+				if tid = r.Header.Get(candlelight.HeaderWPATIDKeyName); tid == "" {
+					tid = genTID()
+				}
 
-			ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
-			ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
-			ctx = addDeviceIdToLog(ctx, r)
-			delegate.ServeHTTP(w, r.WithContext(ctx))
-		})
+				ctx := context.WithValue(r.Context(), ContextKeyRequestTID, tid)
+				ctx = context.WithValue(ctx, ContextKeyRequestArrivalTime, time.Now())
+				ctx = addDeviceIdToLog(ctx, r)
+				ctx = addBearerFingerprintToLog(ctx, r, cfg)
+				delegate.ServeHTTP(w, r.WithContext(ctx))
+			})
+	}
 }
 
 // genTID generates a 16-byte long string
@@ -200,6 +237,48 @@ func addDeviceIdToLog(ctx context.Context, r *http.Request) context.Context {
 	ctx = sallust.With(ctx, logger)
 
 	return ctx
+}
+
+// addBearerFingerprintToLog enriches the request-scoped logger with credential
+// fingerprint fields per cfg. Nothing is added when cfg is the zero value or
+// when no Bearer token is present.
+func addBearerFingerprintToLog(ctx context.Context, r *http.Request, cfg FingerprintConfig) context.Context {
+	if !cfg.SHA256 && cfg.LastNDigits <= 0 {
+		return ctx
+	}
+	token := bearerToken(r)
+	if token == "" {
+		return ctx
+	}
+
+	var fp bearerFingerprint
+	if cfg.LastNDigits > 0 && len(token) >= cfg.LastNDigits {
+		fp.Suffix = token[len(token)-cfg.LastNDigits:]
+	}
+	if cfg.SHA256 {
+		sum := sha256.Sum256([]byte(token))
+		fp.SHA = hex.EncodeToString(sum[:])
+	}
+	if fp.Suffix == "" && fp.SHA == "" {
+		return ctx
+	}
+
+	logger := sallust.Get(ctx).With(zap.Object("bearerFingerprint", fp))
+	return sallust.With(ctx, logger)
+}
+
+// bearerToken returns the token portion of an "Authorization: Bearer <token>"
+// header, or "" if the header is missing or not a Bearer scheme.
+func bearerToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return ""
+	}
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return ""
+	}
+	return parts[1]
 }
 
 // getDeviceId extracts device id from the request path params

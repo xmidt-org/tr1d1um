@@ -38,6 +38,7 @@ type Options struct {
 	Authenticate                *alice.Chain
 	Log                         *zap.Logger
 	ReducedLoggingResponseCodes []int
+	BearerFingerprint             transaction.FingerprintConfig
 }
 
 // ConfigHandler sets up the server that powers the stat service
@@ -55,7 +56,7 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(statHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
 		Methods(http.MethodGet)
 }
 
