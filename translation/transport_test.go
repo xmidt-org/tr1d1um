@@ -26,6 +26,26 @@ import (
 // ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "test-tid")
 
+// testToken is a minimal Token implementation for testing
+type testToken struct {
+	principal string
+	type_     string
+	attrs     map[string]interface{}
+}
+
+func (t testToken) Principal() string {
+	return t.principal
+}
+
+func (t testToken) Type() string {
+	return t.type_
+}
+
+func (t testToken) Get(key string) (interface{}, bool) {
+	v, ok := t.attrs[key]
+	return v, ok
+}
+
 func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
 		assert := assert.New(t)
@@ -100,9 +120,10 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-			attrs := bascule.NewAttributes(test.attrMap)
-			auth := bascule.Authentication{
-				Token: bascule.NewToken(test.tokenType, "client0", attrs),
+			token := testToken{
+				principal: "client0",
+				type_:     test.tokenType,
+				attrs:     test.attrMap,
 			}
 
 			var ctx context.Context
@@ -117,7 +138,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
-				ctx = bascule.WithAuthentication(ctxTID, auth)
+				ctx = bascule.WithToken(ctxTID, token)
 			}
 
 			wrpMsg, e := decodeRequest(ctx, r)
