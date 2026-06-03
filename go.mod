@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/go-kit/kit v0.13.0
+	github.com/golang-jwt/jwt/v4 v4.0.0
 	github.com/goph/emperror v0.17.3-0.20190703203600-60a8d9faa17b
 	github.com/gorilla/mux v1.8.1
 	github.com/justinas/alice v1.2.0
@@ -12,25 +13,24 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
-	github.com/xmidt-org/ancla v0.3.12
+	github.com/xmidt-org/ancla v0.4.8
 	github.com/xmidt-org/arrange v0.4.0
-	github.com/xmidt-org/bascule v0.11.6
+	github.com/xmidt-org/bascule v1.1.1
 	github.com/xmidt-org/candlelight v0.1.23
-	github.com/xmidt-org/clortho v0.1.3
-	github.com/xmidt-org/httpaux v0.4.2
+	github.com/xmidt-org/clortho v0.0.4
+	github.com/xmidt-org/httpaux v0.4.3
 	github.com/xmidt-org/sallust v0.2.4
-	github.com/xmidt-org/touchstone v0.1.7
+	github.com/xmidt-org/touchstone v0.1.8
+	github.com/xmidt-org/webhook-schema v0.2.2
 	github.com/xmidt-org/webpa-common/v2 v2.6.0
 	github.com/xmidt-org/wrp-go/v3 v3.7.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.68.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.uber.org/fx v1.24.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 )
 
 require (
-	emperror.dev/emperror v0.33.0 // indirect
-	emperror.dev/errors v0.8.1 // indirect
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -45,7 +45,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -75,8 +74,8 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/xmidt-org/argus v0.10.18 // indirect
-	github.com/xmidt-org/chronon v0.1.6 // indirect
+	github.com/xmidt-org/chronon v0.1.1 // indirect
+	github.com/xmidt-org/urlegit v0.1.29 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
@@ -92,11 +91,11 @@ require (
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/grpc v1.80.0 // indirect

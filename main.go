@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/chrysom"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
@@ -193,7 +193,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		touchstone.Provide(),
 		touchhttp.Provide(),
 		provideMetrics(),
-		ancla.ProvideMetrics(),
+		chrysom.ProvideMetrics(),
 		arrangepprof.HTTP{
 			RouterName: "server_pprof",
 		}.Provide(),
@@ -211,7 +211,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 			loadTracing,
 			newHTTPClient,
 		),
-		provideAuthChain("authx.inbound"),
+		provideAuthChain(),
 		provideServers(),
 		provideHandlers(),
 	)

@@ -15,8 +15,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
@@ -24,6 +24,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
+	webhook "github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -44,7 +45,7 @@ type httpClientTimeout struct {
 }
 
 type authAcquirerConfig struct {
-	JWT   acquire.RemoteBearerTokenAcquirerOptions
+	JWT   transaction.RemoteBearerTokenAcquirerOptions
 	Basic string
 }
 
@@ -55,7 +56,6 @@ type provideWebhookHandlersIn struct {
 	WebhookConfig      ancla.Config
 	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
 	Logger             *zap.Logger
-	Measures           *ancla.Measures
 	Tracing            candlelight.Tracing
 	Tf                 *touchstone.Factory
 }
@@ -103,96 +103,98 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
-func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
+func createAuthAcquirer(config authAcquirerConfig) (transaction.AuthAcquirer, error) {
 	if config.JWT.AuthURL != "" && config.JWT.Buffer != 0 && config.JWT.Timeout != 0 {
-		return acquire.NewRemoteBearerTokenAcquirer(config.JWT)
+		return &transaction.JwtAcquirer{Config: config.JWT}, nil
 	}
 
 	if config.Basic != "" {
-		return acquire.NewFixedAuthAcquirer(config.Basic)
+		return &transaction.BasicAcquirer{Token: config.Basic}, nil
 	}
 
 	return nil, errors.New("auth acquirer not configured properly")
 }
 
-func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
+func v2WebhookValidators(c ancla.Config) (webhook.Validators, error) {
 	//build validators and webhook handler for previous version that only check loopback.
-	v, err := ancla.BuildValidators(ancla.ValidatorConfig{
-		URL: ancla.URLVConfig{
-			AllowLoopback:        c.Validation.URL.AllowLoopback,
-			AllowIP:              true,
-			AllowSpecialUseHosts: true,
-			AllowSpecialUseIPs:   true,
-		},
-		TTL: c.Validation.TTL,
-	})
-	if err != nil {
-		return ancla.Validators{}, err
+
+	v2Validation := c.Validation
+	v2Validation.URL.AllowLoopback = true
+	v2Validation.IP.Allow = true
+	v2Validation.Domain.AllowSpecialUseDomains = true
+
+	return buildWebhookValidators(v2Validation)
+}
+
+func buildWebhookValidators(validation schema.SchemaURLValidatorConfig) (webhook.Validators, error) {
+	if validation.TTL.Now == nil {
+		validation.TTL.Now = time.Now
 	}
 
-	return v, nil
+	checker, err := validation.BuildURLChecker()
+	if err != nil {
+		return nil, err
+	}
+
+	return webhook.Validators(validation.BuildOptions(checker)), nil
 }
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
-	// Webhooks (if not configured, handlers are not set up)
 	if !in.V.IsSet(webhookConfigKey) {
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
 
-	webhookConfig := in.WebhookConfig
-	webhookConfig.Logger = in.Logger
-	listenerMeasures := ancla.ListenerConfig{
-		Measures: *in.Measures,
+	service := &simpleWebhookService{
+		logger: in.Logger,
 	}
-	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
 
-	svc, err := ancla.NewService(webhookConfig, sallust.Get)
+	builtValidators, err := buildWebhookValidators(in.WebhookConfig.Validation)
 	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
+		return out, fmt.Errorf("failed to initialize webhook validators: %w", err)
 	}
 
-	stopWatches, err := svc.StartListener(listenerMeasures, sallust.With)
+	v2Validators, err := v2WebhookValidators(in.WebhookConfig)
 	if err != nil {
-		return out, fmt.Errorf("webhook service start listener error: %s", err)
-	}
-	in.Logger.Info("Webhook service enabled")
-
-	in.Lifecycle.Append(fx.Hook{
-		OnStop: func(_ context.Context) error {
-			stopWatches()
-			return nil
-		},
-	})
-
-	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
-		GetLogger: sallust.Get,
-	})
-
-	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
-	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
+		return out, fmt.Errorf("failed to setup v2 webhook validators: %w", err)
 	}
 
-	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+	handlerConfig := ancla.HandlerConfig{
 		V:                 builtValidators,
-		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
-	})
-
-	v2Validators, err := v2WebhookValidators(webhookConfig)
-	if err != nil {
-		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
 	}
 
-	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
-		V:                 v2Validators,
-		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
-		GetLogger:         sallust.Get,
-	})
+	out.AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(service, handlerConfig)
+	out.GetAllWebhooksHandler = ancla.NewGetAllWRPEventStreamsHandler(service, handlerConfig)
+
+	v2HandlerConfig := handlerConfig
+	v2HandlerConfig.V = v2Validators
+	out.V2AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(service, v2HandlerConfig)
 
 	in.Logger.Info("Webhook service enabled")
 	return
+}
+
+// simpleWebhookService provides a basic implementation of ancla.Service
+type simpleWebhookService struct {
+	logger *zap.Logger
+	store  []schema.Manifest // Simple in-memory store for demo
+}
+
+// Add implements ancla.Service interface
+func (s *simpleWebhookService) Add(ctx context.Context, owner string, manifest schema.Manifest) error {
+	s.logger.Info("Adding webhook", zap.String("owner", owner))
+	s.store = append(s.store, manifest)
+	return nil
+}
+
+// GetAll implements ancla.Service interface
+func (s *simpleWebhookService) GetAll(ctx context.Context) ([]schema.Manifest, error) {
+	s.logger.Info("Getting all webhooks")
+	result := make([]schema.Manifest, len(s.store))
+	copy(result, s.store)
+	return result, nil
 }
 
 func provideHandlers() fx.Option {

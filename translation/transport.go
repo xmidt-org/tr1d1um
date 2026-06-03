@@ -20,7 +20,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
-	"github.com/xmidt-org/bascule/basculechecks"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
@@ -93,27 +92,33 @@ func getPartnerIDs(h http.Header) []string {
 
 // getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
 func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
-	auth, ok := bascule.FromContext(ctx)
+	auth, ok := bascule.Get(ctx)
 	//if no token
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
-	tokenType := auth.Token.Type()
-	//if not jwt type
-	if tokenType != "jwt" {
-		return getPartnerIDs(r.Header)
+	// Try to access token attributes
+	if accessor, ok := auth.(bascule.AttributesAccessor); ok {
+		// First try simple top-level partner keys
+		for _, key := range transaction.PartnerKeys() {
+			if partnerVal, found := accessor.Get(key); found {
+				partnerIDs, err := cast.ToStringSliceE(partnerVal)
+				if err == nil {
+					return partnerIDs
+				}
+			}
+		}
+		// Try nested path: allowedResources.allowedPartners
+		partnerIDs, ok := bascule.GetAttribute[[]interface{}](accessor, "allowedResources", "allowedPartners")
+		if ok && len(partnerIDs) > 0 {
+			strIDs, err := cast.ToStringSliceE(partnerIDs)
+			if err == nil {
+				return strIDs
+			}
+		}
 	}
-	partnerVal, ok := bascule.GetNestedAttribute(auth.Token.Attributes(), basculechecks.PartnerKeys()...)
-	//if no partner ids
-	if !ok {
-		return getPartnerIDs(r.Header)
-	}
-	partnerIDs, err := cast.ToStringSliceE(partnerVal)
-
-	if err != nil {
-		return getPartnerIDs(r.Header)
-	}
-	return partnerIDs
+	// Fallback to headers
+	return getPartnerIDs(r.Header)
 }
 
 func getTID(ctx context.Context) string {

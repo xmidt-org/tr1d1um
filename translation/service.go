@@ -9,7 +9,6 @@ import (
 
 	"net/http"
 
-	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/xmidt-org/wrp-go/v3"
@@ -30,7 +29,7 @@ type ServiceOptions struct {
 	WRPSource string
 
 	//Acquirer provides a mechanism to build auth headers for outbound requests.
-	AuthAcquirer acquire.Acquirer
+	AuthAcquirer transaction.AuthAcquirer
 
 	//T is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
@@ -49,7 +48,7 @@ func NewService(o *ServiceOptions) Service {
 
 type service struct {
 	transactor   transaction.T
-	authAcquirer acquire.Acquirer
+	authAcquirer transaction.AuthAcquirer
 	xmidtWrpURL  string
 	wrpSource    string
 }
