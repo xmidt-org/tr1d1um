@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/justinas/alice"
@@ -36,6 +37,9 @@ type JWTValidator struct {
 	// It was unused in Tr1d1um and can be manually configured if needed.
 	// Leeway bascule.Leeway
 
+	// AuthRequestTimeout bounds how long an inbound request may run on the primary
+	// and alternate servers before its context is cancelled.
+	AuthRequestTimeout time.Duration `json:"authRequestTimeout" yaml:"authRequestTimeout"`
 }
 
 // JWTToken implements bascule.Token
@@ -55,8 +59,8 @@ func provideAuthChain() fx.Option {
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},
-			func(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
-				return createAuthMiddleware(config, logger)
+			func(v JWTValidator, logger *zap.Logger) (*basculehttp.Middleware, error) {
+				return createAuthMiddleware(v, logger)
 			},
 			fx.Annotated{
 				Name: "auth_chain",
@@ -64,16 +68,18 @@ func provideAuthChain() fx.Option {
 					return alice.New(middleware.Then)
 				},
 			},
+			fx.Annotated{
+				Name:   "request_timeout",
+				Target: provideRequestTimeoutMiddleware,
+			},
 		),
 	)
 }
 
 // createAuthMiddleware creates a properly configured Bascule middleware with JWT support
-func createAuthMiddleware(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
-	// Create Clortho resolver for JWT key
-	resolver, err := clortho.NewResolver(
-		clortho.WithConfig(config),
-	)
+func createAuthMiddleware(v JWTValidator, logger *zap.Logger) (*basculehttp.Middleware, error) {
+	// Create Clortho resolver for JWT key with JWKS/request timeouts applied.
+	resolver, err := newTimedResolver(v)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT key resolver: %w", err)
 	}

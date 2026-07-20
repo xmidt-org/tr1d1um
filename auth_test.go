@@ -116,7 +116,7 @@ func TestCreateAuthMiddleware(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mw, err := createAuthMiddleware(tc.config, logger)
+			mw, err := createAuthMiddleware(JWTValidator{Config: tc.config}, logger)
 			if tc.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, mw)

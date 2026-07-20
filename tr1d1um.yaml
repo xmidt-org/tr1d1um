@@ -52,6 +52,10 @@ servers:
   primary:
     address: :6100
     disableHTTPKeepAlives: true
+    readHeaderTimeout: 10s
+    readTimeout: 60s
+    writeTimeout: 60s
+    idleTimeout: 120s
     header:
       X-Midt-Server:
         - tr1d1um
@@ -59,6 +63,10 @@ servers:
         - development
   alternate:
     address: :8090
+    readHeaderTimeout: 10s
+    readTimeout: 60s
+    writeTimeout: 60s
+    idleTimeout: 120s
     header:
       X-Midt-Server:
         - tr1d1um
@@ -263,6 +271,8 @@ jwtValidator:
       # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
       # This field is required and has no default.
       template: "http://localhost/{keyID}"
+      # timeout is the maximum time allowed for on-demand JWKS key fetches.
+      timeout: 5s
     refresh:
       sources:
         # URI is the location where keys are served.  By default, clortho supports
@@ -271,6 +281,10 @@ jwtValidator:
         #
         # This field is required and has no default.
         - uri: "http://localhost/available"
+  # authRequestTimeout bounds how long inbound API requests may run before the
+  # request context is cancelled.  This prevents goroutines from accumulating
+  # when downstream dependencies (such as JWKS) are slow or unresponsive.
+  authRequestTimeout: 30s
 authx:
   inbound:
     # basic is a list of Basic Auth credentials intended to be used for local testing purposes

@@ -59,6 +59,10 @@ servers:
   primary:
     address: :6100
     disableHTTPKeepAlives: true
+    readHeaderTimeout: 10s
+    readTimeout: 60s
+    writeTimeout: 60s
+    idleTimeout: 120s
     header:
       X-Midt-Server:
         - tr1d1um
@@ -225,6 +229,7 @@ jwtValidator:
       # This field is required and has no default.
 
       Template: "http://themis:6500/keys/{keyID}"
+      Timeout: (( grab $JWKS_RESOLVE_TIMEOUT || "5s" ))
 
     Refresh:
       Sources:
@@ -235,6 +240,7 @@ jwtValidator:
         # This field is required and has no default.
         - URI: "http://themis:6500/keys/available"
 
+  authRequestTimeout: (( grab $AUTH_REQUEST_TIMEOUT || "30s" ))
 
 authx:
   inbound:
