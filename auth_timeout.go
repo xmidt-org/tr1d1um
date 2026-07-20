@@ -19,11 +19,15 @@ const (
 	defaultAuthRequestTimeout = 150 * time.Second
 )
 
+// timeoutResolver wraps a clortho.Resolver and enforces a deadline on each
+// Resolve call so waiters cannot block forever when JWKS fetch hangs.
 type timeoutResolver struct {
 	delegate clortho.Resolver
 	timeout  time.Duration
 }
 
+// Resolve fetches a signing key by key ID, cancelling the call if it exceeds
+// the configured timeout (used during JWT validation).
 func (tr *timeoutResolver) Resolve(ctx context.Context, keyID string) (clortho.Key, error) {
 	if tr.timeout <= 0 {
 		return tr.delegate.Resolve(ctx, keyID)
@@ -35,10 +39,13 @@ func (tr *timeoutResolver) Resolve(ctx context.Context, keyID string) (clortho.K
 	return tr.delegate.Resolve(resolveCtx, keyID)
 }
 
+// AddListener forwards resolve-event listeners to the underlying resolver.
 func (tr *timeoutResolver) AddListener(l clortho.ResolveListener) clortho.CancelListenerFunc {
 	return tr.delegate.AddListener(l)
 }
 
+// jwksResolveTimeout returns the JWKS fetch/resolve deadline from config, or
+// the default when unset.
 func jwksResolveTimeout(v JWTValidator) time.Duration {
 	if v.Config.Resolve.Timeout > 0 {
 		return v.Config.Resolve.Timeout
@@ -47,6 +54,8 @@ func jwksResolveTimeout(v JWTValidator) time.Duration {
 	return defaultJWKSResolveTimeout
 }
 
+// authRequestTimeout returns the inbound request context deadline from config,
+// or the default when unset.
 func authRequestTimeout(v JWTValidator) time.Duration {
 	if v.AuthRequestTimeout > 0 {
 		return v.AuthRequestTimeout
@@ -55,6 +64,8 @@ func authRequestTimeout(v JWTValidator) time.Duration {
 	return defaultAuthRequestTimeout
 }
 
+// provideJWKSFetcherOptions builds clortho fetcher options that apply an HTTP
+// client timeout to JWKS downloads from Themis (http/https).
 func provideJWKSFetcherOptions(v JWTValidator) ([]clortho.FetcherOption, error) {
 	timeout := jwksResolveTimeout(v)
 
@@ -75,6 +86,8 @@ func provideJWKSFetcherOptions(v JWTValidator) ([]clortho.FetcherOption, error) 
 	return []clortho.FetcherOption{clortho.WithLoader(loader)}, nil
 }
 
+// newTimedResolver creates a clortho Resolver with timed JWKS HTTP fetches and
+// a Resolve-level deadline wrapper for JWT auth.
 func newTimedResolver(v JWTValidator) (clortho.Resolver, error) {
 	fetcherOptions, err := provideJWKSFetcherOptions(v)
 	if err != nil {
@@ -97,6 +110,8 @@ func newTimedResolver(v JWTValidator) (clortho.Resolver, error) {
 	return decorateResolverWithTimeout(resolver, v), nil
 }
 
+// decorateResolverWithTimeout wraps resolver so each Resolve call is bounded
+// by jwksResolveTimeout.
 func decorateResolverWithTimeout(r clortho.Resolver, v JWTValidator) clortho.Resolver {
 	return &timeoutResolver{
 		delegate: r,
@@ -104,11 +119,15 @@ func decorateResolverWithTimeout(r clortho.Resolver, v JWTValidator) clortho.Res
 	}
 }
 
+// provideRequestTimeoutMiddleware is the fx provider for inbound request
+// timeout middleware used by primary/alternate servers.
 func provideRequestTimeoutMiddleware(v JWTValidator) alice.Constructor {
 	timeout := authRequestTimeout(v)
 	return requestTimeoutMiddleware(timeout)
 }
 
+// requestTimeoutMiddleware returns alice middleware that cancels the request
+// context after timeout so handler goroutines cannot accumulate indefinitely.
 func requestTimeoutMiddleware(timeout time.Duration) alice.Constructor {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
