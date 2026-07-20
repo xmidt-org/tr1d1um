@@ -54,7 +54,7 @@ servers:
     disableHTTPKeepAlives: true
     readHeaderTimeout: 10s
     readTimeout: 60s
-    writeTimeout: 60s
+    writeTimeout: 150s
     idleTimeout: 120s
     header:
       X-Midt-Server:
@@ -65,7 +65,7 @@ servers:
     address: :8090
     readHeaderTimeout: 10s
     readTimeout: 60s
-    writeTimeout: 60s
+    writeTimeout: 150s
     idleTimeout: 120s
     header:
       X-Midt-Server:
@@ -282,9 +282,10 @@ jwtValidator:
         # This field is required and has no default.
         - uri: "http://localhost/available"
   # authRequestTimeout bounds how long inbound API requests may run before the
-  # request context is cancelled.  This prevents goroutines from accumulating
-  # when downstream dependencies (such as JWKS) are slow or unresponsive.
-  authRequestTimeout: 30s
+  # request context is cancelled. Keep this at or above xmidtClientTimeout (135s)
+  # so legitimate device/config calls are not cancelled early. JWKS key fetches
+  # are bounded separately by config.resolve.timeout.
+  authRequestTimeout: 150s
 authx:
   inbound:
     # basic is a list of Basic Auth credentials intended to be used for local testing purposes

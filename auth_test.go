@@ -197,6 +197,13 @@ func TestJWTTokenParser_Parse(t *testing.T) {
 			expectKeyID: "kid-resolve",
 		},
 		{
+			name:        "resolver times out",
+			raw:         signToken(t, jwt.SigningMethodRS256, jwt.MapClaims{"sub": "frank-timeout"}, "kid-timeout", privateKey),
+			resolverErr: context.DeadlineExceeded,
+			expectErr:   bascule.ErrBadCredentials,
+			expectKeyID: "kid-timeout",
+		},
+		{
 			name:        "unsupported key type",
 			raw:         signToken(t, jwt.SigningMethodRS256, jwt.MapClaims{"sub": "grace"}, "kid-unsupported", privateKey),
 			resolverKey: &mockUnsupportedClorthoKey{},

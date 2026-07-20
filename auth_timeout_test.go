@@ -79,6 +79,13 @@ func TestJWKSResolveTimeoutDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultJWKSResolveTimeout, jwksResolveTimeout(JWTValidator{}))
 	assert.Equal(t, defaultAuthRequestTimeout, authRequestTimeout(JWTValidator{}))
+
+	assert.Equal(t, 3*time.Second, jwksResolveTimeout(JWTValidator{
+		Config: clortho.Config{Resolve: clortho.ResolveConfig{Timeout: 3 * time.Second}},
+	}))
+	assert.Equal(t, 90*time.Second, authRequestTimeout(JWTValidator{
+		AuthRequestTimeout: 90 * time.Second,
+	}))
 }
 
 func TestProvideJWKSFetcherOptions(t *testing.T) {

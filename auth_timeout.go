@@ -14,7 +14,9 @@ import (
 
 const (
 	defaultJWKSResolveTimeout = 5 * time.Second
-	defaultAuthRequestTimeout = 30 * time.Second
+	// defaultAuthRequestTimeout must stay above xmidtClientTimeout (135s) so
+	// legitimate device/config requests are not cancelled early.
+	defaultAuthRequestTimeout = 150 * time.Second
 )
 
 type timeoutResolver struct {

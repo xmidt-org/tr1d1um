@@ -38,7 +38,8 @@ type JWTValidator struct {
 	// Leeway bascule.Leeway
 
 	// AuthRequestTimeout bounds how long an inbound request may run on the primary
-	// and alternate servers before its context is cancelled.
+	// and alternate servers before its context is cancelled. Keep this at or above
+	// xmidtClientTimeout so long device operations are not cut off.
 	AuthRequestTimeout time.Duration `json:"authRequestTimeout" yaml:"authRequestTimeout"`
 }
 
@@ -112,6 +113,9 @@ func createAuthMiddleware(v JWTValidator, logger *zap.Logger) (*basculehttp.Midd
 		basculehttp.WithAuthenticator(authenticator),
 		basculehttp.WithErrorStatusCoder(
 			func(r *http.Request, err error) int {
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+					return http.StatusGatewayTimeout
+				}
 				if errors.Is(err, bascule.ErrMissingCredentials) {
 					return 401
 				}
@@ -191,6 +195,11 @@ func (jtp *JWTTokenParser) Parse(ctx context.Context, raw string) (bascule.Token
 
 	if err != nil {
 		jtp.logger.Error("JWT parsing failed", zap.Error(err))
+		// Preserve timeout/cancel so callers and status coding can distinguish
+		// upstream JWKS stalls from malformed tokens.
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return nil, fmt.Errorf("%w: %w", bascule.ErrBadCredentials, err)
+		}
 		return nil, bascule.ErrInvalidCredentials
 	}
 

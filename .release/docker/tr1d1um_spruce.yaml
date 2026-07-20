@@ -61,7 +61,7 @@ servers:
     disableHTTPKeepAlives: true
     readHeaderTimeout: 10s
     readTimeout: 60s
-    writeTimeout: 60s
+    writeTimeout: 150s
     idleTimeout: 120s
     header:
       X-Midt-Server:
@@ -240,7 +240,7 @@ jwtValidator:
         # This field is required and has no default.
         - URI: "http://themis:6500/keys/available"
 
-  authRequestTimeout: (( grab $AUTH_REQUEST_TIMEOUT || "30s" ))
+  authRequestTimeout: (( grab $AUTH_REQUEST_TIMEOUT || "150s" ))
 
 authx:
   inbound:
