@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/justinas/alice"
@@ -36,11 +35,6 @@ type JWTValidator struct {
 	// Note: Leeway was removed in Bascule v1.1.1
 	// It was unused in Tr1d1um and can be manually configured if needed.
 	// Leeway bascule.Leeway
-
-	// AuthRequestTimeout bounds how long an inbound request may run on the primary
-	// and alternate servers before its context is cancelled. Keep this at or above
-	// xmidtClientTimeout so long device operations are not cut off.
-	AuthRequestTimeout time.Duration `json:"authRequestTimeout" yaml:"authRequestTimeout"`
 }
 
 // JWTToken implements bascule.Token
@@ -69,17 +63,13 @@ func provideAuthChain() fx.Option {
 					return alice.New(middleware.Then)
 				},
 			},
-			fx.Annotated{
-				Name:   "request_timeout",
-				Target: provideRequestTimeoutMiddleware,
-			},
 		),
 	)
 }
 
 // createAuthMiddleware creates a properly configured Bascule middleware with JWT support
 func createAuthMiddleware(v JWTValidator, logger *zap.Logger) (*basculehttp.Middleware, error) {
-	// Create Clortho resolver for JWT key with JWKS/request timeouts applied.
+	// Create Clortho resolver for JWT key with JWKS resolve timeouts applied.
 	resolver, err := newTimedResolver(v)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT key resolver: %w", err)

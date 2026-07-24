@@ -6,8 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -59,32 +57,12 @@ func TestTimeoutResolver(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestRequestTimeoutMiddleware(t *testing.T) {
-	t.Parallel()
-
-	handler := requestTimeoutMiddleware(25 * time.Millisecond)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusOK, rec.Code)
-}
-
 func TestJWKSResolveTimeoutDefaults(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, defaultJWKSResolveTimeout, jwksResolveTimeout(JWTValidator{}))
-	assert.Equal(t, defaultAuthRequestTimeout, authRequestTimeout(JWTValidator{}))
-
 	assert.Equal(t, 3*time.Second, jwksResolveTimeout(JWTValidator{
 		Config: clortho.Config{Resolve: clortho.ResolveConfig{Timeout: 3 * time.Second}},
-	}))
-	assert.Equal(t, 90*time.Second, authRequestTimeout(JWTValidator{
-		AuthRequestTimeout: 90 * time.Second,
 	}))
 }
 

@@ -236,8 +236,6 @@ jwtValidator:
         # This field is required and has no default.
         - URI: "http://themis:6500/keys/available"
 
-  authRequestTimeout: (( grab $AUTH_REQUEST_TIMEOUT || "150s" ))
-
 authx:
   inbound:
     # basic is a list of Basic Auth credentials intended to be used for local testing purposes

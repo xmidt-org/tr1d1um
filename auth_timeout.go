@@ -8,16 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/justinas/alice"
 	"github.com/xmidt-org/clortho"
 )
 
-const (
-	defaultJWKSResolveTimeout = 5 * time.Second
-	// defaultAuthRequestTimeout must stay above xmidtClientTimeout (135s) so
-	// legitimate device/config requests are not cancelled early.
-	defaultAuthRequestTimeout = 150 * time.Second
-)
+const defaultJWKSResolveTimeout = 5 * time.Second
 
 // timeoutResolver wraps a clortho.Resolver and enforces a deadline on each
 // Resolve call so waiters cannot block forever when JWKS fetch hangs.
@@ -52,16 +46,6 @@ func jwksResolveTimeout(v JWTValidator) time.Duration {
 	}
 
 	return defaultJWKSResolveTimeout
-}
-
-// authRequestTimeout returns the inbound request context deadline from config,
-// or the default when unset.
-func authRequestTimeout(v JWTValidator) time.Duration {
-	if v.AuthRequestTimeout > 0 {
-		return v.AuthRequestTimeout
-	}
-
-	return defaultAuthRequestTimeout
 }
 
 // provideJWKSFetcherOptions builds clortho fetcher options that apply an HTTP
@@ -116,25 +100,5 @@ func decorateResolverWithTimeout(r clortho.Resolver, v JWTValidator) clortho.Res
 	return &timeoutResolver{
 		delegate: r,
 		timeout:  jwksResolveTimeout(v),
-	}
-}
-
-// provideRequestTimeoutMiddleware is the fx provider for inbound request
-// timeout middleware used by primary/alternate servers.
-func provideRequestTimeoutMiddleware(v JWTValidator) alice.Constructor {
-	timeout := authRequestTimeout(v)
-	return requestTimeoutMiddleware(timeout)
-}
-
-// requestTimeoutMiddleware returns alice middleware that cancels the request
-// context after timeout so handler goroutines cannot accumulate indefinitely.
-func requestTimeoutMiddleware(timeout time.Duration) alice.Constructor {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx, cancel := context.WithTimeout(r.Context(), timeout)
-			defer cancel()
-
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
 	}
 }

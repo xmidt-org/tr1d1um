@@ -94,11 +94,6 @@ type primaryMetricMiddlewareIn struct {
 	Primary alice.Chain `name:"middleware_primary_metrics"`
 }
 
-type requestTimeoutMiddlewareIn struct {
-	fx.In
-	RequestTimeout alice.Constructor `name:"request_timeout"`
-}
-
 type alternateMetricMiddlewareIn struct {
 	fx.In
 	Alternate alice.Chain `name:"middleware_alternate_metrics"`
@@ -155,7 +150,6 @@ func provideServers() fx.Option {
 			Key:  "servers.primary",
 			Inject: arrange.Inject{
 				primaryMetricMiddlewareIn{},
-				requestTimeoutMiddlewareIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
@@ -163,7 +157,6 @@ func provideServers() fx.Option {
 			Key:  "servers.alternate",
 			Inject: arrange.Inject{
 				alternateMetricMiddlewareIn{},
-				requestTimeoutMiddlewareIn{},
 			},
 		}.Provide(),
 		arrangehttp.Server{
