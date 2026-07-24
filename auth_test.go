@@ -116,7 +116,7 @@ func TestCreateAuthMiddleware(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mw, err := createAuthMiddleware(tc.config, logger)
+			mw, err := createAuthMiddleware(JWTValidator{Config: tc.config}, logger)
 			if tc.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, mw)
@@ -195,6 +195,13 @@ func TestJWTTokenParser_Parse(t *testing.T) {
 			resolverErr: errors.New("resolve failed"),
 			expectErr:   bascule.ErrInvalidCredentials,
 			expectKeyID: "kid-resolve",
+		},
+		{
+			name:        "resolver times out",
+			raw:         signToken(t, jwt.SigningMethodRS256, jwt.MapClaims{"sub": "frank-timeout"}, "kid-timeout", privateKey),
+			resolverErr: context.DeadlineExceeded,
+			expectErr:   bascule.ErrBadCredentials,
+			expectKeyID: "kid-timeout",
 		},
 		{
 			name:        "unsupported key type",
