@@ -16,8 +16,8 @@ require (
 	github.com/xmidt-org/ancla v0.4.8
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v1.1.1
-	github.com/xmidt-org/candlelight v0.1.23
 	github.com/xmidt-org/clortho v0.0.4
+	github.com/xmidt-org/candlelight v0.2.14
 	github.com/xmidt-org/httpaux v0.4.3
 	github.com/xmidt-org/sallust v0.2.4
 	github.com/xmidt-org/touchstone v0.1.8
