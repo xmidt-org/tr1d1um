@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -78,9 +78,9 @@ func TestSendWRP(t *testing.T) {
 				assert.EqualValues(testCase.ExpectedRequestAuth, r.Header.Get("Authorization"))
 				assert.EqualValues(wrp.Msgpack.ContentType(), r.Header.Get("Content-Type"))
 
-				data, err := ioutil.ReadAll(r.Body)
+				data, err := io.ReadAll(r.Body)
 				require.Nil(err)
-				r.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+				r.Body = io.NopCloser(bytes.NewBuffer(data))
 
 				assert.EqualValues(string(expected), string(data))
 
