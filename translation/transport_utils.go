@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/xmidt-org/sallust"
@@ -145,10 +145,10 @@ func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.C
 	logger := sallust.Get(ctx)
 
 	if r.Method == http.MethodPatch {
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, _ := io.ReadAll(r.Body)
 		r.Body.Close()
 
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
 		if e == nil {
 
