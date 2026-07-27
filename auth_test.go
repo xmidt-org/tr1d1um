@@ -151,6 +151,7 @@ func TestJWTTokenParser_Parse(t *testing.T) {
 		},
 		{
 			name:        "valid token uses sub claim",
+			// nolint: goconst
 			raw:         signToken(t, jwt.SigningMethodRS256, jwt.MapClaims{"sub": "alice"}, "kid-sub", privateKey),
 			resolverKey: &mockClorthoKey{keyID: "kid-sub", public: &privateKey.PublicKey},
 			expectUser:  "alice",
