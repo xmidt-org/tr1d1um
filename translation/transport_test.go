@@ -84,7 +84,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		expectedPartnerIDs     []string
 	}{
 		{
-			name:      "Partners from JWT",
+			name: "Partners from JWT",
 			// nolint: goconst
 			tokenType: "jwt",
 			attrMap: map[string]interface{}{
