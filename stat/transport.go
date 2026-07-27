@@ -56,7 +56,7 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
 		Methods(http.MethodGet)
 }
 
@@ -95,6 +95,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
+		// nolint: goconst
 		"message": err.Error(),
 	})
 }

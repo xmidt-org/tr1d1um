@@ -9,7 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +55,7 @@ func TestTransactIdeal(t *testing.T) {
 
 	rawXmidtResponse := &http.Response{
 		StatusCode: 404,
-		Body:       ioutil.NopCloser(bytes.NewBufferString("not found")),
+		Body:       io.NopCloser(bytes.NewBufferString("not found")),
 		Header: http.Header{
 			"X-A": []string{"a", "b"}, //should be forwarded
 			"Y-A": []string{"c", "d"}, //should be ignored
@@ -232,6 +232,7 @@ func TestAddDeviceIdToLog(t *testing.T) {
 			ctx:  context.Background(),
 			req: func() (r *http.Request) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				// nolint: goconst
 				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
 				return
 			},
@@ -244,6 +245,7 @@ func TestAddDeviceIdToLog(t *testing.T) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
 				return
 			},
+			// nolint: goconst
 			deviceid: "mac:000000000000",
 		},
 	}
@@ -322,9 +324,10 @@ func TestAddBearerFingerprintToLog(t *testing.T) {
 			expected: map[string]any{"suffix": "1234567890"},
 		},
 		{
-			desc:     "sha only",
-			cfg:      FingerprintConfig{SHA256: true},
-			header:   "Bearer " + token,
+			desc:   "sha only",
+			cfg:    FingerprintConfig{SHA256: true},
+			header: "Bearer " + token,
+			// nolint: goconst
 			expected: map[string]any{"sha": sha},
 		},
 		{

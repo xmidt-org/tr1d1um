@@ -168,6 +168,7 @@ func TestWrapInWRP(t *testing.T) {
 	t.Run("GivenParameters", func(t *testing.T) {
 		assert := assert.New(t)
 
+		// nolint: goconst
 		w, e := wrap([]byte{'t'}, "t0", map[string]string{"deviceid": "mac:112233445566", "service": "s0"}, nil, nil)
 
 		assert.Nil(e)
@@ -194,6 +195,7 @@ func TestDecodeValidServiceRequest(t *testing.T) {
 	t.Run("ValidService", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "localhost:8090/api", nil)
+		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"service": "s0"})
 
 		i, err := f(context.TODO(), r)

@@ -10,7 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -120,7 +120,7 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 
 		defer resp.Body.Close()
 
-		result.Body, err = ioutil.ReadAll(resp.Body)
+		result.Body, err = io.ReadAll(resp.Body)
 		return
 	}
 
@@ -286,6 +286,7 @@ func getDeviceId(r *http.Request) string {
 	vars := mux.Vars(r)
 	id := vars["deviceid"]
 	if id == "" {
+		// nolint: goconst
 		id = "mac:000000000000"
 	}
 

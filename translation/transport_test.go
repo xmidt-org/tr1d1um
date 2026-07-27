@@ -57,6 +57,7 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("WRPWrapFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
@@ -66,6 +67,7 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("Ideal", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
@@ -82,7 +84,8 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		expectedPartnerIDs     []string
 	}{
 		{
-			name:      "Partners from JWT",
+			name: "Partners from JWT",
+			// nolint: goconst
 			tokenType: "jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
@@ -128,6 +131,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 
 			var ctx context.Context
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+			// nolint: goconst
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
 			if test.addPartnerIDsInHeaders {
@@ -193,6 +197,7 @@ func TestRequestPayload(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
 
+		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"service": "add"})
 		_, e := requestPayload(r)
 		assert.EqualValues(ErrMissingTable, e)
@@ -292,6 +297,7 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowNotProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
+		// nolint: goconst
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(""))
 
 		assert.Nil(p)
@@ -301,6 +307,7 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowInvalidProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
+		// nolint: goconst
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid row"))
 
 		assert.Nil(p)
@@ -557,6 +564,7 @@ func TestEncodeError(t *testing.T) {
 
 			expected := bytes.NewBufferString("")
 			json.NewEncoder(expected).Encode(map[string]string{
+				// nolint: goconst
 				"message": e.Error()})
 
 			encodeError(ctxTID, e, w)
@@ -592,6 +600,7 @@ func TestEncodeError(t *testing.T) {
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{
+			// nolint: goconst
 			"message": transaction.ErrTr1d1umInternal.Error()})
 
 		assert.EqualValues(expected.String(), w.Body.String())

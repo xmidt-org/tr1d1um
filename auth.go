@@ -20,11 +20,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var possiblePrefixURLs = []string{
-	"/" + apiBase,
-	"/" + prevAPIBase,
-}
-
 // JWTValidator provides a convenient way to define jwt validator through config files
 type JWTValidator struct {
 	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
