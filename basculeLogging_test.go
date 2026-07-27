@@ -18,8 +18,9 @@ func TestSanitizeHeaders(t *testing.T) {
 	}{
 		{
 			Description: "Filtered",
-			Input:       http.Header{"Authorization": []string{"Basic xyz"}, "HeaderA": []string{"x"}},
-			Expected:    http.Header{"HeaderA": []string{"x"}, "Authorization-Type": []string{"Basic"}},
+			// nolint: goconst
+			Input:    http.Header{"Authorization": []string{"Basic xyz"}, "HeaderA": []string{"x"}},
+			Expected: http.Header{"HeaderA": []string{"x"}, "Authorization-Type": []string{"Basic"}},
 		},
 		{
 			Description: "Handled human error",

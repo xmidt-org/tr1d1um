@@ -61,7 +61,8 @@ func TestProvideAPIRouter(t *testing.T) {
 		expectCode int
 	}{
 		{
-			name:       "matches fixed v3 prefix",
+			name: "matches fixed v3 prefix",
+			// nolint: goconst
 			prefix:     "/api/v3",
 			requestURI: "/api/v3/ping",
 			expectCode: http.StatusNoContent,
@@ -288,8 +289,9 @@ func TestFixV2Duration(t *testing.T) {
 			expectCtorErr: true,
 		},
 		{
-			name:            "non-v2 request passes through unchanged",
-			cfg:             anclaschema.TTLVConfig{Max: 5 * time.Minute, Now: fixedNow},
+			name: "non-v2 request passes through unchanged",
+			cfg:  anclaschema.TTLVConfig{Max: 5 * time.Minute, Now: fixedNow},
+			// nolint: goconst
 			vars:            map[string]string{"version": apiVersion},
 			body:            `{}`,
 			expectCode:      http.StatusNoContent,

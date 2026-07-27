@@ -232,6 +232,7 @@ func TestAddDeviceIdToLog(t *testing.T) {
 			ctx:  context.Background(),
 			req: func() (r *http.Request) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
+				// nolint: goconst
 				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
 				return
 			},
@@ -244,6 +245,7 @@ func TestAddDeviceIdToLog(t *testing.T) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
 				return
 			},
+			// nolint: goconst
 			deviceid: "mac:000000000000",
 		},
 	}
@@ -325,6 +327,7 @@ func TestAddBearerFingerprintToLog(t *testing.T) {
 			desc:     "sha only",
 			cfg:      FingerprintConfig{SHA256: true},
 			header:   "Bearer " + token,
+			// nolint: goconst
 			expected: map[string]any{"sha": sha},
 		},
 		{
