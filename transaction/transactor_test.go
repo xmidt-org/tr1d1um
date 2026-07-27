@@ -9,7 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +55,7 @@ func TestTransactIdeal(t *testing.T) {
 
 	rawXmidtResponse := &http.Response{
 		StatusCode: 404,
-		Body:       ioutil.NopCloser(bytes.NewBufferString("not found")),
+		Body:       io.NopCloser(bytes.NewBufferString("not found")),
 		Header: http.Header{
 			"X-A": []string{"a", "b"}, //should be forwarded
 			"Y-A": []string{"c", "d"}, //should be ignored
@@ -324,9 +324,9 @@ func TestAddBearerFingerprintToLog(t *testing.T) {
 			expected: map[string]any{"suffix": "1234567890"},
 		},
 		{
-			desc:     "sha only",
-			cfg:      FingerprintConfig{SHA256: true},
-			header:   "Bearer " + token,
+			desc:   "sha only",
+			cfg:    FingerprintConfig{SHA256: true},
+			header: "Bearer " + token,
 			// nolint: goconst
 			expected: map[string]any{"sha": sha},
 		},

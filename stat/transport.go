@@ -95,6 +95,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
+		// nolint: goconst
 		"message": err.Error(),
 	})
 }
