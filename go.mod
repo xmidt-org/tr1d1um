@@ -14,7 +14,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/xmidt-org/ancla v0.4.8
-	github.com/xmidt-org/arrange v0.4.0
+	github.com/xmidt-org/arrange v0.5.6
 	github.com/xmidt-org/bascule v1.1.1
 	github.com/xmidt-org/candlelight v0.2.15
 	github.com/xmidt-org/clortho v0.1.14
