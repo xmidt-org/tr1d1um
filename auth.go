@@ -30,7 +30,6 @@ type JWTValidator struct {
 	// Note: Leeway was removed in Bascule v1.1.1
 	// It was unused in Tr1d1um and can be manually configured if needed.
 	// Leeway bascule.Leeway
-
 }
 
 // JWTToken implements bascule.Token
@@ -50,8 +49,8 @@ func provideAuthChain() fx.Option {
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},
-			func(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
-				return createAuthMiddleware(config, logger)
+			func(v JWTValidator, logger *zap.Logger) (*basculehttp.Middleware, error) {
+				return createAuthMiddleware(v, logger)
 			},
 			fx.Annotated{
 				Name: "auth_chain",
@@ -64,11 +63,9 @@ func provideAuthChain() fx.Option {
 }
 
 // createAuthMiddleware creates a properly configured Bascule middleware with JWT support
-func createAuthMiddleware(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
-	// Create Clortho resolver for JWT key
-	resolver, err := clortho.NewResolver(
-		clortho.WithConfig(config),
-	)
+func createAuthMiddleware(v JWTValidator, logger *zap.Logger) (*basculehttp.Middleware, error) {
+	// Create Clortho resolver for JWT key with JWKS resolve timeouts applied.
+	resolver, err := newTimedResolver(v)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT key resolver: %w", err)
 	}
@@ -101,6 +98,9 @@ func createAuthMiddleware(config clortho.Config, logger *zap.Logger) (*basculeht
 		basculehttp.WithAuthenticator(authenticator),
 		basculehttp.WithErrorStatusCoder(
 			func(r *http.Request, err error) int {
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+					return http.StatusGatewayTimeout
+				}
 				if errors.Is(err, bascule.ErrMissingCredentials) {
 					return 401
 				}
@@ -180,6 +180,11 @@ func (jtp *JWTTokenParser) Parse(ctx context.Context, raw string) (bascule.Token
 
 	if err != nil {
 		jtp.logger.Error("JWT parsing failed", zap.Error(err))
+		// Preserve timeout/cancel so callers and status coding can distinguish
+		// upstream JWKS stalls from malformed tokens.
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return nil, fmt.Errorf("%w: %w", bascule.ErrBadCredentials, err)
+		}
 		return nil, bascule.ErrInvalidCredentials
 	}
 
