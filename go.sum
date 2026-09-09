@@ -480,8 +480,8 @@ github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSW
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/ugorji/go/codec v1.2.14 h1:yOQvXCBc3Ij46LRkRoh4Yd5qK6LVOgi0bYOXfb7ifjw=
 github.com/ugorji/go/codec v1.2.14/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-github.com/xmidt-org/ancla v0.4.8 h1:qiY9KYwi15/tjwJcinmlyNqj79lrfvXoOc+wu3KlruY=
-github.com/xmidt-org/ancla v0.4.8/go.mod h1:Ysrk+ivsKTqidyo0UYzFFd1BEVXY+zKeK8m/TydrXMU=
+github.com/xmidt-org/ancla v0.4.10 h1:ii72SiXSeEsHebc3Qr1voXrULYUghglCgYX/DwQipqc=
+github.com/xmidt-org/ancla v0.4.10/go.mod h1:KlZYjKrnPUnBt+ZlFOD+5yIeH7/gfhKSxWtu8c5tFkA=
 github.com/xmidt-org/arrange v0.4.0 h1:DmJJTK58C44B4efyBV78SmMH0mn0G54n3caVn5BopUU=
 github.com/xmidt-org/arrange v0.4.0/go.mod h1:MA1eKUZYxaSMIKJL3D/iJEMQruiefmhq+s5E9J4UJv0=
 github.com/xmidt-org/bascule v1.1.1 h1:Njx4utxYKKQqfNxy/tyVZbzuj04RsZrVQsq4NcclGaY=
