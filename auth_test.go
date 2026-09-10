@@ -79,6 +79,7 @@ func TestJWTToken_Principal(t *testing.T) {
 		name      string
 		principal string
 	}{
+		// nolint: goconst
 		{name: "returns principal string", principal: "alice"},
 		{name: "returns empty principal", principal: ""},
 	}
@@ -150,7 +151,8 @@ func TestJWTTokenParser_Parse(t *testing.T) {
 			expectErr: bascule.ErrMissingCredentials,
 		},
 		{
-			name:        "valid token uses sub claim",
+			name: "valid token uses sub claim",
+			// nolint: goconst
 			raw:         signToken(t, jwt.SigningMethodRS256, jwt.MapClaims{"sub": "alice"}, "kid-sub", privateKey),
 			resolverKey: &mockClorthoKey{keyID: "kid-sub", public: &privateKey.PublicKey},
 			expectUser:  "alice",

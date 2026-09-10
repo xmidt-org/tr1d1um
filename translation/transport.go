@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -63,10 +62,10 @@ func ConfigHandler(c *Options) {
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(welcome(WRPHandler)))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}.Propagator(), false)(welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(welcome(WRPHandler)))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -257,6 +256,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
+		// nolint: goconst
 		"message": err.Error(),
 	})
 
@@ -270,7 +270,7 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 		data []byte
 	)
 
-	if data, err = ioutil.ReadAll(in); err == nil {
+	if data, err = io.ReadAll(in); err == nil {
 		if wdmp, err = loadWDMP(data, newCID, oldCID, syncCMC); err == nil {
 			return json.Marshal(wdmp)
 		}
@@ -307,7 +307,7 @@ func requestAddPayload(m map[string]string, input io.Reader) (p []byte, err erro
 
 	wdmp.Table = table
 
-	payload, err := ioutil.ReadAll(input)
+	payload, err := io.ReadAll(input)
 
 	if err != nil {
 		return nil, ErrInvalidPayload
@@ -334,7 +334,7 @@ func requestReplacePayload(m map[string]string, input io.Reader) ([]byte, error)
 
 	wdmp.Table = table
 
-	payload, err := ioutil.ReadAll(input)
+	payload, err := io.ReadAll(input)
 
 	if err != nil {
 		return nil, err

@@ -76,6 +76,7 @@ func TestEncodeError(t *testing.T) {
 
 		json.NewEncoder(expected).Encode(
 			map[string]string{
+				// nolint: goconst
 				"message": transaction.ErrTr1d1umInternal.Error(),
 			},
 		)
