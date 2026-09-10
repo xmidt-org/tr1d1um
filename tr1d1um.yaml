@@ -263,6 +263,8 @@ jwtValidator:
       # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
       # This field is required and has no default.
       template: "http://localhost/{keyID}"
+      # timeout is the maximum time allowed for on-demand JWKS key fetches.
+      timeout: 5s
     refresh:
       sources:
         # URI is the location where keys are served.  By default, clortho supports
