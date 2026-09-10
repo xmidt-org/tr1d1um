@@ -51,6 +51,9 @@ const (
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
 	fingerprintCredsKey               = "fingerprintCreds"
+	capabilityCheckKey                = "capabilityCheck"
+	authxInboundKey                   = "authx.inbound"
+	partnerIDsKey                     = "partnerIDs"
 )
 
 var (

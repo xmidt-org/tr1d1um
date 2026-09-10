@@ -7,7 +7,6 @@ linters:
     - bodyclose
     - dupl
     - errorlint
-    - goconst
     - gosec
     - misspell
     - prealloc

@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	anclaschema "github.com/xmidt-org/ancla/schema"
@@ -56,6 +57,8 @@ type primaryEndpointIn struct {
 	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string                      `name:"supportedServices"`
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
+	PartnerIDs                  partnerIDConfig               `name:"partnerIDs"`
+	PartnerIDSources            *prometheus.CounterVec        `name:"partner_ids"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -134,6 +137,10 @@ func provideServers() fx.Option {
 			fx.Annotated{
 				Name:   "bearerFingerprint",
 				Target: arrange.UnmarshalKey(fingerprintCredsKey, transaction.FingerprintConfig{}),
+			},
+			fx.Annotated{
+				Name:   "partnerIDs",
+				Target: arrange.UnmarshalKey(partnerIDsKey, partnerIDConfig{}),
 			},
 			fx.Annotated{
 				Name:   "api_router",
@@ -230,6 +237,11 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 		BearerFingerprint:           in.BearerFingerprint,
+		PartnerIDs: translation.PartnerIDOptions{
+			AllowHeader: in.PartnerIDs.AllowHeader,
+			AllowEmpty:  in.PartnerIDs.AllowEmpty,
+			Record:      partnerIDRecorder(in.PartnerIDSources),
+		},
 	})
 }
 
