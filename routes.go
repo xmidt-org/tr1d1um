@@ -18,7 +18,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
-	anclaschema "github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
@@ -30,7 +29,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	webhook "github.com/xmidt-org/webhook-schema"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -294,16 +292,19 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclaschema.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
-	if config.Max < 0 {
-		return nil, fmt.Errorf("failed to initialize duration validation: max TTL must be non-negative")
+	durationCheck, err := ancla.CheckDuration(config.Max)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create duration check: %v", err)
 	}
-	if config.Jitter < 0 {
-		return nil, fmt.Errorf("failed to initialize duration validation: jitter must be non-negative")
+
+	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create until check: %v", err)
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -319,9 +320,6 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
-			if logger == nil && getLogger != nil {
-				logger = getLogger(r.Context())
-			}
 
 			requestPayload, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -329,8 +327,7 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 				return
 			}
 
-			//nolint:staticcheck // RegistrationV1 is deprecated but required for v2 backwards compatibility
-			var wr webhook.RegistrationV1
+			var wr ancla.WebhookRegistration
 			err = json.Unmarshal(requestPayload, &wr)
 			if err != nil {
 				var e *json.UnmarshalTypeError
@@ -346,27 +343,28 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 			}
 
 			// check to see if the Webhook has a valid until/duration.
-			// If not, set the WebhookRegistration duration to default
-			if wr.Until.IsZero() {
-				if wr.Duration == 0 {
-					wr.Duration = webhook.CustomDuration(config.Max)
+			// If not, set the WebhookRegistration  duration to 5m.
+			webhook := wr.ToWebhook()
+			if webhook.Until.IsZero() {
+				if webhook.Duration == 0 {
+					wr.Duration = ancla.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
 				} else {
-					durationErr := wr.ValidateDuration(config.Max)
+					durationErr := durationCheck(webhook)
 					if durationErr != nil {
-						wr.Duration = webhook.CustomDuration(config.Max)
+						wr.Duration = ancla.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
 					}
 				}
 			} else {
-				untilErr := wr.CheckUntil(config.Now, config.Jitter, config.Max)
+				untilErr := untilCheck(webhook)
 				if untilErr != nil {
 					wr.Until = time.Time{}
-					wr.Duration = webhook.CustomDuration(config.Max)
+					wr.Duration = ancla.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to %v", untilErr, config.Max))
+						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 				}
 			}
 

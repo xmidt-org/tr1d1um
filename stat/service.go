@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/xmidt-org/bascule/acquire"
+
 	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
@@ -34,7 +36,7 @@ type ServiceOptions struct {
 	//AuthAcquirer provides a mechanism to fetch auth tokens to complete the HTTP transaction
 	//with the remote server.
 	//(Optional)
-	AuthAcquirer transaction.AuthAcquirer
+	AuthAcquirer acquire.Acquirer
 
 	//HTTPTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
@@ -44,7 +46,7 @@ type ServiceOptions struct {
 type service struct {
 	transactor transaction.T
 
-	authAcquirer transaction.AuthAcquirer
+	authAcquirer acquire.Acquirer
 
 	xmidtStatURL string
 }
