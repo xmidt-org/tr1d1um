@@ -26,26 +26,6 @@ import (
 // ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "test-tid")
 
-// testToken is a minimal Token implementation for testing
-type testToken struct {
-	principal string
-	type_     string
-	attrs     map[string]interface{}
-}
-
-func (t testToken) Principal() string {
-	return t.principal
-}
-
-func (t testToken) Type() string {
-	return t.type_
-}
-
-func (t testToken) Get(key string) (interface{}, bool) {
-	v, ok := t.attrs[key]
-	return v, ok
-}
-
 func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
 		assert := assert.New(t)
@@ -57,8 +37,9 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("WRPWrapFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-		// nolint: goconst
-		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+		r = mux.SetURLVars(r, map[string]string{
+			// nolint: goconst
+			"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
@@ -67,7 +48,6 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("Ideal", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
@@ -85,8 +65,9 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	}{
 		{
 			name: "Partners from JWT",
+			tokenType:
 			// nolint: goconst
-			tokenType: "jwt",
+			"jwt",
 			attrMap: map[string]interface{}{
 				"allowedResources": map[string]interface{}{
 					"allowedPartners": []interface{}{"partnerA", "partnerB"},
@@ -123,15 +104,13 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-			token := testToken{
-				principal: "client0",
-				type_:     test.tokenType,
-				attrs:     test.attrMap,
+			attrs := bascule.NewAttributes(test.attrMap)
+			auth := bascule.Authentication{
+				Token: bascule.NewToken(test.tokenType, "client0", attrs),
 			}
 
 			var ctx context.Context
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-			// nolint: goconst
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
 			if test.addPartnerIDsInHeaders {
@@ -142,7 +121,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
-				ctx = bascule.WithToken(ctxTID, token)
+				ctx = bascule.WithAuthentication(ctxTID, auth)
 			}
 
 			wrpMsg, e := decodeRequest(ctx, r)
@@ -197,8 +176,9 @@ func TestRequestPayload(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
 
-		// nolint: goconst
-		r = mux.SetURLVars(r, map[string]string{"service": "add"})
+		r = mux.SetURLVars(r, map[string]string{
+			// nolint: goconst
+			"service": "add"})
 		_, e := requestPayload(r)
 		assert.EqualValues(ErrMissingTable, e)
 	})
@@ -297,8 +277,9 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowNotProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
-		// nolint: goconst
-		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(""))
+		p, e := requestAddPayload(map[string]string{
+			// nolint: goconst
+			"parameter": "t0"}, bytes.NewBufferString(""))
 
 		assert.Nil(p)
 		assert.EqualValues(ErrMissingRow, e)
@@ -307,7 +288,6 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowInvalidProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
-		// nolint: goconst
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid row"))
 
 		assert.Nil(p)
@@ -600,7 +580,6 @@ func TestEncodeError(t *testing.T) {
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{
-			// nolint: goconst
 			"message": transaction.ErrTr1d1umInternal.Error()})
 
 		assert.EqualValues(expected.String(), w.Body.String())
