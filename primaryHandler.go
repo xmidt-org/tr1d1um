@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
@@ -23,6 +23,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
+	"github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -44,14 +45,13 @@ type httpClientTimeout struct {
 
 type provideWebhookHandlersIn struct {
 	fx.In
-	Lifecycle          fx.Lifecycle
-	V                  *viper.Viper
-	WebhookConfig      ancla.Config
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
-	Logger             *zap.Logger
-	Measures           *ancla.Measures
-	Tracing            candlelight.Tracing
-	Tf                 *touchstone.Factory
+	Lifecycle     fx.Lifecycle
+	V             *viper.Viper
+	WebhookConfig ancla.Config
+	Logger        *zap.Logger
+	Service       ancla.Service
+	Tracing       candlelight.Tracing
+	Tf            *touchstone.Factory
 }
 
 type provideWebhookHandlersOut struct {
@@ -97,22 +97,19 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
-func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {
-	//build validators and webhook handler for previous version that only check loopback.
-	v, err := ancla.BuildValidators(ancla.ValidatorConfig{
-		URL: ancla.URLVConfig{
-			AllowLoopback:        c.Validation.URL.AllowLoopback,
-			AllowIP:              true,
-			AllowSpecialUseHosts: true,
-			AllowSpecialUseIPs:   true,
+func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
+	return (&schema.SchemaURLValidatorConfig{
+		URL: schema.URLVConfig{
+			AllowLoopback: c.Validation.URL.AllowLoopback,
+		},
+		Domain: schema.DomainVConfig{
+			AllowSpecialUseDomains: true,
+		},
+		IP: schema.IPVConfig{
+			Allow: true,
 		},
 		TTL: c.Validation.TTL,
-	})
-	if err != nil {
-		return ancla.Validators{}, err
-	}
-
-	return v, nil
+	}).BuildOptions()
 }
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
@@ -121,55 +118,29 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
-
-	webhookConfig := in.WebhookConfig
-	webhookConfig.Logger = in.Logger
-	listenerMeasures := ancla.ListenerConfig{
-		Measures: *in.Measures,
-	}
-	webhookConfig.BasicClientConfig.HTTPClient = newHTTPClient(in.ArgusClientTimeout, in.Tracing)
-
-	svc, err := ancla.NewService(webhookConfig, sallust.Get)
-	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook service: %s", err)
-	}
-
-	stopWatches, err := svc.StartListener(listenerMeasures, sallust.With)
-	if err != nil {
-		return out, fmt.Errorf("webhook service start listener error: %s", err)
-	}
-	in.Logger.Info("Webhook service enabled")
-
-	in.Lifecycle.Append(fx.Hook{
-		OnStop: func(_ context.Context) error {
-			stopWatches()
-			return nil
-		},
-	})
-
-	out.GetAllWebhooksHandler = ancla.NewGetAllWebhooksHandler(svc, ancla.HandlerConfig{
+	out.GetAllWebhooksHandler = ancla.NewGetAllWRPEventStreamsHandler(in.Service, ancla.HandlerConfig{
 		GetLogger: sallust.Get,
 	})
 
-	builtValidators, err := ancla.BuildValidators(webhookConfig.Validation)
+	builtValidators, err := in.WebhookConfig.Validation.BuildOptions()
 	if err != nil {
-		return out, fmt.Errorf("failed to initialize webhook validators: %s", err)
+		return out, fmt.Errorf("failed to initialize webhook validators: %w", err)
 	}
 
-	out.AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+	out.AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(in.Service, ancla.HandlerConfig{
 		V:                 builtValidators,
-		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})
 
-	v2Validators, err := v2WebhookValidators(webhookConfig)
+	v2Validators, err := v2WebhookValidators(in.WebhookConfig)
 	if err != nil {
-		return out, fmt.Errorf("failed to setup v2 webhook validators: %s", err)
+		return out, fmt.Errorf("failed to setup v2 webhook validators: %w", err)
 	}
 
-	out.V2AddWebhookHandler = ancla.NewAddWebhookHandler(svc, ancla.HandlerConfig{
+	out.V2AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(in.Service, ancla.HandlerConfig{
 		V:                 v2Validators,
-		DisablePartnerIDs: webhookConfig.DisablePartnerIDs,
+		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})
 
@@ -179,9 +150,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 
 func provideHandlers() fx.Option {
 	return fx.Options(
-		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 		fx.Provide(
-			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
 			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
 			provideWebhookHandlers,
