@@ -13,11 +13,10 @@ func TestMakeStatEndpoint(t *testing.T) {
 	endpoint := makeStatEndpoint(s)
 
 	sr := &statRequest{
-		DeviceID:        "mac:1122334455",
-		AuthHeaderValue: "a0",
+		DeviceID: "mac:1122334455",
 	}
 
-	s.On("RequestStat", context.TODO(), "a0", "mac:1122334455").Return(nil, nil)
+	s.On("RequestStat", context.TODO(), "mac:1122334455").Return(nil, nil)
 
 	endpoint(context.TODO(), sr)
 	s.AssertExpectations(t)

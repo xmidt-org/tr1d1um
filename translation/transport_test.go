@@ -12,7 +12,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
@@ -21,6 +24,11 @@ import (
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
 
 	"github.com/xmidt-org/bascule"
+)
+
+const (
+	allowedPartners  = "allowedPartners"
+	allowedResources = "allowedResources"
 )
 
 // ctxTID is a context with a defined value for a TID
@@ -68,10 +76,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			tokenType:
 			// nolint: goconst
 			"jwt",
-			attrMap: map[string]interface{}{
-				"allowedResources": map[string]interface{}{
-					"allowedPartners": []interface{}{"partnerA", "partnerB"},
-				}},
+			attrMap:            map[string]any{allowedPartners: []string{"partnerA", "partnerB"}},
 			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
 
@@ -104,11 +109,6 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-			attrs := bascule.NewAttributes(test.attrMap)
-			auth := bascule.Authentication{
-				Token: bascule.NewToken(test.tokenType, "client0", attrs),
-			}
-
 			var ctx context.Context
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
@@ -121,11 +121,11 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
-				ctx = bascule.WithAuthentication(ctxTID, auth)
+				ctx = enrichWithBasculeToken(context.Background(), true, test.attrMap)
 			}
 
 			wrpMsg, e := decodeRequest(ctx, r)
-			assert.Nil(e)
+			assert.NoError(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
 			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
 		})
@@ -584,4 +584,84 @@ func TestEncodeError(t *testing.T) {
 
 		assert.EqualValues(expected.String(), w.Body.String())
 	})
+}
+
+type testJWT struct {
+	jwt.Token
+}
+
+func (t testJWT) Principal() string {
+	p, _ := t.Token.Subject()
+	return p
+}
+
+func (t testJWT) Get(k string) (any, bool) {
+	return t.Field(k)
+}
+
+func (t testJWT) Audience() []string {
+	v, _ := t.Token.Audience()
+
+	return v
+}
+
+func (t testJWT) Expiration() time.Time {
+	v, _ := t.Token.Expiration()
+
+	return v
+}
+
+func (t testJWT) IssuedAt() time.Time {
+	v, _ := t.Token.IssuedAt()
+
+	return v
+}
+
+func (t testJWT) Issuer() string {
+	v, _ := t.Token.Issuer()
+
+	return v
+}
+
+func (t testJWT) JwtID() string {
+	v, _ := t.Token.JwtID()
+
+	return v
+}
+
+func (t testJWT) NotBefore() time.Time {
+	v, _ := t.Token.NotBefore()
+
+	return v
+}
+
+func (t testJWT) Subject() string {
+	v, _ := t.Token.Subject()
+
+	return v
+}
+
+func (t testJWT) Capabilities() (caps []string) {
+	if v, ok := t.Field(basculejwt.CapabilitiesKey); ok {
+		caps, _ = bascule.GetCapabilities(v)
+	}
+
+	return
+}
+
+func enrichWithBasculeToken(ctx context.Context, isBearer bool, attrMap map[string]any) context.Context {
+	if isBearer {
+		token, err := jwt.NewBuilder().
+			Claim(allowedResources, attrMap).
+			Subject("client0").
+			Issuer("https://example.com").
+			Build()
+		if err != nil {
+			panic(fmt.Errorf("failed to build test JWT: %v", err))
+		}
+
+		return bascule.WithToken(ctx, &testJWT{token})
+	}
+
+	return bascule.WithToken(ctx, bascule.StubToken("client0"))
 }

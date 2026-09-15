@@ -64,8 +64,7 @@ func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err err
 	var deviceID wrp.DeviceID
 	if deviceID, err = wrp.ParseDeviceID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
-			AuthHeaderValue: r.Header.Get(authHeaderKey),
-			DeviceID:        string(deviceID),
+			DeviceID: string(deviceID),
 		}
 	} else {
 		err = transaction.NewBadRequestError(err)

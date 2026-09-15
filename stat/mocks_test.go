@@ -17,13 +17,13 @@ type MockService struct {
 	mock.Mock
 }
 
-// RequestStat provides a mock function with given fields: ctx, authHeaderValue, deviceID
-func (_m *MockService) RequestStat(ctx context.Context, authHeaderValue string, deviceID string) (*transaction.XmidtResponse, error) {
-	ret := _m.Called(ctx, authHeaderValue, deviceID)
+// RequestStat provides a mock function with given fields: ctx, deviceID
+func (_m *MockService) RequestStat(ctx context.Context, deviceID string) (*transaction.XmidtResponse, error) {
+	ret := _m.Called(ctx, deviceID)
 
 	var r0 *transaction.XmidtResponse
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *transaction.XmidtResponse); ok {
-		r0 = rf(ctx, authHeaderValue, deviceID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *transaction.XmidtResponse); ok {
+		r0 = rf(ctx, deviceID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*transaction.XmidtResponse)
@@ -31,8 +31,8 @@ func (_m *MockService) RequestStat(ctx context.Context, authHeaderValue string, 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, authHeaderValue, deviceID)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, deviceID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -66,13 +66,4 @@ func (_m *MockTr1d1umTransactor) Transact(_a0 *http.Request) (*transaction.Xmidt
 	}
 
 	return r0, r1
-}
-
-type mockAcquirer struct {
-	mock.Mock
-}
-
-func (m *mockAcquirer) Acquire() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
 }

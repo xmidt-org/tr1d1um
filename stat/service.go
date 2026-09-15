@@ -8,21 +8,20 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xmidt-org/bascule/acquire"
-
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // Service defines the behavior of the device statistics Tr1d1um Service.
 type Service interface {
-	RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error)
+	RequestStat(ctx context.Context, deviceID string) (*transaction.XmidtResponse, error)
 }
 
 // NewService constructs a new stat service instance given some options.
 func NewService(o *ServiceOptions) Service {
 	return &service{
 		transactor:   o.HTTPTransactor,
-		authAcquirer: o.AuthAcquirer,
+		auth:         o.Auth,
 		xmidtStatURL: o.XmidtStatURL,
 	}
 }
@@ -33,10 +32,9 @@ type ServiceOptions struct {
 	//It's expected to have the "${device}" substring to perform device ID substitution.
 	XmidtStatURL string
 
-	//AuthAcquirer provides a mechanism to fetch auth tokens to complete the HTTP transaction
-	//with the remote server.
+	//Auth decorates http requests with authorization header(s).
 	//(Optional)
-	AuthAcquirer acquire.Acquirer
+	Auth auth.Decorator
 
 	//HTTPTransactor is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
@@ -46,26 +44,25 @@ type ServiceOptions struct {
 type service struct {
 	transactor transaction.T
 
-	authAcquirer acquire.Acquirer
+	auth auth.Decorator
 
 	xmidtStatURL string
 }
 
 // RequestStat contacts the XMiDT cluster for device statistics.
-func (s *service) RequestStat(ctx context.Context, authHeaderValue, deviceID string) (*transaction.XmidtResponse, error) {
+func (s *service) RequestStat(ctx context.Context, deviceID string) (*transaction.XmidtResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.Replace(s.xmidtStatURL, "${device}", deviceID, 1), nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if s.authAcquirer != nil {
-		authHeaderValue, err = s.authAcquirer.Acquire()
+	if s.auth != nil {
+		err = s.auth.Decorate(ctx, r)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	r.Header.Set("Authorization", authHeaderValue)
 	return s.transactor.Transact(r)
 }
