@@ -17,6 +17,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -47,7 +48,6 @@ const (
 	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
 	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
-	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
 	fingerprintCredsKey               = "fingerprintCreds"
@@ -190,6 +190,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
 		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		auth.Provide(),
 		touchstone.Provide(),
 		touchhttp.Provide(),
 		provideMetrics(),
@@ -211,7 +212,6 @@ func tr1d1um(arguments []string) (exitCode int) {
 			loadTracing,
 			newHTTPClient,
 		),
-		provideAuthChain("authx.inbound"),
 		provideServers(),
 		provideHandlers(),
 	)

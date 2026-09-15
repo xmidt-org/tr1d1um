@@ -9,7 +9,7 @@ import (
 
 	"net/http"
 
-	"github.com/xmidt-org/bascule/acquire"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/xmidt-org/wrp-go/v3"
@@ -30,7 +30,7 @@ type ServiceOptions struct {
 	WRPSource string
 
 	//Acquirer provides a mechanism to build auth headers for outbound requests.
-	AuthAcquirer acquire.Acquirer
+	Auth auth.Decorator
 
 	//T is the component that's responsible to make the HTTP
 	//request to the XMiDT API and return only data we care about.
@@ -40,18 +40,18 @@ type ServiceOptions struct {
 // NewService constructs a new translation service instance given some options.
 func NewService(o *ServiceOptions) Service {
 	return &service{
-		xmidtWrpURL:  o.XmidtWrpURL,
-		wrpSource:    o.WRPSource,
-		transactor:   o.T,
-		authAcquirer: o.AuthAcquirer,
+		xmidtWrpURL: o.XmidtWrpURL,
+		wrpSource:   o.WRPSource,
+		transactor:  o.T,
+		auth:        o.Auth,
 	}
 }
 
 type service struct {
-	transactor   transaction.T
-	authAcquirer acquire.Acquirer
-	xmidtWrpURL  string
-	wrpSource    string
+	transactor  transaction.T
+	auth        auth.Decorator
+	xmidtWrpURL string
+	wrpSource   string
 }
 
 // SendWRP sends the given wrpMsg to the XMiDT cluster and returns the response if any.
@@ -72,14 +72,13 @@ func (w *service) SendWRP(ctx context.Context, wrpMsg *wrp.Message, authHeaderVa
 		return nil, err
 	}
 
-	if w.authAcquirer != nil {
-		authHeaderValue, err = w.authAcquirer.Acquire()
+	if w.auth != nil {
+		err = w.auth.Decorate(ctx, r)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
-	r.Header.Set("Authorization", authHeaderValue)
 	return w.transactor.Transact(r)
 }

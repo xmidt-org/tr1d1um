@@ -26,6 +26,7 @@ import (
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -50,7 +51,7 @@ type primaryEndpointIn struct {
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	AuthAcquirer                authAcquirerConfig            `name:"authAcquirer"`
+	Auth                        auth.Decorator
 	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string                      `name:"supportedServices"`
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
@@ -198,16 +199,8 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		otelmux.Middleware("mainSpan", otelMuxOptions...),
 	)
 
-	if in.V.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(in.AuthAcquirer)
-		if err != nil {
-			in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
-		} else {
-			in.TranslationOptions.AuthAcquirer = acquirer
-			in.StatServiceOptions.AuthAcquirer = acquirer
-			in.Logger.Info("Outbound request authentication token acquirer enabled")
-		}
-	}
+	in.StatServiceOptions.Auth = in.Auth
+	in.TranslationOptions.Auth = in.Auth
 	ss := stat.NewService(in.StatServiceOptions)
 	ts := translation.NewService(in.TranslationOptions)
 

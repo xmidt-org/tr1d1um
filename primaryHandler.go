@@ -16,7 +16,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/bascule/acquire"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
@@ -41,11 +40,6 @@ type httpClientTimeout struct {
 
 	// NetDialerTimeout is the net dialer timeout
 	NetDialerTimeout time.Duration
-}
-
-type authAcquirerConfig struct {
-	JWT   acquire.RemoteBearerTokenAcquirerOptions
-	Basic string
 }
 
 type provideWebhookHandlersIn struct {
@@ -101,18 +95,6 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 		Timeout:   timeouts.ClientTimeout,
 		Transport: transport,
 	}
-}
-
-func createAuthAcquirer(config authAcquirerConfig) (acquire.Acquirer, error) {
-	if config.JWT.AuthURL != "" && config.JWT.Buffer != 0 && config.JWT.Timeout != 0 {
-		return acquire.NewRemoteBearerTokenAcquirer(config.JWT)
-	}
-
-	if config.Basic != "" {
-		return acquire.NewFixedAuthAcquirer(config.Basic)
-	}
-
-	return nil, errors.New("auth acquirer not configured properly")
 }
 
 func v2WebhookValidators(c ancla.Config) (ancla.Validators, error) {

@@ -19,9 +19,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/bascule"
-	"github.com/xmidt-org/bascule/basculechecks"
+	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/wrp-go/v3/wrphttp"
@@ -93,23 +94,31 @@ func getPartnerIDs(h http.Header) []string {
 
 // getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
 func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
-	auth, ok := bascule.FromContext(ctx)
-	//if no token
+	token, ok := bascule.Get(ctx)
+	//if not jwt type
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
-	tokenType := auth.Token.Type()
+
 	//if not jwt type
-	if tokenType != "jwt" {
+	switch token.(type) {
+	case basculejwt.Claims:
+	default:
 		return getPartnerIDs(r.Header)
 	}
-	partnerVal, ok := bascule.GetNestedAttribute(auth.Token.Attributes(), basculechecks.PartnerKeys()...)
+
+	accessor, ok := token.(bascule.AttributesAccessor)
+	if !ok {
+		return getPartnerIDs(r.Header)
+	}
+
+	partnerVal, ok := bascule.GetAttribute[any](accessor, auth.PartnerKeys...)
 	//if no partner ids
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
-	partnerIDs, err := cast.ToStringSliceE(partnerVal)
 
+	partnerIDs, err := cast.ToStringSliceE(partnerVal)
 	if err != nil {
 		return getPartnerIDs(r.Header)
 	}
