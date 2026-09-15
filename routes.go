@@ -5,24 +5,22 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/httpaux"
-	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
@@ -30,6 +28,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
+	webhook "github.com/xmidt-org/webhook-schema"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -225,15 +224,20 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
-	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
-			return err
-		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)))).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)))
+	if in.AddWebhookHandler == nil && in.GetAllWebhooksHandler == nil {
+		return nil
 	}
+
+	hooks := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)
+	hook := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)
+	fixV2Middleware, err := fixV2Duration(in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
+	if err != nil {
+		return fmt.Errorf("failed to initialize v2 endpoint middleware: %v", err)
+	}
+
+	in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(hook))).Methods(http.MethodPost)
+	in.APIRouter.Handle("/hooks", in.AuthChain.Then(hooks)).Methods(http.MethodGet)
+
 	return nil
 }
 
@@ -285,20 +289,13 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
-	durationCheck, err := ancla.CheckDuration(config.Max)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create duration check: %v", err)
-	}
-
-	untilCheck, err := ancla.CheckUntil(config.Jitter, config.Max, config.Now)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create until check: %v", err)
-	}
+	durationOpt := webhook.ValidateRegistrationDuration(config.Max)
+	untilOpt := webhook.Until(config.Now, config.Jitter, config.Max)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +317,7 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 				return
 			}
 
-			var wr ancla.WebhookRegistration
+			var wr webhook.RegistrationV1
 			err = json.Unmarshal(requestPayload, &wr)
 			if err != nil {
 				var e *json.UnmarshalTypeError
@@ -337,25 +334,24 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config ancla.TTL
 
 			// check to see if the Webhook has a valid until/duration.
 			// If not, set the WebhookRegistration  duration to 5m.
-			webhook := wr.ToWebhook()
-			if webhook.Until.IsZero() {
-				if webhook.Duration == 0 {
-					wr.Duration = ancla.CustomDuration(config.Max)
+			if wr.Until.IsZero() {
+				if wr.Duration == 0 {
+					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
 				} else {
-					durationErr := durationCheck(webhook)
+					durationErr := durationOpt.Validate(&wr)
 					if durationErr != nil {
-						wr.Duration = ancla.CustomDuration(config.Max)
+						wr.Duration = webhook.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
 							fmt.Sprintf("Invalid duration will not be accepted in v3: %v, webhook duration defaulted to %v", durationErr, config.Max))
 					}
 				}
 			} else {
-				untilErr := untilCheck(webhook)
+				untilErr := untilOpt.Validate(&wr)
 				if untilErr != nil {
 					wr.Until = time.Time{}
-					wr.Duration = ancla.CustomDuration(config.Max)
+					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 				}
