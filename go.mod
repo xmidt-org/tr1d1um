@@ -15,7 +15,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/xmidt-org/ancla v0.5.2
 	github.com/xmidt-org/arrange v0.4.0
-	github.com/xmidt-org/bascule v1.3.5
+	github.com/xmidt-org/bascule v1.4.0
 	github.com/xmidt-org/candlelight v0.2.15
 	github.com/xmidt-org/clortho v0.3.1
 	github.com/xmidt-org/httpaux v0.4.5
