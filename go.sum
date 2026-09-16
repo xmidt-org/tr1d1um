@@ -470,8 +470,8 @@ github.com/xmidt-org/ancla v0.5.2 h1:o93ISp6Y7/ei7r55PbfcmAxEh3CJwOUFC3SEMTN8Guo
 github.com/xmidt-org/ancla v0.5.2/go.mod h1:AximaWc7ACdmqM6cuvWfbQiFTtoNLG7RJVOF+9L/sVY=
 github.com/xmidt-org/arrange v0.4.0 h1:DmJJTK58C44B4efyBV78SmMH0mn0G54n3caVn5BopUU=
 github.com/xmidt-org/arrange v0.4.0/go.mod h1:MA1eKUZYxaSMIKJL3D/iJEMQruiefmhq+s5E9J4UJv0=
-github.com/xmidt-org/bascule v1.4.0 h1:F4N5/3Vk0H7dpUwMcjEsN7ImgVysvplQYqnO4B5rJzc=
-github.com/xmidt-org/bascule v1.4.0/go.mod h1:XrPQ6LNCG+cIR9PQuG8w6ALLCv93W5j9caHRuR/yJ6M=
+github.com/xmidt-org/bascule v1.4.2 h1:HlgNPxjoZZQN0MeA+JZsPHfVdJe96QOH0vB7CojAByk=
+github.com/xmidt-org/bascule v1.4.2/go.mod h1:qjlmurwfOj2M6f400osg3sQqnrZe+1bNxIfuvJdioOw=
 github.com/xmidt-org/candlelight v0.2.15 h1:ALAGaLYSUpdKmL3yXGi6CwljOO8xyvxxaSbbE7LOyTo=
 github.com/xmidt-org/candlelight v0.2.15/go.mod h1:RgHVxsW43gCMm2sq0RmwhVK4isbeCkQLUS1ZlpG0qFQ=
 github.com/xmidt-org/chronon v0.1.15 h1:S+NbNO1WeFy+39T8bTrrX+7p9fKwzenejAvJaqbkOIo=

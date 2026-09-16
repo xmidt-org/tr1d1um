@@ -11,16 +11,13 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cast"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
+	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/clortho"
-
-	// nolint: staticcheck
-
 	"go.uber.org/zap"
 )
 
@@ -115,15 +112,15 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		partner = determinePartnerID(e.Token)
 	}
 
-	if errors.Is(e.Err, jwt.TokenExpiredError{}) {
+	if errors.Is(e.Err, basculejwt.ErrExpired) {
 		reason = AuthUnsatifiedExp
-	} else if errors.Is(e.Err, jwt.InvalidIssuedAtError{}) {
+	} else if errors.Is(e.Err, basculejwt.ErrInvalidIssuedAt) {
 		reason = AuthUnsatifiedIAT
-	} else if errors.Is(e.Err, jwt.TokenNotYetValidError{}) {
+	} else if errors.Is(e.Err, basculejwt.ErrNotYetValid) {
 		reason = AuthUnsatifiedNBF
 	} else if errors.Is(e.Err, clortho.ErrKeyProviderKeyNotFound) {
 		reason = AuthKeyNotFind
-	} else if errors.Is(e.Err, jws.VerifyError()) {
+	} else if errors.Is(e.Err, basculejwt.ErrInvalidSignature) {
 		reason = AuthCannotVerify
 	} else if errors.Is(e.Err, bascule.ErrMissingCredentials) {
 		reason = AuthMissingCreds
