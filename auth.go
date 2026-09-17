@@ -6,12 +6,12 @@ package main
 import (
 	"context"
 	"crypto/rsa"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/justinas/alice"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -25,17 +25,32 @@ type JWTValidator struct {
 	// Config is used to create the clortho Resolver & Refresher for JWT verification keys
 	Config clortho.Config
 
-	// Leeway is used to set the amount of time buffer should be given to JWT
-	// time values, such as nbf
-	// Note: Leeway was removed in Bascule v1.1.1
-	// It was unused in Tr1d1um and can be manually configured if needed.
-	// Leeway bascule.Leeway
+	// Leeway (jwtValidator.leeway) allowed a clock-skew tolerance on the exp,
+	// nbf and iat claims.  bascule v0.11 read it here and applied it to every
+	// bearer token; bascule v1.1.1 dropped the type, and it is not restored
+	// because no deployment configures it -- every value was zero, so JWT time
+	// validation behaves the same without it.
+	//
+	// If a deployment ever needs skew tolerance, reinstate it as a jwt.Claims
+	// implementation whose Valid() offsets time.Now() before calling
+	// VerifyExpiresAt/VerifyIssuedAt/VerifyNotBefore, which golang-jwt/v4 still
+	// provides with the same signatures bascule used.
 
 }
 
-// JWTToken implements bascule.Token
+// JWT claims read from a token.
+const (
+	// capabilitiesClaim holds the token's capabilities.  It matches
+	// basculejwt.CapabilitiesKey.
+	capabilitiesClaim = "capabilities"
+)
+
+// JWTToken implements bascule.Token, bascule.CapabilitiesAccessor and
+// bascule.AttributesAccessor
 type JWTToken struct {
-	principal string
+	principal    string
+	capabilities []string
+	claims       map[string]any
 }
 
 // Principal returns the subject claim from the JWT
@@ -43,15 +58,36 @@ func (jt *JWTToken) Principal() string {
 	return jt.principal
 }
 
+// Capabilities returns the capabilities claim, which the authorizer uses to
+// decide what this token is allowed to do.  Returns nil when the token carries
+// none.
+func (jt *JWTToken) Capabilities() []string {
+	return jt.capabilities
+}
+
+// Get returns a claim by name, satisfying bascule.AttributesAccessor.  Callers
+// that need a nested claim should use bascule.GetAttribute, which walks the
+// path for them.
+func (jt *JWTToken) Get(key string) (any, bool) {
+	v, ok := jt.claims[key]
+	return v, ok
+}
+
 func provideAuthChain() fx.Option {
 	return fx.Options(
 		fx.Provide(
 			arrange.UnmarshalKey("jwtValidator", JWTValidator{}),
+			arrange.UnmarshalKey(capabilityCheckKey, CapabilityConfig{}),
+			arrange.UnmarshalKey(authxInboundKey, InboundAuthConfig{}),
 			func(c JWTValidator) clortho.Config {
 				return c.Config
 			},
-			func(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
-				return createAuthMiddleware(config, logger)
+			func(in authMiddlewareIn) (*basculehttp.Middleware, error) {
+				metric, err := newCapabilityMetric(in.CapabilityChecks, in.Capabilities.EndpointBuckets)
+				if err != nil {
+					return nil, fmt.Errorf("capabilityCheck: endpointBuckets: %w", err)
+				}
+				return createAuthMiddleware(in.Config, in.Capabilities, in.Inbound, in.Logger, metric, in.AuthOutcomes)
 			},
 			fx.Annotated{
 				Name: "auth_chain",
@@ -64,7 +100,18 @@ func provideAuthChain() fx.Option {
 }
 
 // createAuthMiddleware creates a properly configured Bascule middleware with JWT support
-func createAuthMiddleware(config clortho.Config, logger *zap.Logger) (*basculehttp.Middleware, error) {
+// authMiddlewareIn collects everything the auth middleware needs from fx.
+type authMiddlewareIn struct {
+	fx.In
+	Config           clortho.Config
+	Capabilities     CapabilityConfig
+	Inbound          InboundAuthConfig
+	Logger           *zap.Logger
+	CapabilityChecks *prometheus.CounterVec `name:"capability_check"`
+	AuthOutcomes     *prometheus.CounterVec `name:"auth_outcome"`
+}
+
+func createAuthMiddleware(config clortho.Config, capabilities CapabilityConfig, inbound InboundAuthConfig, logger *zap.Logger, metric capabilityMetric, authOutcomes *prometheus.CounterVec) (*basculehttp.Middleware, error) {
 	// Create Clortho resolver for JWT key
 	resolver, err := clortho.NewResolver(
 		clortho.WithConfig(config),
@@ -79,40 +126,62 @@ func createAuthMiddleware(config clortho.Config, logger *zap.Logger) (*basculeht
 		logger:   logger,
 	}
 
-	// Create authorization parser with JWT support
-	authParser, err := basculehttp.NewAuthorizationParser(
+	// Assemble the accepted schemes.  Bearer is always available.
+	//
+	// Basic is offered only when credentials are configured, and it is
+	// registered together with the validator that checks them.  These must
+	// stay coupled: basculehttp's Basic parser only base64-decodes a
+	// credential and never checks a password, so offering the scheme without
+	// a validator accepts any "Authorization: Basic <anything>".
+	parserOptions := []basculehttp.AuthorizationParserOption{
 		basculehttp.WithScheme(basculehttp.SchemeBearer, jwtParser),
-		basculehttp.WithBasic(), // Also support basic auth
-	)
+	}
+	var validators []bascule.Validator[*http.Request]
+
+	if len(inbound.Basic) > 0 {
+		basicValidator, err := newBasicAuthValidator(inbound.Basic)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load inbound basic credentials: %w", err)
+		}
+
+		parserOptions = append(parserOptions, basculehttp.WithBasic())
+		validators = append(validators, basicValidator)
+
+		logger.Info("inbound basic auth enabled",
+			zap.Int("credentials", len(inbound.Basic)))
+	}
+
+	authParser, err := basculehttp.NewAuthorizationParser(parserOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization parser: %w", err)
 	}
 
-	// Create authenticator with JWT parser
 	authenticator, err := basculehttp.NewAuthenticator(
 		bascule.WithTokenParsers(authParser),
+		bascule.WithValidators(validators...),
+		bascule.WithAuthenticateListenerFuncs(newAuthOutcomeListener(authOutcomes)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
 
+	// Authorization: every configured capability label must grant the request.
+	approver, err := NewCapabilityApprover(capabilities, logger, metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create capability approver: %w", err)
+	}
+
+	authorizer, err := basculehttp.NewAuthorizer(
+		bascule.WithApprovers[*http.Request](approver),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authorizer: %w", err)
+	}
+
 	// Create middleware with error handling
 	return basculehttp.NewMiddleware(
 		basculehttp.WithAuthenticator(authenticator),
-		basculehttp.WithErrorStatusCoder(
-			func(r *http.Request, err error) int {
-				if errors.Is(err, bascule.ErrMissingCredentials) {
-					return 401
-				}
-				if errors.Is(err, bascule.ErrBadCredentials) {
-					return 401
-				}
-				if errors.Is(err, bascule.ErrInvalidCredentials) {
-					return 400
-				}
-				return 500
-			},
-		),
+		basculehttp.WithAuthorizer(authorizer),
 		basculehttp.WithChallenges(
 			basculehttp.Challenge{
 				Scheme: "Bearer",
@@ -157,19 +226,11 @@ func (jtp *JWTTokenParser) Parse(ctx context.Context, raw string) (bascule.Token
 			return nil, fmt.Errorf("failed to resolve JWT signing key: %w", err)
 		}
 
-		// Extract the actual crypto key from the Clortho key
-		// For RSA keys, we need to get the underlying public key
-		var publicKey interface{}
-		switch k := clorthoKey.(type) {
-		case interface{ PublicKey() *rsa.PublicKey }:
-			publicKey = k.PublicKey()
-		case interface{ Key() interface{} }:
-			publicKey = k.Key()
-		default:
-			return nil, fmt.Errorf("unsupported key type: %T", clorthoKey)
-		}
-
-		// Ensure we have an RSA public key
+		// clortho.Key exposes the underlying key through Public().  The
+		// concrete type implements neither PublicKey() *rsa.PublicKey nor
+		// Key() interface{}, so type-switching on those rejected every key the
+		// resolver returned and no JWT could ever be verified.
+		publicKey := clorthoKey.Public()
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("expected RSA public key, got %T", publicKey)
@@ -209,7 +270,14 @@ func (jtp *JWTTokenParser) Parse(ctx context.Context, raw string) (bascule.Token
 	jtp.logger.Debug("JWT token validated",
 		zap.String("principal", principal))
 
+	var capabilities []string
+	if v, ok := claims[capabilitiesClaim]; ok {
+		capabilities, _ = bascule.GetCapabilities(v)
+	}
+
 	return &JWTToken{
-		principal: principal,
+		principal:    principal,
+		capabilities: capabilities,
+		claims:       claims,
 	}, nil
 }
