@@ -12,7 +12,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
@@ -23,28 +26,13 @@ import (
 	"github.com/xmidt-org/bascule"
 )
 
+const (
+	allowedPartners  = "allowedPartners"
+	allowedResources = "allowedResources"
+)
+
 // ctxTID is a context with a defined value for a TID
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "test-tid")
-
-// testToken is a minimal Token implementation for testing
-type testToken struct {
-	principal string
-	type_     string
-	attrs     map[string]interface{}
-}
-
-func (t testToken) Principal() string {
-	return t.principal
-}
-
-func (t testToken) Type() string {
-	return t.type_
-}
-
-func (t testToken) Get(key string) (interface{}, bool) {
-	v, ok := t.attrs[key]
-	return v, ok
-}
 
 func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
@@ -57,8 +45,9 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("WRPWrapFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-		// nolint: goconst
-		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+		r = mux.SetURLVars(r, map[string]string{
+			// nolint: goconst
+			"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
@@ -67,7 +56,6 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("Ideal", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
 		assert.Nil(e)
@@ -85,12 +73,10 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	}{
 		{
 			name: "Partners from JWT",
+			tokenType:
 			// nolint: goconst
-			tokenType: "jwt",
-			attrMap: map[string]interface{}{
-				"allowedResources": map[string]interface{}{
-					"allowedPartners": []interface{}{"partnerA", "partnerB"},
-				}},
+			"jwt",
+			attrMap:            map[string]any{allowedPartners: []string{"partnerA", "partnerB"}},
 			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
 
@@ -123,15 +109,8 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-			token := testToken{
-				principal: "client0",
-				type_:     test.tokenType,
-				attrs:     test.attrMap,
-			}
-
 			var ctx context.Context
 			r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
-			// nolint: goconst
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
 			if test.addPartnerIDsInHeaders {
@@ -142,11 +121,11 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			if test.tokenType == "" {
 				ctx = ctxTID
 			} else {
-				ctx = bascule.WithToken(ctxTID, token)
+				ctx = enrichWithBasculeToken(context.Background(), true, test.attrMap)
 			}
 
 			wrpMsg, e := decodeRequest(ctx, r)
-			assert.Nil(e)
+			assert.NoError(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
 			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
 		})
@@ -197,8 +176,9 @@ func TestRequestPayload(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
 
-		// nolint: goconst
-		r = mux.SetURLVars(r, map[string]string{"service": "add"})
+		r = mux.SetURLVars(r, map[string]string{
+			// nolint: goconst
+			"service": "add"})
 		_, e := requestPayload(r)
 		assert.EqualValues(ErrMissingTable, e)
 	})
@@ -297,8 +277,9 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowNotProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
-		// nolint: goconst
-		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(""))
+		p, e := requestAddPayload(map[string]string{
+			// nolint: goconst
+			"parameter": "t0"}, bytes.NewBufferString(""))
 
 		assert.Nil(p)
 		assert.EqualValues(ErrMissingRow, e)
@@ -307,7 +288,6 @@ func TestRequestAddPayload(t *testing.T) {
 	t.Run("RowInvalidProvided", func(t *testing.T) {
 		assert := assert.New(t)
 
-		// nolint: goconst
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString("invalid row"))
 
 		assert.Nil(p)
@@ -600,9 +580,88 @@ func TestEncodeError(t *testing.T) {
 
 		expected := bytes.NewBufferString("")
 		json.NewEncoder(expected).Encode(map[string]string{
-			// nolint: goconst
 			"message": transaction.ErrTr1d1umInternal.Error()})
 
 		assert.EqualValues(expected.String(), w.Body.String())
 	})
+}
+
+type testJWT struct {
+	jwt.Token
+}
+
+func (t testJWT) Principal() string {
+	p, _ := t.Token.Subject()
+	return p
+}
+
+func (t testJWT) Get(k string) (any, bool) {
+	return t.Field(k)
+}
+
+func (t testJWT) Audience() []string {
+	v, _ := t.Token.Audience()
+
+	return v
+}
+
+func (t testJWT) Expiration() time.Time {
+	v, _ := t.Token.Expiration()
+
+	return v
+}
+
+func (t testJWT) IssuedAt() time.Time {
+	v, _ := t.Token.IssuedAt()
+
+	return v
+}
+
+func (t testJWT) Issuer() string {
+	v, _ := t.Token.Issuer()
+
+	return v
+}
+
+func (t testJWT) JwtID() string {
+	v, _ := t.Token.JwtID()
+
+	return v
+}
+
+func (t testJWT) NotBefore() time.Time {
+	v, _ := t.Token.NotBefore()
+
+	return v
+}
+
+func (t testJWT) Subject() string {
+	v, _ := t.Token.Subject()
+
+	return v
+}
+
+func (t testJWT) Capabilities() (caps []string) {
+	if v, ok := t.Field(basculejwt.CapabilitiesKey); ok {
+		caps, _ = bascule.GetCapabilities(v)
+	}
+
+	return
+}
+
+func enrichWithBasculeToken(ctx context.Context, isBearer bool, attrMap map[string]any) context.Context {
+	if isBearer {
+		token, err := jwt.NewBuilder().
+			Claim(allowedResources, attrMap).
+			Subject("client0").
+			Issuer("https://example.com").
+			Build()
+		if err != nil {
+			panic(fmt.Errorf("failed to build test JWT: %v", err))
+		}
+
+		return bascule.WithToken(ctx, &testJWT{token})
+	}
+
+	return bascule.WithToken(ctx, bascule.StubToken("client0"))
 }

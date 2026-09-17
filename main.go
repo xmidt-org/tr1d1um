@@ -12,11 +12,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/ancla/chrysom"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/auth"
+	"github.com/xmidt-org/tr1d1um/webhook"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
@@ -47,7 +48,6 @@ const (
 	wrpSourceKey                      = "WRPSource"
 	hooksSchemeKey                    = "hooksScheme"
 	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
-	authAcquirerKey                   = "authAcquirer"
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
 	fingerprintCredsKey               = "fingerprintCreds"
@@ -75,11 +75,6 @@ var defaults = map[string]interface{}{
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
 	XmidtClientTimeout httpClientTimeout `name:"xmidtClientTimeout"`
-}
-
-type ArgusClientTimeoutConfigIn struct {
-	fx.In
-	ArgusClientTimeout httpClientTimeout `name:"argusClientTimeout"`
 }
 
 type TracingConfigIn struct {
@@ -112,18 +107,6 @@ func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeou
 		xct.RequestTimeout = time.Second * 129
 	}
 	return xct
-}
-
-func configureArgusClientTimeout(in ArgusClientTimeoutConfigIn) httpClientTimeout {
-	act := in.ArgusClientTimeout
-
-	if act.ClientTimeout == 0 {
-		act.ClientTimeout = time.Second * 50
-	}
-	if act.NetDialerTimeout == 0 {
-		act.NetDialerTimeout = time.Second * 5
-	}
-	return act
 }
 
 func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
@@ -189,11 +172,11 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fx.Supply(v),
 		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		arrange.ProvideKey("argusClientTimeout", httpClientTimeout{}),
+		auth.Provide(),
+		webhook.Provide(),
 		touchstone.Provide(),
 		touchhttp.Provide(),
 		provideMetrics(),
-		chrysom.ProvideMetrics(),
 		arrangepprof.HTTP{
 			RouterName: "server_pprof",
 		}.Provide(),
@@ -204,14 +187,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 				Name:   "xmidt_client_timeout",
 				Target: configureXmidtClientTimeout,
 			},
-			fx.Annotated{
-				Name:   "argus_client_timeout",
-				Target: configureArgusClientTimeout,
-			},
 			loadTracing,
 			newHTTPClient,
 		),
-		provideAuthChain(),
 		provideServers(),
 		provideHandlers(),
 	)
