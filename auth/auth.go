@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 
 	"github.com/justinas/alice"
@@ -28,6 +29,8 @@ const (
 	jwtConfigKey     = "auth.inbound.JWT"
 	clorthoConfigKey = "auth.inbound.JWT.Clortho"
 )
+
+var stripAPIVersionRegex = regexp.MustCompile(`^/api/v[0-9]+`)
 
 type inboundConfig struct {
 	JWT   jwtConfig
@@ -95,6 +98,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 		validatorOpts = append(validatorOpts, basculehttp.AsValidator(bearerSchemeValidator))
 
 		approver, err := basculecaps.NewApprover(
+			basculecaps.WithURLNormalizeFunc(stripAPIVersion),
 			basculecaps.WithAllMethod(cfg.JWT.AcceptAllMethod),
 			basculecaps.WithPrefixes(cfg.JWT.Capabilities...),
 			basculecaps.WithCacheSize(cfg.JWT.CacheSize))
@@ -148,4 +152,13 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 	}
 
 	return alice.New(setLogger(l), auth.Then), nil
+}
+
+// stripAPIVersion removes a leading /api/vN from a request's path, so that
+// capabilities may be written without it.
+func stripAPIVersion(u url.URL) url.URL {
+	u.Path = stripAPIVersionRegex.ReplaceAllString(u.Path, "")
+	u.RawPath = ""
+
+	return u
 }
