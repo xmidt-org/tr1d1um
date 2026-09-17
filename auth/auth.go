@@ -40,7 +40,7 @@ type inboundConfig struct {
 type jwtConfig struct {
 	AcceptAllMethod string
 	CacheSize       int
-	Capabilities    []string
+	Prefixes        []string
 	EndpointBuckets []string
 }
 
@@ -100,7 +100,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 		approver, err := basculecaps.NewApprover(
 			basculecaps.WithURLNormalizeFunc(stripAPIVersion),
 			basculecaps.WithAllMethod(cfg.JWT.AcceptAllMethod),
-			basculecaps.WithPrefixes(cfg.JWT.Capabilities...),
+			basculecaps.WithPrefixes(cfg.JWT.Prefixes...),
 			basculecaps.WithCacheSize(cfg.JWT.CacheSize))
 		if err != nil {
 			return alice.Chain{}, fmt.Errorf("error setting up JWT capability checks: %v", err)
