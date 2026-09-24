@@ -271,44 +271,109 @@ jwtValidator:
         #
         # This field is required and has no default.
         - uri: "http://localhost/available"
+# authx.inbound configures credentials accepted on inbound requests.
+#
+# basic is a list of base64-encoded "user:password" strings.  Each entry is
+# checked against the credential presented in an Authorization: Basic header.
+#
+# When this list is empty or absent the Basic scheme is not offered at all and
+# any Basic credential is rejected.  The scheme and the credentials that verify
+# it are enabled by the same setting, so Basic can never be accepted without a
+# password check.
+#
+# Authenticating with Basic does not by itself authorize anything: a Basic
+# credential carries no capabilities, so it is subject to the capabilityCheck
+# defaults below like any other token.
+#
+# WARNING! The credential below is for local testing.  Remove it from any
+# production config.
 authx:
   inbound:
-    # basic is a list of Basic Auth credentials intended to be used for local testing purposes
-    # WARNING! Be sure to remove this from your production config
     basic: ["dXNlcjpwYXNz"]
-# capabilityCheck provides the details needed for checking an incoming JWT's
-# capabilities.  If the type of check isn't provided, no checking is done.  The
-# type can be "monitor" or "enforce".  If it is empty or a different value, no
-# checking is done.  If "monitor" is provided, the capabilities are checked but
-# the request isn't rejected when there isn't a valid capability for the
-# request. Instead, a message is logged.  When "enforce" is provided, a request
-# that doesn't have the needed capability is rejected.
+# partnerIDs controls where the partner IDs stamped on outbound WRP messages
+# may come from.
 #
-# The capability is expected to have the format:
+# tr1d1um cannot tell which partner owns the target device, so it does not
+# authorize the choice -- it states the partner and the device confirms or
+# rejects it.  What it does insist on is that the statement comes from the
+# verified token whenever the token makes one, at
+# allowedResources.allowedPartners.
 #
-# {prefix}{endpoint}:{method}
+# Sources are tried in order:
 #
-# The prefix can be a regular expression.  If it's empty, no capability check
-# is done.  The endpoint is a regular expression that should match the endpoint
-# the request was sent to. The method is usually the method of the request, such as
-# GET.  The accept all method is a catchall string that indicates the capability
-# is approved for all methods.
+#   1. the token's allowedResources.allowedPartners claim
+#   2. the X-Webpa-Partner-Id header, if allowHeader is true
+#   3. no partner IDs at all, if allowEmpty is true
+#   4. otherwise the request is refused
+#
+# Both settings default to false, so by default only the token may supply
+# partner IDs.  Set allowHeader to true for callers whose credentials carry no
+# partner claim, such as basic auth.
+#
+# (Optional)
+# partnerIDs:
+#   # allowHeader lets the X-Webpa-Partner-Id header supply partner IDs for
+#   # callers whose token states none, such as basic-auth credentials.  It
+#   # defaults to false: a request presenting no partner IDs from any permitted
+#   # source is refused rather than sent downstream unscoped.
+#   allowHeader: false
+#   # allowEmpty lets a request proceed with no partner IDs at all, leaving the
+#   # outbound WRP message unscoped for the device to interpret.  Defaults to
+#   # false, so such a request is refused instead.
+#   allowEmpty: false
+
+# capabilityCheck controls authorization: what a caller may do once their token
+# has been authenticated.
+#
+# Capabilities are carried by the JWT in its "capabilities" claim and have three
+# parts:
+#
+#   example-prefix:api:device/.*/config:get
+#   \________________/\_________________/
+#          prefix         endpoint:method
+#
+# The prefix -- everything up to and including the segment before the endpoint,
+# e.g. "example-prefix:api:" -- is configured below and identifies capabilities
+# meant for this service.  After it, endpoint is a regular expression matched
+# against the request path with the /api/v3 or /api/v2 prefix removed, and
+# method is the lowercased HTTP verb or the accept-all value.
+#
+# A token may carry capabilities with a different prefix -- later work will add
+# tr181, cidr and rate limits under their own prefixes -- and those are ignored,
+# so an issuer can mint them before this build consumes them.
+#
+# Authorization is a grant: a request is allowed only when some capability
+# matches it.  A request whose token carries no matching capability falls back
+# to "default"; with no default, nothing grants it.
+#
+# type is the mode: "enforce" rejects requests nothing grants, "monitor" records
+# them and lets them through, "disabled" turns the check off, and omitting it
+# leaves the check off and logs that at startup.  Any other value -- including a
+# blank one from a stray key -- stops the server, so a typo cannot quietly
+# disable a security check.
+#
 # (Optional)
 # capabilityCheck:
-#   # type provides the mode for capability checking.
 #   type: "enforce"
-#   # prefix provides the regex to match the capability before the endpoint.
-#   prefix: "prefix Here"
-#   # acceptAllMethod provides a way to have a capability that allows all
-#   # methods for a specific endpoint.
+#   # prefix is everything before the endpoint, including the trailing segment
+#   # and its colon.
+#   prefix: "example-prefix:api:"
+#   # acceptAllMethod is the method value granting every HTTP method.  Defaults
+#   # to "all".
 #   acceptAllMethod: "all"
-#   # endpointBuckets provides regular expressions to use against the request
-#   # endpoint in order to group requests for a metric label.
+#   # endpointBuckets group requests by endpoint for the capability_check metric.
 #   endpointBuckets:
 #     - "hook\\b"
 #     - "hooks\\b"
 #     - "device/.*/stat\\b"
 #     - "device/.*/config\\b"
+#   # default grants these endpoint:method values to a request whose token
+#   # carries no matching capability.  Empty grants such a request nothing.
+#   default: []
+#   # checkBasicAuth subjects basic credentials to the check.  It defaults to
+#   # false: historically a valid basic credential was allowed everything and
+#   # the check applied only to bearer tokens.
+#   checkBasicAuth: false
 
 
 ##############################################################################

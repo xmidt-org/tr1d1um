@@ -23,11 +23,34 @@ const (
 )
 
 func provideMetrics() fx.Option {
-	return touchstone.CounterVec(
-		prometheus.CounterOpts{
-			Name: serviceConfigsRetriesCounter,
-			Help: "Count of retries for xmidt service configs api calls.",
-		},
-		[]string{apiLabel}...,
+	return fx.Options(
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: serviceConfigsRetriesCounter,
+				Help: "Count of retries for xmidt service configs api calls.",
+			},
+			[]string{apiLabel}...,
+		),
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: capabilityCheckCounter,
+				Help: "Outcome of capability checks by label, outcome, and endpoint bucket.",
+			},
+			[]string{capabilityLabelName, outcomeLabel, endpointLabel}...,
+		),
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: authOutcomeCounter,
+				Help: "Outcome of authentication attempts by scheme.",
+			},
+			[]string{schemeLabel, outcomeLabel}...,
+		),
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: partnerIDsCounter,
+				Help: "Where a request's WRP partner IDs were sourced from.",
+			},
+			[]string{sourceLabel}...,
+		),
 	)
 }
