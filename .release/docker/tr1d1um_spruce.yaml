@@ -225,6 +225,7 @@ jwtValidator:
       # This field is required and has no default.
 
       Template: "http://themis:6500/keys/{keyID}"
+      Timeout: (( grab $JWKS_RESOLVE_TIMEOUT || "5s" ))
 
     Refresh:
       Sources:
@@ -234,7 +235,6 @@ jwtValidator:
         #
         # This field is required and has no default.
         - URI: "http://themis:6500/keys/available"
-
 
 authx:
   inbound:
