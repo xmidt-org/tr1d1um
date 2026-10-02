@@ -12,13 +12,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/spf13/cast"
+	"github.com/xmidt-org/bascule"
+
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
-	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
@@ -43,6 +44,40 @@ type Options struct {
 	ValidServices               []string
 	ReducedLoggingResponseCodes []int
 	BearerFingerprint           transaction.FingerprintConfig
+
+	// PartnerIDs governs where partner IDs may come from.
+	PartnerIDs PartnerIDOptions
+}
+
+// PartnerIDSource names where a request's partner IDs came from.  These are
+// metric label values: watching the header source drain to zero is how a
+// deployment knows it can leave AllowHeader false.
+const (
+	PartnerIDSourceToken   = "token"
+	PartnerIDSourceHeader  = "header"
+	PartnerIDSourceEmpty   = "empty"
+	PartnerIDSourceRefused = "refused"
+)
+
+// PartnerIDOptions governs the sources permitted for the partner IDs stamped on
+// outbound WRP messages.
+type PartnerIDOptions struct {
+	// AllowHeader lets the X-Webpa-Partner-Id header supply partner IDs for
+	// callers whose token states none.
+	AllowHeader bool
+
+	// AllowEmpty lets a request proceed with no partner IDs at all.
+	AllowEmpty bool
+
+	// Record counts which source supplied a request's partner IDs.  Optional.
+	Record func(source string)
+}
+
+// record reports the source used, when a recorder is configured.
+func (o PartnerIDOptions) record(source string) {
+	if o.Record != nil {
+		o.Record(source)
+	}
 }
 
 // ConfigHandler sets up the server that powers the translation service
@@ -55,7 +90,7 @@ func ConfigHandler(c *Options) {
 
 	WRPHandler := kithttp.NewServer(
 		makeTranslationEndpoint(c.S),
-		decodeValidServiceRequest(c.ValidServices, decodeRequest),
+		decodeValidServiceRequest(c.ValidServices, makeDecodeRequest(c.PartnerIDs)),
 		encodeResponse,
 		opts...,
 	)
@@ -89,35 +124,85 @@ func getPartnerIDs(h http.Header) []string {
 	return partners
 }
 
-// getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
-func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
-	auth, ok := bascule.Get(ctx)
-	//if no token
+// ErrNoPartnerIDs is returned when neither the token nor an allowed header
+// supplies a partner ID.
+var ErrNoPartnerIDs = transaction.NewBadRequestError(
+	errors.New("no partner IDs presented"))
+
+// JWT claims read from a token.
+const (
+	allowedResourcesClaim = "allowedResources"
+	allowedPartnersClaim  = "allowedPartners"
+)
+
+// partnerIDClaimPath is where a JWT states the partners its bearer may act for.
+
+var partnerIDClaimPath = []string{allowedResourcesClaim, allowedPartnersClaim}
+
+// getPartnerIDsDecodeRequest returns the partner IDs to stamp on the outbound
+// WRP message.
+//
+// tr1d1um cannot tell which partner owns the target device, so it does not
+// authorize the choice; it states the partner and the device confirms or
+// rejects it.  What it can insist on is that the statement comes from the
+// verified token whenever the token makes one.
+//
+// The X-Webpa-Partner-Id header is consulted only for callers whose token
+// carries no partner IDs, and only when a deployment has allowed it.  With no
+// source at all the request is refused, unless the deployment has said an
+// unscoped request is acceptable.
+func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request, cfg PartnerIDOptions) ([]string, error) {
+	if partners := partnerIDsFromToken(ctx); len(partners) > 0 {
+		cfg.record(PartnerIDSourceToken)
+		return partners, nil
+	}
+
+	if cfg.AllowHeader {
+		if partners := getPartnerIDs(r.Header); len(partners) > 0 {
+			cfg.record(PartnerIDSourceHeader)
+			return partners, nil
+		}
+	}
+
+	if cfg.AllowEmpty {
+		cfg.record(PartnerIDSourceEmpty)
+		return nil, nil
+	}
+
+	cfg.record(PartnerIDSourceRefused)
+	return nil, ErrNoPartnerIDs
+}
+
+// partnerIDsFromToken reads the partner IDs the verified token states.
+func partnerIDsFromToken(ctx context.Context) []string {
+	token, ok := bascule.Get(ctx)
 	if !ok {
-		return getPartnerIDs(r.Header)
+		return nil
 	}
-	// Try to access token attributes
-	if accessor, ok := auth.(bascule.AttributesAccessor); ok {
-		// First try simple top-level partner keys
-		for _, key := range transaction.PartnerKeys() {
-			if partnerVal, found := accessor.Get(key); found {
-				partnerIDs, err := cast.ToStringSliceE(partnerVal)
-				if err == nil {
-					return partnerIDs
-				}
-			}
-		}
-		// Try nested path: allowedResources.allowedPartners
-		partnerIDs, ok := bascule.GetAttribute[[]interface{}](accessor, "allowedResources", "allowedPartners")
-		if ok && len(partnerIDs) > 0 {
-			strIDs, err := cast.ToStringSliceE(partnerIDs)
-			if err == nil {
-				return strIDs
-			}
-		}
+
+	accessor, ok := token.(bascule.AttributesAccessor)
+	if !ok {
+		return nil
 	}
-	// Fallback to headers
-	return getPartnerIDs(r.Header)
+
+	value, found := bascule.GetAttribute[any](accessor, partnerIDClaimPath...)
+	if !found {
+		return nil
+	}
+
+	partners, err := cast.ToStringSliceE(value)
+	if err != nil {
+		// The claim is present but not a list of strings.  That is a problem
+		// with the token rather than with this service, so the request carries
+		// on to whatever fallback is configured -- but silently discarding it
+		// would leave a refused request with no explanation.
+		sallust.Get(ctx).Warn("partner IDs claim is not a list of strings",
+			zap.String("claim", strings.Join(partnerIDClaimPath, ".")),
+			zap.Error(err))
+		return nil
+	}
+
+	return partners
 }
 
 func getTID(ctx context.Context) string {
@@ -131,7 +216,17 @@ func getTID(ctx context.Context) string {
 }
 
 /* Request Decoding */
-func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
+
+// makeDecodeRequest builds the request decoder.  It is a closure so the partner
+// authorizer can be supplied from configuration rather than reached for
+// globally.
+func makeDecodeRequest(cfg PartnerIDOptions) kithttp.DecodeRequestFunc {
+	return func(ctx context.Context, r *http.Request) (interface{}, error) {
+		return decodeRequest(ctx, r, cfg)
+	}
+}
+
+func decodeRequest(ctx context.Context, r *http.Request, cfg PartnerIDOptions) (decodedRequest interface{}, err error) {
 	var (
 		payload    []byte
 		wrpMsg     *wrp.Message
@@ -141,7 +236,7 @@ func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interfa
 
 	if payload, err = requestPayload(r); err == nil {
 		tid = getTID(ctx)
-		partnerIDs = getPartnerIDsDecodeRequest(ctx, r)
+		partnerIDs, err = getPartnerIDsDecodeRequest(ctx, r, cfg)
 	}
 
 	if err == nil {

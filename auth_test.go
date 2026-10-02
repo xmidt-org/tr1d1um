@@ -8,7 +8,10 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -46,11 +49,10 @@ func (m *mockClorthoKey) KeyUsage() string                       { return "sig" 
 func (m *mockClorthoKey) Raw() interface{}                       { return m.public }
 func (m *mockClorthoKey) Public() crypto.PublicKey               { return m.public }
 
-// PublicKey matches one of the key access patterns used by JWTTokenParser.
-func (m *mockClorthoKey) PublicKey() *rsa.PublicKey {
-	pub, _ := m.public.(*rsa.PublicKey)
-	return pub
-}
+// NOTE: this mock deliberately implements only the clortho.Key interface, the
+// same method set as clortho's concrete key type.  Adding a convenience
+// accessor here that production keys do not have (an earlier version had
+// PublicKey() *rsa.PublicKey) hides real key-extraction bugs from these tests.
 
 type mockUnsupportedClorthoKey struct{}
 
@@ -117,7 +119,7 @@ func TestCreateAuthMiddleware(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mw, err := createAuthMiddleware(tc.config, logger)
+			mw, err := createAuthMiddleware(tc.config, CapabilityConfig{}, InboundAuthConfig{}, logger, nopCapabilityMetric{}, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, mw)
@@ -126,6 +128,73 @@ func TestCreateAuthMiddleware(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.NotNil(t, mw)
+		})
+	}
+}
+
+// TestCreateAuthMiddleware_Status pins the status each rejection produces.
+//
+// Two of these guard removals: the Basic cases guard against re-adding
+// basculehttp.WithBasic() without a credential store, and the whole table
+// guards the decision to let bascule map errors to statuses rather than
+// mapping them here.
+func TestCreateAuthMiddleware_Status(t *testing.T) {
+	tests := []struct {
+		description    string
+		authHeader     string
+		expectedStatus int
+	}{
+		{
+			description:    "no credentials",
+			expectedStatus: http.StatusUnauthorized,
+		}, {
+			description:    "basic is not an offered scheme",
+			authHeader:     "Basic " + base64.StdEncoding.EncodeToString([]byte("any:thing")),
+			expectedStatus: http.StatusUnauthorized,
+		}, {
+			description:    "basic with empty credentials",
+			authHeader:     "Basic " + base64.StdEncoding.EncodeToString([]byte(":")),
+			expectedStatus: http.StatusUnauthorized,
+		}, {
+			description:    "unrecognized scheme",
+			authHeader:     "Negotiate abc",
+			expectedStatus: http.StatusUnauthorized,
+		}, {
+			description:    "bearer that is not a JWT",
+			authHeader:     "Bearer not-a-jwt",
+			expectedStatus: http.StatusBadRequest,
+		},
+		// NOTE: "Bearer " -- a scheme, one space, and no credential -- panics
+		// inside bascule v1.1.1.  ParseAuthorization (basculehttp/
+		// authorization.go:37) checks len(scheme) > 0 but not len(v) > 0
+		// before indexing v[0], so an empty credential indexes an empty
+		// string.  Reachable by any unauthenticated request.  Add a case here
+		// once that is fixed upstream.
+	}
+
+	mw, err := createAuthMiddleware(clortho.Config{
+		Resolve: clortho.ResolveConfig{Template: "https://keys.example/{keyID}"},
+	}, CapabilityConfig{}, InboundAuthConfig{}, zap.NewNop(), nopCapabilityMetric{}, nil)
+	require.NoError(t, err)
+	require.NotNil(t, mw)
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			reached := false
+			handler := mw.Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/device/mac:112233445566/config", nil)
+			if tc.authHeader != "" {
+				req.Header.Set("Authorization", tc.authHeader)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			assert.False(t, reached, "protected handler must not be reached")
+			assert.Equal(t, tc.expectedStatus, rec.Code)
 		})
 	}
 }

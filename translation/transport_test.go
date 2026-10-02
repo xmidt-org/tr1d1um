@@ -50,16 +50,17 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("PayloadFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-		_, e := decodeRequest(ctxTID, r)
+		_, e := decodeRequest(ctxTID, r, PartnerIDOptions{AllowHeader: true})
 		assert.EqualValues(ErrEmptyNames, e)
 	})
 
 	t.Run("WRPWrapFailure", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
 		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
-		wrpMsg, e := decodeRequest(ctxTID, r)
+		wrpMsg, e := decodeRequest(ctxTID, r, PartnerIDOptions{AllowHeader: true})
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
 	})
@@ -67,9 +68,10 @@ func TestDecodeRequest(t *testing.T) {
 	t.Run("Ideal", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+		r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
 		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
-		wrpMsg, e := decodeRequest(ctxTID, r)
+		wrpMsg, e := decodeRequest(ctxTID, r, PartnerIDOptions{AllowHeader: true})
 		assert.Nil(e)
 		assert.NotEmpty(wrpMsg)
 	})
@@ -82,14 +84,15 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		attrMap                map[string]interface{}
 		addPartnerIDsInHeaders bool
 		expectedPartnerIDs     []string
+		expectRefusal          bool
 	}{
 		{
 			name: "Partners from JWT",
 			// nolint: goconst
 			tokenType: "jwt",
 			attrMap: map[string]interface{}{
-				"allowedResources": map[string]interface{}{
-					"allowedPartners": []interface{}{"partnerA", "partnerB"},
+				allowedResourcesClaim: map[string]interface{}{
+					allowedPartnersClaim: []interface{}{"partnerA", "partnerB"},
 				}},
 			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
@@ -103,17 +106,18 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		},
 
 		{
-			name:      "No Patner IDs",
-			tokenType: "jwt",
-			attrMap:   map[string]interface{}{},
+			name:          "No partner IDs from any source is refused",
+			tokenType:     "jwt",
+			attrMap:       map[string]interface{}{},
+			expectRefusal: true,
 		},
 
 		{
 			name:      "Wrong type for partners from JWT",
 			tokenType: "jwt",
 			attrMap: map[string]interface{}{
-				"allowedResources": map[string]interface{}{
-					"allowedPartners": map[string]string{"partner-A": "first", "partner-B": "second"},
+				allowedResourcesClaim: map[string]interface{}{
+					allowedPartnersClaim: map[string]string{"partner-A": "first", "partner-B": "second"},
 				}},
 			addPartnerIDsInHeaders: true,
 			expectedPartnerIDs:     []string{"partner0", "partner1"},
@@ -145,7 +149,13 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 				ctx = bascule.WithToken(ctxTID, token)
 			}
 
-			wrpMsg, e := decodeRequest(ctx, r)
+			wrpMsg, e := decodeRequest(ctx, r, PartnerIDOptions{AllowHeader: true})
+
+			if test.expectRefusal {
+				assert.ErrorIs(e, ErrNoPartnerIDs)
+				return
+			}
+
 			assert.Nil(e)
 			realWRP, _ := wrpMsg.(*wrpRequest)
 			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
@@ -605,4 +615,75 @@ func TestEncodeError(t *testing.T) {
 
 		assert.EqualValues(expected.String(), w.Body.String())
 	})
+}
+
+// TestGetPartnerIDsRecordsSource pins which source each branch reports, since
+// that counter is what tells a deployment whether AllowHeader is still needed.
+func TestGetPartnerIDsRecordsSource(t *testing.T) {
+	tests := []struct {
+		description    string
+		tokenPartners  []string
+		headerPartners string
+		options        PartnerIDOptions
+		expectedSource string
+		expectedErr    bool
+	}{
+		{
+			description:    "token supplies them",
+			tokenPartners:  []string{"partnerA"},
+			headerPartners: "ignored",
+			options:        PartnerIDOptions{AllowHeader: true},
+			expectedSource: PartnerIDSourceToken,
+		}, {
+			description:    "header supplies them when the token does not",
+			headerPartners: "partner0",
+			options:        PartnerIDOptions{AllowHeader: true},
+			expectedSource: PartnerIDSourceHeader,
+		}, {
+			description:    "header ignored when not allowed",
+			headerPartners: "partner0",
+			options:        PartnerIDOptions{AllowEmpty: true},
+			expectedSource: PartnerIDSourceEmpty,
+		}, {
+			description:    "empty when nothing supplies them and that is allowed",
+			options:        PartnerIDOptions{AllowEmpty: true},
+			expectedSource: PartnerIDSourceEmpty,
+		}, {
+			description:    "refused when nothing supplies them",
+			options:        PartnerIDOptions{AllowHeader: true},
+			expectedSource: PartnerIDSourceRefused,
+			expectedErr:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			var recorded []string
+			opts := tc.options
+			opts.Record = func(source string) { recorded = append(recorded, source) }
+
+			attrs := map[string]interface{}{}
+			if len(tc.tokenPartners) > 0 {
+				attrs[allowedResourcesClaim] = map[string]interface{}{
+					allowedPartnersClaim: tc.tokenPartners,
+				}
+			}
+			ctx := bascule.WithToken(context.Background(),
+				testToken{principal: "client0", type_: "jwt", attrs: attrs})
+
+			r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+			if tc.headerPartners != "" {
+				r.Header.Set(wrphttp.PartnerIdHeader, tc.headerPartners)
+			}
+
+			_, err := getPartnerIDsDecodeRequest(ctx, r, opts)
+
+			if tc.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, []string{tc.expectedSource}, recorded)
+		})
+	}
 }
