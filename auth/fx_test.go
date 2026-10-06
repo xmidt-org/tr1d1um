@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	anclaauth "github.com/xmidt-org/ancla/auth"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/clortho/clorthofx"
 	"github.com/xmidt-org/touchstone"
@@ -181,7 +180,6 @@ func TestProvide(t *testing.T) {
 			app := fx.New(
 				fx.NopLogger,
 				fx.Supply(v, zap.NewNop(), touchstone.Config{}),
-				arrange.ForViper(v),
 				touchstone.Provide(),
 				Provide(v),
 				fx.Invoke(func(in struct {
