@@ -12,17 +12,18 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xmidt-org/arrange"
-	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/auth"
+	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"github.com/xmidt-org/tr1d1um/webhook"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 
 	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/xmidt-org/candlelight"
 )
 
@@ -151,7 +152,35 @@ func exitIfError(logger *zap.Logger, err error) {
 	}
 }
 
-//nolint:funlen
+// newApp assembles the tr1d1um application from its configuration.
+func newApp(v *viper.Viper, l *zap.Logger) fx.Option {
+	return fx.Options(
+		fx.WithLogger(func() fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: l}
+		}),
+		fx.Supply(l),
+		fx.Supply(v),
+		viperfx.Provide("xmidtClientTimeout", httpClientTimeout{}),
+		auth.Provide(v),
+		webhook.Provide(),
+		touchstone.Provide(),
+		touchhttp.Provide(),
+		provideMetrics(),
+		fx.Provide(
+			consts,
+			viperfx.Unmarshal(tracingConfigKey, candlelight.Config{}),
+			fx.Annotated{
+				Name:   "xmidt_client_timeout",
+				Target: configureXmidtClientTimeout,
+			},
+			loadTracing,
+			newHTTPClient,
+		),
+		provideServers(),
+		provideHandlers(),
+	)
+}
+
 func tr1d1um(arguments []string) (exitCode int) {
 	v, l, f, err := setup(arguments)
 	if err != nil {
@@ -166,33 +195,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		os.Exit(0)
 	}
 
-	app := fx.New(
-		arrange.LoggerFunc(l.Sugar().Infof),
-		fx.Supply(l),
-		fx.Supply(v),
-		arrange.ForViper(v),
-		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		auth.Provide(v),
-		webhook.Provide(),
-		touchstone.Provide(),
-		touchhttp.Provide(),
-		provideMetrics(),
-		arrangepprof.HTTP{
-			RouterName: "server_pprof",
-		}.Provide(),
-		fx.Provide(
-			consts,
-			arrange.UnmarshalKey(tracingConfigKey, candlelight.Config{}),
-			fx.Annotated{
-				Name:   "xmidt_client_timeout",
-				Target: configureXmidtClientTimeout,
-			},
-			loadTracing,
-			newHTTPClient,
-		),
-		provideServers(),
-		provideHandlers(),
-	)
+	app := fx.New(newApp(v, l))
 
 	switch err := app.Err(); {
 	case errors.Is(err, pflag.ErrHelp):

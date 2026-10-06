@@ -16,10 +16,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla/auth"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/clortho/clorthofx"
 	"github.com/xmidt-org/touchstone"
+	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -49,8 +49,8 @@ func Provide(v *viper.Viper) fx.Option {
 	opts := []fx.Option{
 		provideMetrics(),
 		fx.Provide(
-			arrange.UnmarshalKey(inboundConfigKey, inboundConfig{}),
-			arrange.UnmarshalKey(outboundConfigKey, outboundConfig{}),
+			viperfx.Unmarshal(inboundConfigKey, inboundConfig{}),
+			viperfx.Unmarshal(outboundConfigKey, outboundConfig{}),
 			fx.Annotate(
 				provideDecoratorsParseOpts,
 				fx.ParamTags(`optional:"true"`),
@@ -65,7 +65,7 @@ func Provide(v *viper.Viper) fx.Option {
 		opts = append(opts,
 			clorthofx.Provide(),
 			fx.Provide(
-				arrange.UnmarshalKey(clorthoConfigKey, clorthoConfig{}),
+				viperfx.Unmarshal(clorthoConfigKey, clorthoConfig{}),
 				newClorthoConfig,
 			),
 		)

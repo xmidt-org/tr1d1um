@@ -15,11 +15,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -151,8 +151,8 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 func provideHandlers() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
-			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
+			viperfx.Unmarshal("prometheus", touchstone.Config{}),
+			viperfx.Unmarshal("prometheus.handler", touchhttp.Config{}),
 			provideWebhookHandlers,
 		),
 	)

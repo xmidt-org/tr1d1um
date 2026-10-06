@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -17,14 +18,15 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
-	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
+	"github.com/xmidt-org/arrange/arrangepprof"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/httpaux"
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/auth"
+	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -38,6 +40,16 @@ var (
 	errFailedWebhookUnmarshal = errors.New("failed to JSON unmarshal webhook")
 
 	v2WarningHeader = "X-Xmidt-Warning"
+)
+
+// The HTTP servers.  Each name is both the name of the server's *mux.Router
+// component and the prefix of the components arrangehttp builds it from.
+const (
+	primaryServer   = "server_primary"
+	alternateServer = "server_alternate"
+	healthServer    = "server_health"
+	metricsServer   = "server_metrics"
+	pprofServer     = "server_pprof"
 )
 
 type primaryEndpointIn struct {
@@ -87,21 +99,6 @@ type provideURLPrefixIn struct {
 	PrevVerSupport bool `name:"previousVersionSupport"`
 }
 
-type primaryMetricMiddlewareIn struct {
-	fx.In
-	Primary alice.Chain `name:"middleware_primary_metrics"`
-}
-
-type alternateMetricMiddlewareIn struct {
-	fx.In
-	Alternate alice.Chain `name:"middleware_alternate_metrics"`
-}
-
-type healthMetricMiddlewareIn struct {
-	fx.In
-	Health alice.Chain `name:"middleware_health_metrics"`
-}
-
 type metricMiddlewareOut struct {
 	fx.Out
 	Primary   alice.Chain `name:"middleware_primary_metrics"`
@@ -115,23 +112,114 @@ type metricsRoutesIn struct {
 	Handler touchhttp.Handler
 }
 
+type healthRoutesIn struct {
+	fx.In
+	Router *mux.Router `name:"server_health"`
+}
+
+// serialShutdowner lets several goroutines ask the application to shut down
+// at once.
+//
+// arrangehttp has every server report its exit through the application's
+// fx.Shutdowner, with an exit code.  When the application stops, all of the
+// servers do that together, and fx records the exit code without
+// synchronization.
+type serialShutdowner struct {
+	lock     sync.Mutex
+	delegate fx.Shutdowner
+}
+
+func (s *serialShutdowner) Shutdown(opts ...fx.ShutdownOption) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.delegate.Shutdown(opts...)
+}
+
+func serializeShutdown(sh fx.Shutdowner) fx.Shutdowner {
+	return &serialShutdowner{delegate: sh}
+}
+
+// nameTag is the fx tag for a named component.
+func nameTag(name string) string {
+	return fmt.Sprintf(`name:"%s"`, name)
+}
+
+// provideServerConfig unmarshals a server's configuration from key and
+// provides it under the name arrangehttp looks for.
+func provideServerConfig(name, key string) fx.Option {
+	return fx.Provide(
+		fx.Annotate(
+			viperfx.Unmarshal(key, arrangehttp.ServerConfig{}),
+			fx.ResultTags(nameTag(name+".config")),
+		),
+	)
+}
+
+// provideServer wires one HTTP server into the application.  It provides a
+// *mux.Router component called name for routes to be added to, unmarshals the
+// server's configuration from key, and binds the server to the application
+// lifecycle so that it starts and stops with it.
+//
+// When middleware is not empty it names an alice.Chain component that wraps
+// the whole router, so that it sees every request, including one that
+// matches no route.
+func provideServer(name, key, middleware string) fx.Option {
+	handler := fx.Annotate(
+		func(r *mux.Router) http.Handler { return r },
+		fx.ParamTags(nameTag(name)),
+		fx.ResultTags(nameTag(name+".handler")),
+	)
+	if middleware != "" {
+		handler = fx.Annotate(
+			func(r *mux.Router, chain alice.Chain) http.Handler { return chain.Then(r) },
+			fx.ParamTags(nameTag(name), nameTag(middleware)),
+			fx.ResultTags(nameTag(name+".handler")),
+		)
+	}
+
+	return fx.Options(
+		fx.Provide(
+			fx.Annotate(mux.NewRouter, fx.ResultTags(nameTag(name))),
+			handler,
+		),
+		provideServerConfig(name, key),
+		arrangehttp.ProvideServer(name),
+	)
+}
+
+// providePprofServer wires the server that serves the pprof endpoints.  Its
+// routes are fixed, so it has no router component for others to add to.
+func providePprofServer(name, key string) fx.Option {
+	return fx.Options(
+		fx.Provide(
+			fx.Annotate(
+				func() http.Handler { return arrangepprof.HTTP{}.New() },
+				fx.ResultTags(nameTag(name+".handler")),
+			),
+		),
+		provideServerConfig(name, key),
+		arrangehttp.ProvideServer(name),
+	)
+}
+
 func provideServers() fx.Option {
 	return fx.Options(
-		arrange.ProvideKey(reqMaxRetriesKey, 0),
-		arrange.ProvideKey(reqRetryIntervalKey, time.Duration(0)),
-		arrange.ProvideKey("previousVersionSupport", true),
-		arrange.ProvideKey("targetURL", ""),
-		arrange.ProvideKey("WRPSource", ""),
-		arrange.ProvideKey(translationServicesKey, []string{}),
+		viperfx.Provide(reqMaxRetriesKey, 0),
+		viperfx.Provide(reqRetryIntervalKey, time.Duration(0)),
+		viperfx.Provide("previousVersionSupport", true),
+		viperfx.Provide("targetURL", ""),
+		viperfx.Provide("WRPSource", ""),
+		viperfx.Provide(translationServicesKey, []string{}),
 		fx.Provide(metricMiddleware),
 		fx.Provide(
 			fx.Annotated{
 				Name:   "reducedLoggingResponseCodes",
-				Target: arrange.UnmarshalKey(reducedTransactionLoggingCodesKey, []int{}),
+				Target: viperfx.Unmarshal(reducedTransactionLoggingCodesKey, []int{}),
 			},
 			fx.Annotated{
 				Name:   "bearerFingerprint",
-				Target: arrange.UnmarshalKey(fingerprintCredsKey, transaction.FingerprintConfig{}),
+				Target: viperfx.Unmarshal(fingerprintCredsKey, transaction.FingerprintConfig{}),
 			},
 			fx.Annotated{
 				Name:   "api_router",
@@ -143,46 +231,17 @@ func provideServers() fx.Option {
 			},
 			provideServiceOptions,
 		),
-		arrangehttp.Server{
-			Name: "server_primary",
-			Key:  "servers.primary",
-			Inject: arrange.Inject{
-				primaryMetricMiddlewareIn{},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_alternate",
-			Key:  "servers.alternate",
-			Inject: arrange.Inject{
-				alternateMetricMiddlewareIn{},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_health",
-			Key:  "servers.health",
-			Inject: arrange.Inject{
-				healthMetricMiddlewareIn{},
-			},
-			Invoke: arrange.Invoke{
-				func(r *mux.Router) {
-					r.Handle("/health", httpaux.ConstantHandler{
-						StatusCode: http.StatusOK,
-					}).Methods("GET")
-				},
-			},
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_pprof",
-			Key:  "servers.pprof",
-		}.Provide(),
-		arrangehttp.Server{
-			Name: "server_metrics",
-			Key:  "servers.metrics",
-		}.Provide(),
+		fx.Decorate(serializeShutdown),
+		provideServer(primaryServer, "servers.primary", "middleware_primary_metrics"),
+		provideServer(alternateServer, "servers.alternate", "middleware_alternate_metrics"),
+		provideServer(healthServer, "servers.health", "middleware_health_metrics"),
+		provideServer(metricsServer, "servers.metrics", ""),
+		providePprofServer(pprofServer, "servers.pprof"),
 		fx.Invoke(
 			handlePrimaryEndpoint,
 			handleWebhookRoutes,
 			buildMetricsRoutes,
+			buildHealthRoutes,
 			buildAPIAltRouter,
 		),
 	)
@@ -385,6 +444,12 @@ func v2ErrEncode(w http.ResponseWriter, logger *zap.Logger, err error, code int)
 		map[string]interface{}{
 			"message": err.Error(),
 		})
+}
+
+func buildHealthRoutes(in healthRoutesIn) {
+	in.Router.Handle("/health", httpaux.ConstantHandler{
+		StatusCode: http.StatusOK,
+	}).Methods("GET")
 }
 
 func buildMetricsRoutes(in metricsRoutesIn) {

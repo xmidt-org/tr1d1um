@@ -6,7 +6,7 @@ package webhook
 import (
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/anclafx"
-	"github.com/xmidt-org/arrange"
+	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"go.uber.org/fx"
 )
 
@@ -17,9 +17,9 @@ func Provide() fx.Option {
 		module,
 		anclafx.Provide(),
 		fx.Provide(
-			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
-			arrange.UnmarshalKey(clientConfigKey, clientConfig{}),
-			arrange.UnmarshalKey(listenerConfigKey, listnerConfig{}),
+			viperfx.Unmarshal(webhookConfigKey, ancla.Config{}),
+			viperfx.Unmarshal(clientConfigKey, clientConfig{}),
+			viperfx.Unmarshal(listenerConfigKey, listnerConfig{}),
 			fx.Annotate(NewClientOpts, fx.ResultTags(`group:"client_options,flatten"`)),
 			fx.Annotate(NewListenerOpts, fx.ResultTags(`group:"listener_options,flatten"`, ``)),
 		),
