@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"net/http"
@@ -69,14 +70,12 @@ func basicPasswordValidator(allowed map[string]string) func(context.Context, *ht
 			return nil
 		}
 
-		password, ok := allowed[basic.UserName()]
-		// User not found.
-		if !ok {
-			return bascule.ErrBadCredentials
+		expected, known := allowed[basic.UserName()]
 
-		}
-
-		if basic.Password() != password {
+		// Compare even when the user is unknown, against an empty password,
+		// so that a valid and an invalid user name take the same time.
+		match := subtle.ConstantTimeCompare([]byte(basic.Password()), []byte(expected)) == 1
+		if !known || !match {
 			return bascule.ErrBadCredentials
 		}
 

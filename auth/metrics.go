@@ -118,7 +118,7 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		reason = AuthUnsatifiedIAT
 	} else if errors.Is(e.Err, basculejwt.ErrNotYetValid) {
 		reason = AuthUnsatifiedNBF
-	} else if errors.Is(e.Err, clortho.ErrKeyProviderKeyNotFound) {
+	} else if errors.Is(e.Err, clortho.ErrKeyNotFound) {
 		reason = AuthKeyNotFind
 	} else if errors.Is(e.Err, basculejwt.ErrInvalidSignature) {
 		reason = AuthCannotVerify

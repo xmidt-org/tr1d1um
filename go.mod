@@ -17,7 +17,7 @@ require (
 	github.com/xmidt-org/arrange v0.4.0
 	github.com/xmidt-org/bascule v1.4.2
 	github.com/xmidt-org/candlelight v0.2.15
-	github.com/xmidt-org/clortho v0.3.1
+	github.com/xmidt-org/clortho v0.5.0
 	github.com/xmidt-org/httpaux v0.4.5
 	github.com/xmidt-org/sallust v0.2.8
 	github.com/xmidt-org/touchstone v0.1.8
@@ -46,7 +46,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
-	github.com/jtacoma/uritemplates v1.0.0 // indirect
 	github.com/lestrrat-go/dsig v1.4.0 // indirect
 	github.com/lestrrat-go/option/v3 v3.0.0-alpha1 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -66,6 +65,7 @@ require (
 	github.com/ugorji/go/codec v1.2.14 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/xmidt-org/chronon v0.1.15 // indirect
+	github.com/xmidt-org/eventor v1.0.51 // indirect
 	github.com/xmidt-org/urlegit v0.1.31 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect

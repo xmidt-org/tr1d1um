@@ -171,111 +171,87 @@ webhook:
       # that Until is not a time too far in the future.
       jitter: (( grab $WEBHOOK_TTL_JITTER || "10s" ))
 
-  # JWTParserType establishes which parser type will be used by the JWT token
-  # acquirer used by Argus. Options include 'simple' and 'raw'.
-  # Simple: parser assumes token payloads have the following structure: https://github.com/xmidt-org/bascule/blob/c011b128d6b95fa8358228535c63d1945347adaa/acquire/bearer.go#L77
-  # Raw: parser assumes all of the token payload == JWT token
-  # (Optional). Defaults to 'simple'.
-  JWTParserType: (( grab $WEBHOOK_JWT_PARSER_TYPE || "raw" ))
-  BasicClientConfig:
-    # listen is the subsection that configures the listening feature of the argus client
-    # (Optional)
-    listen:
-      # pullInterval provides how often the current webhooks list gets refreshed.
-      pullInterval:  (( grab $ARGUS_PULL_INTERVAL || "5s" ))
+  # client configures the Argus client.
+  client:
+    # storeBaseURL is Argus' network location.
+    storeBaseURL: (( grab $ARGUS_ENDPOINT || "http://argus:6600" ))
 
     # bucket is the partition name where webhooks will be stored.
     bucket: (( grab $ARGUS_BUCKET || "webhooks" ))
 
-    # address is Argus' network location.
-    address: (( grab  $ARGUS_ENDPOINT || "http://argus:6600" ))
+    # clientTimeout is the timeout for requests made through this HTTP
+    # client. This timeout includes connection time, any redirects, and
+    # reading the response body.
+    clientTimeout: 50s
 
-    # auth the authentication method for argus.
-    auth:
-      # basic configures basic authentication for argus.
-      # Must be of form: 'Basic xyz=='
-      basic: (( concat "Basic " authToken ))
+    # netDialerTimeout is the maximum amount of time the HTTP Client Dialer
+    # will wait for a connect to complete.
+    netDialerTimeout: 5s
 
-      # # jwt configures jwt style authentication for argus.
-      jwt:
-      # requestHeaders are added to the request for the token.
-      # (Optional)
-      # requestHeaders:
-      #   "": ""
-
-      # authURL is the URL to access for the token.
-        authURL: (( grab $ARGUS_ACQUIRE_JWT_URL || "http://themis:6501/issue" ))
-
-        # timeout is how long the request to get the token will take before
-        # timing out.
-        timeout: (( grab $ARGUS_ACQUIRE_TIMEOUT || "1m" ))
-
-        # buffer is the length of time before a token expires to get a new token.
-        buffer: (( grab $ARGUS_ACQUIRE_BUFFER || "2m" ))
+  # listener configures how the current list of webhooks is kept up to date.
+  listener:
+    # pullInterval provides how often the current webhooks list gets refreshed.
+    pullInterval: (( grab $ARGUS_PULL_INTERVAL || "5s" ))
 
 ##############################################################################
-# Authorization Credentials
+# Authentication and Authorization
 ##############################################################################
-# jwtValidator provides Bearer auth configuration
-jwtValidator:
-  Config:
-    Resolve:
-      # Template is a URI template used to fetch keys.  This template may
-      # use a single parameter named keyID, e.g. http://keys.com/{keyID}.
-      # This field is required and has no default.
-
-      Template: "http://themis:6500/keys/{keyID}"
-
-    Refresh:
-      Sources:
-        # URI is the location where keys are served.  By default, clortho supports
-        # file://, http://, and https:// URIs, as well as standard file system paths
-        # such as /etc/foo/bar.jwk.
-        #
-        # This field is required and has no default.
-        - URI: "http://themis:6500/keys/available"
-
-
-authx:
+# auth configures the credentials accepted on inbound requests and the
+# credentials attached to the requests tr1d1um makes.  See tr1d1um.yaml in
+# the repository root for a description of every field.
+auth:
+  # inbound configures how callers authenticate to tr1d1um.  Exactly one of
+  # basic or jwt must be configured: the server refuses to start with both or
+  # with neither.
   inbound:
-    # basic is a list of Basic Auth credentials intended to be used for local testing purposes
-    # WARNING! Be sure to remove this from your production config
-    basic: ["dXNlcjpwYXNz"]
+    # basic is a list of base64-encoded "user:password" credentials intended
+    # for local testing.  It cannot be enabled together with jwt.
+    # basic: ["dXNlcjpwYXNz"]
 
-# capabilityCheck provides the details needed for checking an incoming JWT's
-# capabilities.  If the type of check isn't provided, no checking is done.  The
-# type can be "monitor" or "enforce".  If it is empty or a different value, no
-# checking is done.  If "monitor" is provided, the capabilities are checked but
-# the request isn't rejected when there isn't a valid capability for the
-# request. Instead, a message is logged.  When "enforce" is provided, a request
-# that doesn't have the needed capability is rejected.
-#
-# The capability is expected to have the format:
-#
-# {prefix}{endpoint}:{method}
-#
-# The prefix can be a regular expression.  If it's empty, no capability check
-# is done.  The endpoint is a regular expression that should match the endpoint
-# the request was sent to. The method is usually the method of the request, such as
-# GET.  The accept all method is a catchall string that indicates the capability
-# is approved for all methods.
-# (Optional)
-# capabilityCheck:
-#   # type provides the mode for capability checking.
-#   type: "enforce"
-#   # prefix provides the regex to match the capability before the endpoint.
-#   prefix: "prefix Here"
-#   # acceptAllMethod provides a way to have a capability that allows all
-#   # methods for a specific endpoint.
-#   acceptAllMethod: "all"
-#   # endpointBuckets provides regular expressions to use against the request
-#   # endpoint in order to group requests for a metric label.
-#   endpointBuckets:
-#     - "hook\\b"
-#     - "hooks\\b"
-#     - "device/.*/stat\\b"
-#     - "device/.*/config\\b"
+    # jwt configures Bearer authentication against the keys themis serves.
+    jwt:
+      # prefixes are the capability prefixes this service honors.
+      prefixes: ["x1:webpa:api:"]
 
+      # endpointBuckets group requests by endpoint for the
+      # auth_capability_check metric.
+      endpointBuckets:
+        - "hook\\b"
+        - "hooks\\b"
+        - "device/.*/stat\\b"
+        - "device/.*/config\\b"
+
+      # clortho configures where the keys that verify tokens come from.
+      clortho:
+        # keySets poll a server that publishes its keys as a set.
+        keySets:
+          - sources:
+              - uri: "http://themis:6500/keys/available"
+
+        # perKeys fetch one key at a time, by the key ID a token names.
+        perKeys:
+          - template: "http://themis:6500/keys/{keyID}"
+
+  # outbound configures the credentials tr1d1um attaches to the requests it
+  # makes.  fanout covers requests to the XMiDT cluster at targetURL, and
+  # webhook covers requests to Argus.  For each, exactly one of basic or jwt
+  # must be configured.
+  outbound:
+    fanout:
+      # basic is the base64-encoded "user:password" to send.
+      basic: (( grab authToken ))
+
+    webhook:
+      # basic is the base64-encoded "user:password" to send.
+      basic: (( grab authToken ))
+
+      # jwt fetches a bearer token from authURL and reuses it until it nears
+      # expiration.  It cannot be enabled together with basic.
+      # jwt:
+      #   authURL: (( grab $ARGUS_ACQUIRE_JWT_URL || "http://themis:6501/issue" ))
+      #   payloadField: "token"
+      #   timeout: (( grab $ARGUS_ACQUIRE_TIMEOUT || "1m" ))
+      #   buffer: (( grab $ARGUS_ACQUIRE_BUFFER || "2m" ))
 
 ##############################################################################
 # WRP and XMiDT Cloud configurations
@@ -296,18 +272,6 @@ supportedServices:
 ##############################################################################
 # HTTP Transaction Configurations
 ##############################################################################
-# timeouts that apply to the Argus HTTP client.
-# (Optional) By default, the values below will be used.
-argusClientTimeout:
-  # clientTimeout is the timeout for requests made through this
-  # HTTP client. This timeout includes connection time, any
-  # redirects, and reading the response body.
-  clientTimeout: 50s
-
-  # netDialerTimeout is the maximum amount of time the HTTP Client Dialer will
-  # wait for a connect to complete.
-  netDialerTimeout: 5s
-
 # timeouts that apply to the XMiDT HTTP client.
 # (Optional) By default, the values below will be used.
 xmidtClientTimeout:
@@ -334,30 +298,8 @@ requestRetryInterval: "2s"
 # case of ephemeral errors
 requestMaxRetries: 2
 
-#authtoken used to make spruce work better for authAcquirer
+# authToken is the base64-encoded "user:password" sent on outbound requests.
 authToken: (( grab $AUTH_TOKEN || "dXNlcjpwYXNz" ))
-
-# authAcquirer enables configuring the JWT or Basic auth header value factory for outgoing
-# requests to XMiDT. If both types are configured, JWT will be preferred.
-# (Optional)
-authAcquirer:
-  # JWT:
-  #   # requestHeaders are added to the request for the token.
-  #   # (Optional)
-  #   # requestHeaders:
-  #   #   "": ""
-
-  #   # authURL is the URL to access for the token.
-  #   authURL: ""
-
-  #   # timeout is how long the request to get the token will take before
-  #   # timing out.
-  #   timeout: "1m"
-
-  #   # buffer is the length of time before a token expires to get a new token.
-  #   buffer: "2m"
-
-  Basic:  (( concat "Basic " authToken ))
 
 # tracing provides configuration around traces using OpenTelemetry.
 # (Optional). By default, a 'noop' tracer provider is used and tracing is disabled.

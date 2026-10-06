@@ -4,14 +4,15 @@
 package auth
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/justinas/alice"
+	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
@@ -19,7 +20,6 @@ import (
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/basculehttp/basculecaps"
 	"github.com/xmidt-org/bascule/basculejwt"
-	"github.com/xmidt-org/clortho"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +44,13 @@ type jwtConfig struct {
 	EndpointBuckets []string
 }
 
-func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap.Logger, counter *prometheus.CounterVec) (alice.Chain, error) {
+// NewMiddleware builds the inbound authentication and authorization chain.
+//
+// Exactly one of basic or JWT authentication must be configured.  Basic
+// credentials are checked against the configured list.  A JWT must verify
+// against a key the provider supplies, carry a capability granting the
+// request, and state the partner IDs its bearer may act for.
+func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap.Logger, counter *prometheus.CounterVec) (alice.Chain, error) {
 	var (
 		authorizationParserOpts []basculehttp.AuthorizationParserOption
 		authorizerOpts          []bascule.AuthorizerOption[*http.Request]
@@ -56,36 +62,20 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 	if v.IsSet(basicConfigKey) && v.IsSet(jwtConfigKey) {
 		return alice.Chain{}, fmt.Errorf("`%s` and `%s` can't both be set", basicConfigKey, jwtConfigKey)
 	} else if v.IsSet(basicConfigKey) {
-		basicAllowed := make(map[string]string)
-		for _, a := range cfg.Basic {
-			if len(a) == 0 {
-				continue
-			}
-
-			decoded, err := base64.StdEncoding.DecodeString(a)
-			if err != nil {
-				l.Info("failed to decode auth header", zap.Any("authHeader", a), zap.Error(err))
-				continue
-			}
-
-			i := bytes.IndexByte(decoded, ':')
-			if i > 0 {
-				basicAllowed[string(decoded[:i])] = string(decoded[i+1:])
-			}
-		}
-
-		if len(basicAllowed) == 0 {
-			return alice.Chain{}, fmt.Errorf("`%s` must contain at least 1 valid basic cred", basicConfigKey)
+		basicAllowed, err := decodeBasicCredentials(cfg.Basic)
+		if err != nil {
+			return alice.Chain{}, err
 		}
 
 		authorizationParserOpts = append(authorizationParserOpts, basculehttp.WithBasic())
 		validatorOpts = append(validatorOpts, basculehttp.AsValidator(basicSchemeValidator))
 		authorizerOpts = append(authorizerOpts,
 			bascule.WithApproverFuncs(basicPasswordValidator(basicAllowed)))
+
+		l.Info("inbound basic auth enabled", zap.Int("credentials", len(basicAllowed)))
 	} else if v.IsSet(jwtConfigKey) {
-		kp, err := clortho.NewKeyProvider(clortho.WithRingKey(kr))
-		if err != nil {
-			return alice.Chain{}, fmt.Errorf("error setting up clortho KeyProvider: %v", err)
+		if kp == nil {
+			return alice.Chain{}, fmt.Errorf("`%s` must configure at least one key provider", clorthoConfigKey)
 		}
 
 		jwtParseOpts = append(jwtParseOpts, jwt.WithKeyProvider(kp))
@@ -97,11 +87,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 		authorizationParserOpts = append(authorizationParserOpts, basculehttp.WithScheme(basculehttp.SchemeBearer, jwtp))
 		validatorOpts = append(validatorOpts, basculehttp.AsValidator(bearerSchemeValidator))
 
-		approver, err := basculecaps.NewApprover(
-			basculecaps.WithURLNormalizeFunc(stripAPIVersion),
-			basculecaps.WithAllMethod(cfg.JWT.AcceptAllMethod),
-			basculecaps.WithPrefixes(cfg.JWT.Prefixes...),
-			basculecaps.WithCacheSize(cfg.JWT.CacheSize))
+		approver, err := basculecaps.NewApprover(capabilityOptions(cfg.JWT)...)
 		if err != nil {
 			return alice.Chain{}, fmt.Errorf("error setting up JWT capability checks: %v", err)
 		}
@@ -152,6 +138,60 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kr clortho.KeyRing, l *zap
 	}
 
 	return alice.New(setLogger(l), auth.Then), nil
+}
+
+// decodeBasicCredentials turns the configured list of base64 "user:password"
+// strings into a map of user name to password.  A malformed entry is an error
+// so that a bad credential list is caught at startup rather than silently
+// refusing logins later.  The entries are credentials, so an error names the
+// position of the bad one and never its value.
+func decodeBasicCredentials(encoded []string) (map[string]string, error) {
+	allowed := make(map[string]string, len(encoded))
+
+	for i, e := range encoded {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+
+		decoded, err := base64.StdEncoding.DecodeString(e)
+		if err != nil {
+			return nil, fmt.Errorf("`%s[%d]`: not valid base64: %w", basicConfigKey, i, err)
+		}
+
+		user, password, found := strings.Cut(string(decoded), ":")
+		if !found || user == "" {
+			return nil, fmt.Errorf("`%s[%d]`: expected \"user:password\"", basicConfigKey, i)
+		}
+
+		allowed[user] = password
+	}
+
+	if len(allowed) == 0 {
+		return nil, fmt.Errorf("`%s` must contain at least 1 valid basic cred", basicConfigKey)
+	}
+
+	return allowed, nil
+}
+
+// capabilityOptions builds the capability approver's options.  The approver
+// rejects a blank all-method value and a non-positive cache size, so each is
+// passed only when configured and the approver's default applies otherwise.
+func capabilityOptions(cfg jwtConfig) []basculecaps.ApproverOption {
+	opts := []basculecaps.ApproverOption{
+		basculecaps.WithURLNormalizeFunc(stripAPIVersion),
+		basculecaps.WithPrefixes(cfg.Prefixes...),
+	}
+
+	if cfg.AcceptAllMethod != "" {
+		opts = append(opts, basculecaps.WithAllMethod(cfg.AcceptAllMethod))
+	}
+
+	if cfg.CacheSize > 0 {
+		opts = append(opts, basculecaps.WithCacheSize(cfg.CacheSize))
+	}
+
+	return opts
 }
 
 // stripAPIVersion removes a leading /api/vN from a request's path, so that

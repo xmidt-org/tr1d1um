@@ -172,7 +172,7 @@ func tr1d1um(arguments []string) (exitCode int) {
 		fx.Supply(v),
 		arrange.ForViper(v),
 		arrange.ProvideKey("xmidtClientTimeout", httpClientTimeout{}),
-		auth.Provide(),
+		auth.Provide(v),
 		webhook.Provide(),
 		touchstone.Provide(),
 		touchhttp.Provide(),
