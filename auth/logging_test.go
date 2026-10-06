@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
+// SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package auth
 
 import (
 	"net/http"
@@ -19,18 +19,22 @@ func TestSanitizeHeaders(t *testing.T) {
 		{
 			Description: "Filtered",
 			// nolint: goconst
-			Input:    http.Header{"Authorization": []string{"Basic xyz"}, "HeaderA": []string{"x"}},
+			Input: http.Header{"Authorization": []string{"Basic xyz"}, "HeaderA": []string{"x"}},
+			// nolint: goconst
 			Expected: http.Header{"HeaderA": []string{"x"}, "Authorization-Type": []string{"Basic"}},
 		},
 		{
 			Description: "Handled human error",
-			Input:       http.Header{"Authorization": []string{"BasicXYZ"}, "HeaderB": []string{"y"}},
-			Expected:    http.Header{"HeaderB": []string{"y"}},
+			// nolint: goconst
+			Input:    http.Header{"Authorization": []string{"BasicXYZ"}, "HeaderB": []string{"y"}},
+			Expected: http.Header{"HeaderB": []string{"y"}},
 		},
 		{
 			Description: "Not a perfect system",
-			Input:       http.Header{"Authorization": []string{"MySecret IWantToLeakIt"}},
-			Expected:    http.Header{"Authorization-Type": []string{"MySecret"}},
+			// nolint: goconst
+			Input: http.Header{"Authorization": []string{"MySecret IWantToLeakIt"}},
+			// nolint: goconst
+			Expected: http.Header{"Authorization-Type": []string{"MySecret"}},
 		},
 	}
 

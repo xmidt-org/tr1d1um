@@ -14,33 +14,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/xmidt-org/bascule/basculehttp"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
 func TestSendWRP(t *testing.T) {
 	testCases := []struct {
-		Name                 string
-		ExpectedRequestAuth  string
-		EnableAcquirer       bool
-		AcquirerReturnString string
-		AcquirerReturnError  error
+		Name                string
+		ExpectedRequestAuth string
+		EnableAuth          bool
+		MockError           error
 	}{
 		{
 			Name:                "No auth acquirer",
-			ExpectedRequestAuth: "pass-through-token",
+			ExpectedRequestAuth: "",
 		},
 
 		{
-			Name:                 "Auth acquirer enabled - success",
-			EnableAcquirer:       true,
-			ExpectedRequestAuth:  "acquired-token",
-			AcquirerReturnString: "acquired-token",
+			Name:                "Auth acquirer enabled - success",
+			EnableAuth:          true,
+			ExpectedRequestAuth: auth.MockAuthHeaderValue,
 		},
 
 		{
-			Name:                "Auth acquirer enabled error",
-			EnableAcquirer:      true,
-			AcquirerReturnError: errors.New("error retrieving token"),
+			Name:       "Auth acquirer enabled error",
+			EnableAuth: true,
+			MockError:  errors.New("error retrieving token"),
 		},
 	}
 
@@ -50,7 +50,7 @@ func TestSendWRP(t *testing.T) {
 			require := require.New(t)
 
 			m := new(MockTr1d1umTransactor)
-			var a *mockAcquirer
+			var authDecorator *auth.MockDecorator
 
 			options := &ServiceOptions{
 				XmidtWrpURL: "http://localhost/wrp",
@@ -58,14 +58,11 @@ func TestSendWRP(t *testing.T) {
 				T:           m,
 			}
 
-			if testCase.EnableAcquirer {
-				a = new(mockAcquirer)
-				options.AuthAcquirer = a
-
-				err := testCase.AcquirerReturnError
-				a.On("Acquire").Return(testCase.AcquirerReturnString, err)
+			if testCase.EnableAuth {
+				authDecorator = new(auth.MockDecorator)
+				options.Auth = authDecorator
+				authDecorator.On("Decorate", mock.Anything, mock.Anything).Return(testCase.MockError).Once()
 			}
-
 			s := NewService(options)
 
 			var expected = wrp.MustEncode(wrp.Message{
@@ -75,7 +72,7 @@ func TestSendWRP(t *testing.T) {
 
 			var requestMatcher = func(r *http.Request) bool {
 				assert.EqualValues("http://localhost/wrp", r.URL.String())
-				assert.EqualValues(testCase.ExpectedRequestAuth, r.Header.Get("Authorization"))
+				assert.EqualValues(testCase.ExpectedRequestAuth, r.Header.Get(basculehttp.DefaultAuthorizationHeader))
 				assert.EqualValues(wrp.Msgpack.ContentType(), r.Header.Get("Content-Type"))
 
 				data, err := io.ReadAll(r.Body)
@@ -89,7 +86,7 @@ func TestSendWRP(t *testing.T) {
 				return true
 			}
 
-			if testCase.AcquirerReturnError != nil {
+			if testCase.MockError != nil {
 				m.AssertNotCalled(t, "Transact", mock.Anything)
 			} else {
 				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(nil, nil)
@@ -101,9 +98,9 @@ func TestSendWRP(t *testing.T) {
 
 			m.AssertExpectations(t)
 
-			if testCase.EnableAcquirer {
-				a.AssertExpectations(t)
-				assert.Equal(testCase.AcquirerReturnError, e)
+			if testCase.EnableAuth {
+				authDecorator.AssertExpectations(t)
+				assert.Equal(testCase.MockError, e)
 			} else {
 				assert.Nil(e)
 			}

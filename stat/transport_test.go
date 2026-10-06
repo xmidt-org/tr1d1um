@@ -51,8 +51,7 @@ func TestDecodeRequest(t *testing.T) {
 		assert.Nil(err)
 
 		assert.Equal(&statRequest{
-			AuthHeaderValue: "a0",
-			DeviceID:        "mac:112233445566",
+			DeviceID: "mac:112233445566",
 		}, resp.(*statRequest))
 	})
 }

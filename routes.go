@@ -5,28 +5,26 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
-	anclaschema "github.com/xmidt-org/ancla/schema"
+	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/httpaux"
-	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/sallust/sallusthttp"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -52,7 +50,7 @@ type primaryEndpointIn struct {
 	Logger                      *zap.Logger
 	StatServiceOptions          *stat.ServiceOptions
 	TranslationOptions          *translation.ServiceOptions
-	AuthAcquirer                authAcquirerConfig            `name:"authAcquirer"`
+	Auth                        auth.Decorator
 	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string                      `name:"supportedServices"`
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
@@ -200,16 +198,8 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		otelmux.Middleware("mainSpan", otelMuxOptions...),
 	)
 
-	if in.V.IsSet(authAcquirerKey) {
-		acquirer, err := createAuthAcquirer(in.AuthAcquirer)
-		if err != nil {
-			in.Logger.Error("Could not configure auth acquirer", zap.Error(err))
-		} else {
-			in.TranslationOptions.AuthAcquirer = acquirer
-			in.StatServiceOptions.AuthAcquirer = acquirer
-			in.Logger.Info("Outbound request authentication token acquirer enabled")
-		}
-	}
+	in.StatServiceOptions.Auth = in.Auth
+	in.TranslationOptions.Auth = in.Auth
 	ss := stat.NewService(in.StatServiceOptions)
 	ts := translation.NewService(in.TranslationOptions)
 
@@ -234,15 +224,20 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 }
 
 func handleWebhookRoutes(in handleWebhookRoutesIn) error {
-	if in.AddWebhookHandler != nil && in.GetAllWebhooksHandler != nil {
-		fixV2Middleware, err := fixV2Duration(sallust.Get, in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize v2 endpoint middleware: %v\n", err)
-			return err
-		}
-		in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)))).Methods(http.MethodPost)
-		in.APIRouter.Handle("/hooks", in.AuthChain.Then(candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)))
+	if in.AddWebhookHandler == nil && in.GetAllWebhooksHandler == nil {
+		return nil
 	}
+
+	hooks := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)
+	hook := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)
+	fixV2Middleware, err := fixV2Duration(in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
+	if err != nil {
+		return fmt.Errorf("failed to initialize v2 endpoint middleware: %v", err)
+	}
+
+	in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(hook))).Methods(http.MethodPost)
+	in.APIRouter.Handle("/hooks", in.AuthChain.Then(hooks)).Methods(http.MethodGet)
+
 	return nil
 }
 
@@ -294,17 +289,13 @@ func provideURLPrefix(in provideURLPrefixIn) string {
 }
 
 //nolint:funlen
-func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclaschema.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
-	if config.Max < 0 {
-		return nil, fmt.Errorf("failed to initialize duration validation: max TTL must be non-negative")
-	}
-	if config.Jitter < 0 {
-		return nil, fmt.Errorf("failed to initialize duration validation: jitter must be non-negative")
-	}
+	durationOpt := webhook.ValidateRegistrationDuration(config.Max)
+	untilOpt := webhook.Until(config.Now, config.Jitter, config.Max)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -319,9 +310,6 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 			// the duration is bad, change it to 5m and add a header. Then use
 			// the v2 handler.
 			logger := sallusthttp.Get(r)
-			if logger == nil && getLogger != nil {
-				logger = getLogger(r.Context())
-			}
 
 			requestPayload, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -329,7 +317,6 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 				return
 			}
 
-			//nolint:staticcheck // RegistrationV1 is deprecated but required for v2 backwards compatibility
 			var wr webhook.RegistrationV1
 			err = json.Unmarshal(requestPayload, &wr)
 			if err != nil {
@@ -346,14 +333,14 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 			}
 
 			// check to see if the Webhook has a valid until/duration.
-			// If not, set the WebhookRegistration duration to default
+			// If not, set the WebhookRegistration  duration to 5m.
 			if wr.Until.IsZero() {
 				if wr.Duration == 0 {
 					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
 						fmt.Sprintf("Unset duration and until fields will not be accepted in v3, webhook duration defaulted to %v", config.Max))
 				} else {
-					durationErr := wr.ValidateDuration(config.Max)
+					durationErr := durationOpt.Validate(&wr)
 					if durationErr != nil {
 						wr.Duration = webhook.CustomDuration(config.Max)
 						w.Header().Add(v2WarningHeader,
@@ -361,12 +348,12 @@ func fixV2Duration(getLogger func(context.Context) *zap.Logger, config anclasche
 					}
 				}
 			} else {
-				untilErr := wr.CheckUntil(config.Now, config.Jitter, config.Max)
+				untilErr := untilOpt.Validate(&wr)
 				if untilErr != nil {
 					wr.Until = time.Time{}
 					wr.Duration = webhook.CustomDuration(config.Max)
 					w.Header().Add(v2WarningHeader,
-						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to %v", untilErr, config.Max))
+						fmt.Sprintf("Invalid until value will not be accepted in v3: %v, webhook duration defaulted to 5m", untilErr))
 				}
 			}
 

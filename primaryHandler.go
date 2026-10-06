@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -24,7 +23,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
-	webhook "github.com/xmidt-org/webhook-schema"
+	"github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
@@ -44,20 +43,15 @@ type httpClientTimeout struct {
 	NetDialerTimeout time.Duration
 }
 
-type authAcquirerConfig struct {
-	JWT   transaction.RemoteBearerTokenAcquirerOptions
-	Basic string
-}
-
 type provideWebhookHandlersIn struct {
 	fx.In
-	Lifecycle          fx.Lifecycle
-	V                  *viper.Viper
-	WebhookConfig      ancla.Config
-	ArgusClientTimeout httpClientTimeout `name:"argus_client_timeout"`
-	Logger             *zap.Logger
-	Tracing            candlelight.Tracing
-	Tf                 *touchstone.Factory
+	Lifecycle     fx.Lifecycle
+	V             *viper.Viper
+	WebhookConfig ancla.Config
+	Logger        *zap.Logger
+	Service       ancla.Service
+	Tracing       candlelight.Tracing
+	Tf            *touchstone.Factory
 }
 
 type provideWebhookHandlersOut struct {
@@ -103,105 +97,60 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
-func createAuthAcquirer(config authAcquirerConfig) (transaction.AuthAcquirer, error) {
-	if config.JWT.AuthURL != "" && config.JWT.Buffer != 0 && config.JWT.Timeout != 0 {
-		return &transaction.JwtAcquirer{Config: config.JWT}, nil
-	}
-
-	if config.Basic != "" {
-		return &transaction.BasicAcquirer{Token: config.Basic}, nil
-	}
-
-	return nil, errors.New("auth acquirer not configured properly")
-}
-
-func v2WebhookValidators(c ancla.Config) (webhook.Validators, error) {
-	//build validators and webhook handler for previous version that only check loopback.
-
-	v2Validation := c.Validation
-	v2Validation.URL.AllowLoopback = true
-	v2Validation.IP.Allow = true
-	v2Validation.Domain.AllowSpecialUseDomains = true
-
-	return buildWebhookValidators(v2Validation)
-}
-
-func buildWebhookValidators(validation schema.SchemaURLValidatorConfig) (webhook.Validators, error) {
-	if validation.TTL.Now == nil {
-		validation.TTL.Now = time.Now
-	}
-
-	checker, err := validation.BuildURLChecker()
-	if err != nil {
-		return nil, err
-	}
-
-	return webhook.Validators(validation.BuildOptions(checker)), nil
+func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
+	return (&schema.SchemaURLValidatorConfig{
+		URL: schema.URLVConfig{
+			AllowLoopback: c.Validation.URL.AllowLoopback,
+		},
+		Domain: schema.DomainVConfig{
+			AllowSpecialUseDomains: true,
+		},
+		IP: schema.IPVConfig{
+			Allow: true,
+		},
+		TTL: c.Validation.TTL,
+	}).BuildOptions()
 }
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
+	// Webhooks (if not configured, handlers are not set up)
 	if !in.V.IsSet(webhookConfigKey) {
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
+	out.GetAllWebhooksHandler = ancla.NewGetAllWRPEventStreamsHandler(in.Service, ancla.HandlerConfig{
+		GetLogger: sallust.Get,
+	})
 
-	service := &simpleWebhookService{
-		logger: in.Logger,
-	}
-
-	builtValidators, err := buildWebhookValidators(in.WebhookConfig.Validation)
+	builtValidators, err := in.WebhookConfig.Validation.BuildOptions()
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook validators: %w", err)
 	}
+
+	out.AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(in.Service, ancla.HandlerConfig{
+		V:                 builtValidators,
+		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
+		GetLogger:         sallust.Get,
+	})
 
 	v2Validators, err := v2WebhookValidators(in.WebhookConfig)
 	if err != nil {
 		return out, fmt.Errorf("failed to setup v2 webhook validators: %w", err)
 	}
 
-	handlerConfig := ancla.HandlerConfig{
-		V:                 builtValidators,
+	out.V2AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(in.Service, ancla.HandlerConfig{
+		V:                 v2Validators,
 		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
-	}
-
-	out.AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(service, handlerConfig)
-	out.GetAllWebhooksHandler = ancla.NewGetAllWRPEventStreamsHandler(service, handlerConfig)
-
-	v2HandlerConfig := handlerConfig
-	v2HandlerConfig.V = v2Validators
-	out.V2AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(service, v2HandlerConfig)
+	})
 
 	in.Logger.Info("Webhook service enabled")
 	return
 }
 
-// simpleWebhookService provides a basic implementation of ancla.Service
-type simpleWebhookService struct {
-	logger *zap.Logger
-	store  []schema.Manifest // Simple in-memory store for demo
-}
-
-// Add implements ancla.Service interface
-func (s *simpleWebhookService) Add(ctx context.Context, owner string, manifest schema.Manifest) error {
-	s.logger.Info("Adding webhook", zap.String("owner", owner))
-	s.store = append(s.store, manifest)
-	return nil
-}
-
-// GetAll implements ancla.Service interface
-func (s *simpleWebhookService) GetAll(ctx context.Context) ([]schema.Manifest, error) {
-	s.logger.Info("Getting all webhooks")
-	result := make([]schema.Manifest, len(s.store))
-	copy(result, s.store)
-	return result, nil
-}
-
 func provideHandlers() fx.Option {
 	return fx.Options(
-		arrange.ProvideKey(authAcquirerKey, authAcquirerConfig{}),
 		fx.Provide(
-			arrange.UnmarshalKey(webhookConfigKey, ancla.Config{}),
 			arrange.UnmarshalKey("prometheus", touchstone.Config{}),
 			arrange.UnmarshalKey("prometheus.handler", touchhttp.Config{}),
 			provideWebhookHandlers,

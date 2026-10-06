@@ -11,33 +11,33 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xmidt-org/bascule/basculehttp"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 func TestRequestStat(t *testing.T) {
 	testCases := []struct {
-		Name                 string
-		ExpectedRequestAuth  string
-		EnableAcquirer       bool
-		AcquirerReturnString string
-		AcquirerReturnError  error
+		Name                string
+		ExpectedRequestAuth string
+		EnableAuth          bool
+		MockError           error
 	}{
 		{
 			Name:                "No auth acquirer",
-			ExpectedRequestAuth: "pass-through-token",
+			ExpectedRequestAuth: "",
 		},
 
 		{
-			Name:                 "Auth acquirer enabled - success",
-			EnableAcquirer:       true,
-			ExpectedRequestAuth:  "acquired-token",
-			AcquirerReturnString: "acquired-token",
+			Name:                "Auth acquirer enabled - success",
+			EnableAuth:          true,
+			ExpectedRequestAuth: auth.MockAuthHeaderValue,
 		},
 
 		{
-			Name:                "Auth acquirer enabled - error",
-			EnableAcquirer:      true,
-			AcquirerReturnError: errors.New("error retrieving token"),
+			Name:       "Auth acquirer enabled - error",
+			EnableAuth: true,
+			MockError:  errors.New("error retrieving token"),
 		},
 	}
 
@@ -45,41 +45,39 @@ func TestRequestStat(t *testing.T) {
 		t.Run(testCase.Name, func(t *testing.T) {
 			assert := assert.New(t)
 			m := new(MockTr1d1umTransactor)
-			var a *mockAcquirer
+			var authDecorator *auth.MockDecorator
 
 			options := &ServiceOptions{
 				XmidtStatURL:   "http://localhost/stat/${device}",
 				HTTPTransactor: m,
 			}
 
-			if testCase.EnableAcquirer {
-				a = new(mockAcquirer)
-				options.AuthAcquirer = a
-
-				err := testCase.AcquirerReturnError
-				a.On("Acquire").Return(testCase.AcquirerReturnString, err)
+			if testCase.EnableAuth {
+				authDecorator = new(auth.MockDecorator)
+				options.Auth = authDecorator
+				authDecorator.On("Decorate", mock.Anything, mock.Anything).Return(testCase.MockError).Once()
 			}
 
 			s := NewService(options)
 
 			var requestMatcher = func(r *http.Request) bool {
 				return r.URL.String() == "http://localhost/stat/mac:112233445566" &&
-					r.Header.Get("Authorization") == testCase.ExpectedRequestAuth
+					r.Header.Get(basculehttp.DefaultAuthorizationHeader) == testCase.ExpectedRequestAuth
 			}
 
-			if testCase.AcquirerReturnError != nil {
+			if testCase.MockError != nil {
 				m.AssertNotCalled(t, "Transact", mock.Anything)
 			} else {
 				m.On("Transact", mock.MatchedBy(requestMatcher)).Return(&transaction.XmidtResponse{}, nil)
 			}
 
-			_, e := s.RequestStat(context.TODO(), "pass-through-token", "mac:112233445566")
+			_, e := s.RequestStat(context.TODO(), "mac:112233445566")
 
 			m.AssertExpectations(t)
-			if testCase.EnableAcquirer {
-				a.AssertExpectations(t)
-				if testCase.AcquirerReturnError != nil {
-					assert.Equal(testCase.AcquirerReturnError, e)
+			if testCase.EnableAuth {
+				authDecorator.AssertExpectations(t)
+				if testCase.MockError != nil {
+					assert.Equal(testCase.MockError, e)
 				}
 			}
 		})
