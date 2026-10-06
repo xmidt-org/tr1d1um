@@ -10,12 +10,13 @@ import (
 	"net/http"
 	"time"
 
-	gokitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/retry"
+	"github.com/xmidt-org/retry/retryhttp"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
@@ -24,7 +25,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webhook-schema"
-	"github.com/xmidt-org/webpa-common/v2/xhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -97,6 +97,62 @@ func newHTTPClient(timeouts httpClientTimeout, tracing candlelight.Tracing) *htt
 	}
 }
 
+// defaultRetryInterval is the time between retries when none is configured.
+const defaultRetryInterval = time.Second
+
+// newRetryingClient wraps client so that a request failing with a temporary
+// error is retried up to retries times, interval apart, counting each retry
+// with counter.  When retries is less than 1, requests are not retried.
+//
+// CleanupResponse closes the body of every response but the last, which goes
+// to the caller to close.
+//
+//nolint:bodyclose
+func newRetryingClient(logger *zap.Logger, retries int, interval time.Duration, counter prometheus.Counter, client *http.Client) (retryhttp.HTTPClient, error) {
+	if retries < 1 {
+		return client, nil
+	}
+	if interval <= 0 {
+		interval = defaultRetryInterval
+	}
+
+	runner, err := retry.NewRunner(
+		retry.WithPolicyFactory[*http.Response](retry.Config{
+			Interval:   interval,
+			MaxRetries: retries,
+		}),
+		retry.WithShouldRetry(func(_ *http.Response, err error) bool {
+			var temp interface{ Temporary() bool }
+			return errors.As(err, &temp) && temp.Temporary()
+		}),
+		retry.WithOnAttempt(
+			retryhttp.CleanupResponse,
+			func(a retry.Attempt[*http.Response]) {
+				switch {
+				case !a.Done():
+					counter.Inc()
+					logger.Debug("retrying HTTP transaction", zap.Error(a.Err), zap.Int("retry", a.Retries+1))
+				case a.Err != nil:
+					logger.Error("All HTTP transaction retries failed", zap.Error(a.Err), zap.Int("retries", a.Retries))
+				}
+			},
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rc, err := retryhttp.NewClient(
+		retryhttp.WithHTTPClient(client),
+		retryhttp.WithRunner(runner),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return rc, nil
+}
+
 func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
 	return (&schema.SchemaURLValidatorConfig{
 		URL: schema.URLVConfig{
@@ -162,26 +218,23 @@ func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
 	var errs error
 
 	xmidtHTTPClient := newHTTPClient(in.XmidtClientTimeout, in.Tracing)
-	stat_retries_counter, err := in.ServiceConfigsRetries.CurryWith(prometheus.Labels{apiLabel: stat_api})
+	stat_retries_counter, err := in.ServiceConfigsRetries.GetMetricWith(prometheus.Labels{apiLabel: stat_api})
+	errs = errors.Join(errs, err)
+	statClient, err := newRetryingClient(in.Logger, in.RequestMaxRetries, in.RequestRetryInterval, stat_retries_counter, xmidtHTTPClient)
 	errs = errors.Join(errs, err)
 	// Stat Service configs
 	statOptions := &stat.ServiceOptions{
 		HTTPTransactor: transaction.New(
 			&transaction.Options{
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   in.Logger,
-						Retries:  in.RequestMaxRetries,
-						Interval: in.RequestRetryInterval,
-						Counter:  gokitprometheus.NewCounter(stat_retries_counter),
-					},
-					xmidtHTTPClient.Do),
+				Do:             statClient.Do,
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 			}),
 		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.TargetURL),
 	}
 
-	device_retries_counter, err := in.ServiceConfigsRetries.CurryWith(prometheus.Labels{apiLabel: device_api})
+	device_retries_counter, err := in.ServiceConfigsRetries.GetMetricWith(prometheus.Labels{apiLabel: device_api})
+	errs = errors.Join(errs, err)
+	deviceClient, err := newRetryingClient(in.Logger, in.RequestMaxRetries, in.RequestRetryInterval, device_retries_counter, xmidtHTTPClient)
 	errs = errors.Join(errs, err)
 	// WRP Service configs
 	translationOptions := &translation.ServiceOptions{
@@ -190,14 +243,7 @@ func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
 		T: transaction.New(
 			&transaction.Options{
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
-				Do: xhttp.RetryTransactor( //nolint:bodyclose
-					xhttp.RetryOptions{
-						Logger:   in.Logger,
-						Retries:  in.RequestMaxRetries,
-						Interval: in.RequestRetryInterval,
-						Counter:  gokitprometheus.NewCounter(device_retries_counter),
-					},
-					xmidtHTTPClient.Do),
+				Do:             deviceClient.Do,
 			}),
 	}
 
