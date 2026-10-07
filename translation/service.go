@@ -12,7 +12,8 @@ import (
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/wrphttp"
 )
 
 // Service represents the Webpa-Tr1d1um component that translates WDMP data into WRP
@@ -79,6 +80,6 @@ func (w *service) SendWRP(ctx context.Context, wrpMsg *wrp.Message, authHeaderVa
 		}
 	}
 
-	r.Header.Set("Content-Type", wrp.Msgpack.ContentType())
+	r.Header.Set("Content-Type", wrphttp.MEDIA_TYPE_MSGPACK)
 	return w.transactor.Transact(r)
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )

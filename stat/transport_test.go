@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func TestDecodeRequest(t *testing.T) {
 		resp, err := decodeRequest(ctxTID, r)
 
 		assert.Nil(resp)
-		assert.Equal(wrp.ErrorInvalidDeviceName.Error(), err.Error())
+		assert.ErrorIs(err, wrp.ErrorInvalidDeviceName)
 
 	})
 

@@ -27,7 +27,8 @@ require (
 	github.com/xmidt-org/sallust v0.2.10
 	github.com/xmidt-org/touchstone v0.1.8
 	github.com/xmidt-org/webhook-schema v0.2.6
-	github.com/xmidt-org/wrp-go/v3 v3.7.0
+	github.com/xmidt-org/wrp-go/v5 v5.4.6
+	github.com/xmidt-org/wrphttp v0.4.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.72.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
 	go.opentelemetry.io/otel/trace v1.47.0
@@ -65,13 +66,10 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
-	github.com/ugorji/go/codec v1.2.14 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/xmidt-org/chronon v0.1.15 // indirect
 	github.com/xmidt-org/eventor v1.0.51 // indirect
 	github.com/xmidt-org/urlegit v0.1.31 // indirect
-	github.com/xmidt-org/wrp-go/v5 v5.4.6 // indirect
-	github.com/xmidt-org/wrphttp v0.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect

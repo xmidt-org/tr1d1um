@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	transaction "github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 func TestValidateAndDeduceSETCommand(t *testing.T) {
@@ -162,7 +162,11 @@ func TestWrapInWRP(t *testing.T) {
 		w, e := wrap([]byte(""), "", nil, nil, nil)
 
 		assert.Nil(w)
-		assert.EqualValues(transaction.NewBadRequestError(wrp.ErrorInvalidDeviceName), e)
+		assert.ErrorIs(e, wrp.ErrorInvalidDeviceName)
+
+		var coded transaction.CodedError
+		assert.ErrorAs(e, &coded)
+		assert.Equal(http.StatusBadRequest, coded.StatusCode())
 	})
 
 	t.Run("GivenParameters", func(t *testing.T) {
