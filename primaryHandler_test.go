@@ -122,3 +122,15 @@ func TestNewRetryingClient(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateWRPSource(t *testing.T) {
+	for _, source := range []string{"dns:localhost", "dns:tr1d1um.example.com", "mac:112233445566", "event:device-status/foo"} {
+		assert.NoError(t, validateWRPSource(source), source)
+	}
+
+	for _, source := range []string{"", "tr1d1um", "not a locator"} {
+		err := validateWRPSource(source)
+		assert.Error(t, err, source)
+		assert.Contains(t, err.Error(), wrpSourceKey, source)
+	}
+}

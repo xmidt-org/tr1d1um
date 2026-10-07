@@ -25,6 +25,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webhook-schema"
+	"github.com/xmidt-org/wrp-go/v5"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -214,8 +215,21 @@ func provideHandlers() fx.Option {
 	)
 }
 
+// validateWRPSource checks that the configured WRPSource is a WRP locator.
+// wrp-go validates every message tr1d1um sends, and the source is stamped on
+// all of them, so a bad value would fail every request rather than one.
+func validateWRPSource(source string) error {
+	if _, err := wrp.ParseLocator(source); err != nil {
+		return fmt.Errorf("%s %q is not a valid WRP locator: %w", wrpSourceKey, source, err)
+	}
+
+	return nil
+}
+
 func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
 	var errs error
+
+	errs = errors.Join(errs, validateWRPSource(in.WRPSource))
 
 	xmidtHTTPClient := newHTTPClient(in.XmidtClientTimeout, in.Tracing)
 	stat_retries_counter, err := in.ServiceConfigsRetries.GetMetricWith(prometheus.Labels{apiLabel: stat_api})

@@ -24,13 +24,17 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/wrp-go/v3/wrphttp"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 const (
 	contentTypeHeaderKey = "Content-Type"
 	authHeaderKey        = "Authorization"
+
+	// partnerIDHeader carries the partner IDs of a request whose credentials
+	// state none.  wrp-go v3 defined it as wrphttp.PartnerIdHeader; v5 has no
+	// wrphttp package.
+	partnerIDHeader = "X-Xmidt-Partner-Id"
 )
 
 // Options wraps the properties needed to set up the translation server
@@ -78,7 +82,7 @@ func ConfigHandler(c *Options) {
 // getPartnerIDs returns the array that represents the partner-ids that were
 // passed in as headers.  This function handles multiple duplicate headers.
 func getPartnerIDs(h http.Header) []string {
-	headers, ok := h[wrphttp.PartnerIdHeader]
+	headers, ok := h[partnerIDHeader]
 	if !ok {
 		return nil
 	}
@@ -223,7 +227,10 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 
 	wrpModel := new(wrp.Message)
 
-	if err = wrp.NewDecoderBytes(resp.Body, wrp.Msgpack).Decode(wrpModel); err == nil {
+	// The device's response is passed through, not acted on, so it is decoded
+	// without wrp-go's standard validation: a response missing a field that
+	// the standard requires must still reach the caller.
+	if err = wrp.NewDecoderBytes(resp.Body, wrp.Msgpack).Decode(wrpModel, wrp.NoStandardValidation()); err == nil {
 
 		// device response model
 		var d struct {

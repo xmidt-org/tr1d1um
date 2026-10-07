@@ -30,6 +30,12 @@ func (c *codedError) StatusCode() int {
 	return c.statusCode
 }
 
+// Unwrap exposes the underlying error, so errors.Is and errors.As see
+// through the status code to the cause.
+func (c *codedError) Unwrap() error {
+	return c.error
+}
+
 // NewBadRequestError is the constructor for an error returned for bad HTTP requests to tr1d1um
 func NewBadRequestError(e error) CodedError {
 	return NewCodedError(e, http.StatusBadRequest)

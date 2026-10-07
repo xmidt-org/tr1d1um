@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 func TestMakeTranslationEndpoint(t *testing.T) {

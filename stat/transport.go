@@ -12,7 +12,7 @@ import (
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"go.uber.org/zap"
 
 	kithttp "github.com/go-kit/kit/transport/http"

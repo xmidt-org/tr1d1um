@@ -20,8 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/wrp-go/v3/wrphttp"
+	"github.com/xmidt-org/wrp-go/v5"
 
 	"github.com/xmidt-org/bascule"
 )
@@ -114,8 +113,8 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 
 			if test.addPartnerIDsInHeaders {
-				r.Header.Set(wrphttp.PartnerIdHeader, "partner0")
-				r.Header.Add(wrphttp.PartnerIdHeader, "partner1")
+				r.Header.Set(partnerIDHeader, "partner0")
+				r.Header.Add(partnerIDHeader, "partner1")
 			}
 
 			if test.tokenType == "" {
@@ -437,7 +436,7 @@ func TestEncodeResponse(t *testing.T) {
 					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 						Type:    wrp.SimpleRequestResponseMessageType,
 						Payload: []byte(`{"statusCode": 520}`),
-					}, wrp.Msgpack)).Bytes(),
+					}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 				},
 				expectedStatusCode: 520,
 				deviceStatusCode:   520,
@@ -448,7 +447,7 @@ func TestEncodeResponse(t *testing.T) {
 					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 						Type:    wrp.SimpleRequestResponseMessageType,
 						Payload: []byte(`{"statusCode": 599}`),
-					}, wrp.Msgpack)).Bytes(),
+					}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 				},
 				expectedStatusCode: 599,
 				deviceStatusCode:   599,
@@ -459,7 +458,7 @@ func TestEncodeResponse(t *testing.T) {
 					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 						Type:    wrp.SimpleRequestResponseMessageType,
 						Payload: []byte(`{"statusCode": 1000}`),
-					}, wrp.Msgpack)).Bytes(),
+					}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 				},
 				expectedStatusCode: 200,
 				deviceStatusCode:   1000,
@@ -470,7 +469,7 @@ func TestEncodeResponse(t *testing.T) {
 					Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 						Type:    wrp.SimpleRequestResponseMessageType,
 						Payload: []byte(`{"statusCode": -1}`),
-					}, wrp.Msgpack)).Bytes(),
+					}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 				},
 				expectedStatusCode: 200,
 				deviceStatusCode:   -1,
@@ -498,7 +497,7 @@ func TestEncodeResponse(t *testing.T) {
 			Code: http.StatusOK,
 			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
-				Payload: internalErrorResponse}, wrp.Msgpack)).Bytes(),
+				Payload: internalErrorResponse}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
@@ -517,7 +516,7 @@ func TestEncodeResponse(t *testing.T) {
 			Body: bytes.NewBuffer(wrp.MustEncode(&wrp.Message{
 				Type:    wrp.SimpleRequestResponseMessageType,
 				Payload: []byte(`{"statusCode":`),
-			}, wrp.Msgpack)).Bytes(),
+			}, wrp.Msgpack, wrp.NoStandardValidation())).Bytes(),
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)

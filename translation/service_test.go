@@ -16,7 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/tr1d1um/auth"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/wrphttp"
 )
 
 func TestSendWRP(t *testing.T) {
@@ -65,15 +66,17 @@ func TestSendWRP(t *testing.T) {
 			}
 			s := NewService(options)
 
-			var expected = wrp.MustEncode(wrp.Message{
-				Type:   wrp.SimpleRequestResponseMessageType,
-				Source: "dns:tr1d1um-xyz-example.com",
+			var expected = wrp.MustEncode(&wrp.Message{
+				Type:            wrp.SimpleRequestResponseMessageType,
+				Source:          "dns:tr1d1um-xyz-example.com",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-tid",
 			}, wrp.Msgpack)
 
 			var requestMatcher = func(r *http.Request) bool {
 				assert.EqualValues("http://localhost/wrp", r.URL.String())
 				assert.EqualValues(testCase.ExpectedRequestAuth, r.Header.Get(basculehttp.DefaultAuthorizationHeader))
-				assert.EqualValues(wrp.Msgpack.ContentType(), r.Header.Get("Content-Type"))
+				assert.EqualValues(wrphttp.MEDIA_TYPE_MSGPACK, r.Header.Get("Content-Type"))
 
 				data, err := io.ReadAll(r.Body)
 				require.Nil(err)
@@ -93,7 +96,9 @@ func TestSendWRP(t *testing.T) {
 			}
 
 			_, e := s.SendWRP(context.TODO(), &wrp.Message{
-				Type: wrp.SimpleRequestResponseMessageType,
+				Type:            wrp.SimpleRequestResponseMessageType,
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-tid",
 			}, "pass-through-token")
 
 			m.AssertExpectations(t)

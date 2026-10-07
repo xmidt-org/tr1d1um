@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
