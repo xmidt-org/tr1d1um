@@ -45,7 +45,10 @@ type Options struct {
 	ValidServices               []string
 	ReducedLoggingResponseCodes []int
 	BearerFingerprint           transaction.FingerprintConfig
-	tracing                     candlelight.Tracing
+
+	// Tracing supplies the propagator and header prefix used to pick up
+	// trace context from incoming requests.
+	Tracing candlelight.Tracing
 }
 
 // ConfigHandler sets up the server that powers the translation service
@@ -65,10 +68,10 @@ func ConfigHandler(c *Options) {
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.tracing, false)(welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.tracing, false)(welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 

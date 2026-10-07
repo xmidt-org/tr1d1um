@@ -39,6 +39,10 @@ type Options struct {
 	Log                         *zap.Logger
 	ReducedLoggingResponseCodes []int
 	BearerFingerprint           transaction.FingerprintConfig
+
+	// Tracing supplies the propagator and header prefix used to pick up
+	// trace context from incoming requests.
+	Tracing candlelight.Tracing
 }
 
 // ConfigHandler sets up the server that powers the stat service
@@ -56,7 +60,7 @@ func ConfigHandler(c *Options) {
 		opts...,
 	)
 
-	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(candlelight.Tracing{}, false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
 		Methods(http.MethodGet)
 }
 

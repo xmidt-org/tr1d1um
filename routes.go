@@ -270,6 +270,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		Log:                         in.Logger,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 		BearerFingerprint:           in.BearerFingerprint,
+		Tracing:                     in.Tracing,
 	})
 	translation.ConfigHandler(&translation.Options{
 		S:                           ts,
@@ -279,6 +280,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 		BearerFingerprint:           in.BearerFingerprint,
+		Tracing:                     in.Tracing,
 	})
 }
 
