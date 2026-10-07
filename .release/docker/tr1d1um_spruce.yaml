@@ -301,16 +301,23 @@ authToken: (( grab $AUTH_TOKEN || "dXNlcjpwYXNz" ))
 # tracing provides configuration around traces using OpenTelemetry.
 # (Optional). By default, a 'noop' tracer provider is used and tracing is disabled.
 tracing:
-  # provider is the provider name. Currently, stdout, jaegar and zipkin are supported.
-  # 'noop' can also be used as provider to explicitly disable tracing.
+  # provider is the name of the trace provider to use: otlp/grpc, otlp/http,
+  # stdout, or noop.  'noop' explicitly disables tracing.  The jaeger and
+  # zipkin providers were removed in candlelight v0.4.0; send OTLP to Jaeger
+  # directly, or to an OpenTelemetry Collector that exports to Zipkin.
   provider: (( grab $TRACING_PROVIDER_NAME || "noop" ))
+
+  # environment names the deployment environment, exported with every span
+  # as the deployment.environment resource attribute.  Empty omits it.
+  environment: (( grab $TRACING_ENVIRONMENT || "" ))
 
   # skipTraceExport only applies when provider is stdout. Set skipTraceExport to true
   # so that trace information is not written to stdout.
   # skipTraceExport: true
 
-  # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
-  endpoint: (( grab $TRACING_PROVIDER_ENDPOINT || "http://localhost:9411/api/v2/spans" ))
+  # endpoint is where trace information should be routed.  Applies to the
+  # otlp providers: OTLP/gRPC uses port 4317 by default, OTLP/HTTP port 4318.
+  endpoint: (( grab $TRACING_PROVIDER_ENDPOINT || "localhost:4317" ))
 
 # previousVersionSupport allows us to support two different major versions of
 # the API at the same time from the same application.  When this is true,

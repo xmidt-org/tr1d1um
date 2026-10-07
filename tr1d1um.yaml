@@ -424,16 +424,29 @@ requestMaxRetries: 2
 # tracing provides configuration around traces using OpenTelemetry.
 # (Optional). By default, a 'noop' tracer provider is used and tracing is disabled.
 tracing:
-  # provider is the name of the trace provider to use. Currently, otlp/grpc, otlp/http, stdout, jaeger and zipkin are supported.
-  # 'noop' can also be used as provider to explicitly disable tracing.
+  # provider is the name of the trace provider to use: otlp/grpc, otlp/http,
+  # stdout, or noop.  'noop' explicitly disables tracing.
+  #
+  # The jaeger and zipkin providers were removed in candlelight v0.4.0 along
+  # with the OpenTelemetry exporters behind them.  Jaeger accepts OTLP
+  # natively, so use otlp/grpc (port 4317) or otlp/http (port 4318) against
+  # it.  For Zipkin, send OTLP to an OpenTelemetry Collector that exports to
+  # Zipkin, or to a Zipkin server that accepts OTLP.
   provider: "noop"
+
+  # environment names the deployment environment, such as "prod" or
+  # "staging".  It is exported with every span as the deployment.environment
+  # resource attribute.  Leave it empty to omit it.
+  # (Optional)
+  # environment: ""
 
   # skipTraceExport only applies when provider is stdout. Set skipTraceExport to true
   # so that trace information is not written to stdout.
   # skipTraceExport: true
 
-  # endpoint is where trace information should be routed. Applies to otlp, zipkin, and jaegar. OTLP/gRPC uses port 4317 by default.
-  # OTLP/HTTP uses port 4318 by default.
+  # endpoint is where trace information should be routed.  Applies to the
+  # otlp providers.  OTLP/gRPC uses port 4317 by default and OTLP/HTTP uses
+  # port 4318.
   # endpoint: "localhost:4317"
 
   # ParentBased and NoParent dictate if and when new spans should be created.
