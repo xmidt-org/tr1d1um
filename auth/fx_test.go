@@ -136,14 +136,16 @@ func TestProvide(t *testing.T) {
 
 	credential := encodedCredential("user", "pass")
 	outbound := map[string]any{
-		fanoutBasicConfigKey:   credential,
-		webhookBascicConfigKey: credential,
+		fanoutConfigKey + ".Basic":  credential,
+		webhookConfigKey + ".Basic": credential,
 	}
 
 	cases := []struct {
-		name    string
-		set     map[string]any
-		wantErr error
+		name     string
+		set      map[string]any
+		outbound map[string]any
+		wantErr  error
+		failure  bool
 	}{
 		{
 			name: "basic",
@@ -164,13 +166,45 @@ func TestProvide(t *testing.T) {
 				jwtPrefixesKey: []string{testPrefix},
 			},
 			wantErr: clorthofx.ErrNoProviders,
+		}, {
+			name: "spiffe outbound",
+			set: map[string]any{
+				basicKey: []string{credential},
+			},
+			outbound: map[string]any{
+				fanoutConfigKey + ".SPIFFE": map[string]any{ //nolint:gosec // a client ID, not a credential
+					"tokenURL": "https://issuer.example.com/token",
+					"clientID": testClientID,
+					"scopes":   []string{"x1:webpa:api:device/.*/config:get"},
+					"socket":   "unix:///run/spire/sockets/agent.sock",
+				},
+				webhookConfigKey + ".Basic": credential,
+			},
+		}, {
+			name: "outbound with two modes",
+			set: map[string]any{
+				basicKey: []string{credential},
+			},
+			outbound: map[string]any{
+				fanoutConfigKey + ".Basic": credential,
+				fanoutConfigKey + ".SPIFFE": map[string]any{ //nolint:gosec // a client ID, not a credential
+					"tokenURL": "https://issuer.example.com/token",
+					"clientID": testClientID,
+				},
+				webhookConfigKey + ".Basic": credential,
+			},
+			failure: true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			v := viper.New()
-			for k, val := range outbound {
+			ob := outbound
+			if tc.outbound != nil {
+				ob = tc.outbound
+			}
+			for k, val := range ob {
 				v.Set(k, val)
 			}
 			for k, val := range tc.set {
@@ -193,9 +227,12 @@ func TestProvide(t *testing.T) {
 				}),
 			)
 
-			if tc.wantErr != nil {
+			switch {
+			case tc.failure:
+				assert.Error(t, app.Err())
+			case tc.wantErr != nil:
 				assert.ErrorIs(t, app.Err(), tc.wantErr)
-			} else {
+			default:
 				assert.NoError(t, app.Err())
 			}
 		})
