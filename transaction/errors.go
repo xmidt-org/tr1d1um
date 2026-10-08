@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 
-	kithttp "github.com/go-kit/kit/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -52,12 +51,12 @@ func NewCodedError(e error, code int) CodedError {
 
 // ErrorLogEncoder decorates the errorEncoder in such a way that
 // errors are logged with their corresponding unique request identifier
-func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee kithttp.ErrorEncoder) kithttp.ErrorEncoder {
+func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee ErrorEncoder) ErrorEncoder {
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
 		code := http.StatusInternalServerError
-		var sc kithttp.StatusCoder
-		if errors.As(e, &sc) {
-			code = sc.StatusCode()
+		var ce CodedError
+		if errors.As(e, &ce) {
+			code = ce.StatusCode()
 		}
 
 		if l := getLogger(ctx); l != nil && code != http.StatusNotFound {

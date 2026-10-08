@@ -6,7 +6,7 @@ package translation
 import (
 	"context"
 
-	"github.com/go-kit/kit/endpoint"
+	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
 )
 
@@ -15,9 +15,8 @@ type wrpRequest struct {
 	AuthHeaderValue string
 }
 
-func makeTranslationEndpoint(s Service) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		wrpReq := (request).(*wrpRequest)
-		return s.SendWRP(ctx, wrpReq.WRPMessage, wrpReq.AuthHeaderValue)
+func makeTranslationEndpoint(s Service) func(context.Context, *wrpRequest) (*transaction.XmidtResponse, error) {
+	return func(ctx context.Context, r *wrpRequest) (*transaction.XmidtResponse, error) {
+		return s.SendWRP(ctx, r.WRPMessage, r.AuthHeaderValue)
 	}
 }

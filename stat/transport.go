@@ -15,7 +15,6 @@ import (
 	"github.com/xmidt-org/wrp-go/v5"
 	"go.uber.org/zap"
 
-	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 )
@@ -48,23 +47,19 @@ type Options struct {
 // ConfigHandler sets up the server that powers the stat service
 // That is, it configures the mux paths to access the service
 func ConfigHandler(c *Options) {
-	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(sallust.Get, encodeError)),
-		kithttp.ServerFinalizer(transaction.Log(c.ReducedLoggingResponseCodes)),
+	statHandler := transaction.Handler[*statRequest, *transaction.XmidtResponse]{
+		Decode:      decodeRequest,
+		Serve:       makeStatEndpoint(c.S),
+		Encode:      encodeResponse,
+		EncodeError: transaction.ErrorLogEncoder(sallust.Get, encodeError),
+		Finalize:    transaction.Log(c.ReducedLoggingResponseCodes),
 	}
-
-	statHandler := kithttp.NewServer(
-		makeStatEndpoint(c.S),
-		decodeRequest,
-		encodeResponse,
-		opts...,
-	)
 
 	c.APIRouter.Handle("/device/{deviceid}/stat", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(transaction.Welcome(c.BearerFingerprint)(statHandler)))).
 		Methods(http.MethodGet)
 }
 
-func decodeRequest(_ context.Context, r *http.Request) (req interface{}, err error) {
+func decodeRequest(_ context.Context, r *http.Request) (req *statRequest, err error) {
 	var deviceID wrp.DeviceID
 	if deviceID, err = wrp.ParseDeviceID(mux.Vars(r)["deviceid"]); err == nil {
 		req = &statRequest{
@@ -107,9 +102,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 // TODO: What about if XMiDT cluster reports 500. There would be ambiguity
 // about which machine is actually having the error (Tr1d1um or the Xmidt API)
 // do we care to make that distinction?
-func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	resp := response.(*transaction.XmidtResponse)
-
+func encodeResponse(ctx context.Context, w http.ResponseWriter, resp *transaction.XmidtResponse) (err error) {
 	if resp == nil || resp.Body == nil {
 		err = errResponseIsNil
 		return

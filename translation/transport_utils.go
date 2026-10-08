@@ -15,7 +15,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"go.uber.org/zap"
 
-	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/wrp-go/v5"
 )
@@ -108,8 +107,10 @@ func wrap(WDMP []byte, tid string, pathVars map[string]string, partnerIDs []stri
 	}, nil
 }
 
-func decodeValidServiceRequest(services []string, decoder kithttp.DecodeRequestFunc) kithttp.DecodeRequestFunc {
-	return func(c context.Context, r *http.Request) (interface{}, error) {
+type decodeRequestFunc func(context.Context, *http.Request) (*wrpRequest, error)
+
+func decodeValidServiceRequest(services []string, decoder decodeRequestFunc) decodeRequestFunc {
+	return func(c context.Context, r *http.Request) (*wrpRequest, error) {
 
 		if !contains(mux.Vars(r)["service"], services) {
 			return nil, ErrInvalidService
