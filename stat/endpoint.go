@@ -6,16 +6,15 @@ package stat
 import (
 	"context"
 
-	"github.com/go-kit/kit/endpoint"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 type statRequest struct {
 	DeviceID string
 }
 
-func makeStatEndpoint(s Service) endpoint.Endpoint {
-	return func(ctx context.Context, r interface{}) (interface{}, error) {
-		statReq := (r).(*statRequest)
-		return s.RequestStat(ctx, statReq.DeviceID)
+func makeStatEndpoint(s Service) func(context.Context, *statRequest) (*transaction.XmidtResponse, error) {
+	return func(ctx context.Context, r *statRequest) (*transaction.XmidtResponse, error) {
+		return s.RequestStat(ctx, r.DeviceID)
 	}
 }

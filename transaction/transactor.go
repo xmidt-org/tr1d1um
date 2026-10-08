@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
@@ -131,7 +130,7 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 
 // Log is used by the different Tr1d1um services to
 // keep track of incoming requests and their corresponding responses
-func Log(reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
+func Log(reducedLoggingResponseCodes []int) FinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
 		logger := sallust.Get(ctx)
@@ -161,7 +160,7 @@ func Log(reducedLoggingResponseCodes []int) kithttp.ServerFinalizerFunc {
 		}
 
 		if includeHeaders {
-			response.Headers = ctx.Value(kithttp.ContextKeyResponseHeaders)
+			response.Headers = ctx.Value(ContextKeyResponseHeaders)
 		}
 
 		logger.Info("response", zap.Any("response", response))
@@ -194,7 +193,7 @@ type FingerprintConfig struct {
 
 // Welcome is an Alice-style constructor that defines necessary request
 // context values assumed to exist by the delegate. These values should
-// be those expected to be used both in and outside the gokit server flow.
+// be those expected to be used both in and outside the Handler flow.
 // The returned constructor also enriches the request-scoped logger with
 // credential fingerprint fields per the provided FingerprintConfig.
 func Welcome(cfg FingerprintConfig) func(http.Handler) http.Handler {

@@ -184,7 +184,7 @@ func TestWrapInWRP(t *testing.T) {
 }
 
 func TestDecodeValidServiceRequest(t *testing.T) {
-	f := decodeValidServiceRequest([]string{"s0"}, func(_ context.Context, _ *http.Request) (interface{}, error) {
+	f := decodeValidServiceRequest([]string{"s0"}, func(_ context.Context, _ *http.Request) (*wrpRequest, error) {
 		return nil, nil
 	})
 

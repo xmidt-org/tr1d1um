@@ -21,7 +21,6 @@ import (
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 
-	"github.com/goph/emperror"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xmidt-org/candlelight"
@@ -191,7 +190,9 @@ func tr1d1um(arguments []string) (exitCode int) {
 	// This allows us to communicate the version of the binary upon request.
 	if done, parseErr := printVersion(f, arguments); done {
 		// if we're done, we're exiting no matter what
-		exitIfError(l, emperror.Wrap(parseErr, "failed to parse arguments"))
+		if parseErr != nil {
+			exitIfError(l, fmt.Errorf("failed to parse arguments: %w", parseErr))
+		}
 		os.Exit(0)
 	}
 

@@ -125,8 +125,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 
 			wrpMsg, e := decodeRequest(ctx, r)
 			assert.NoError(e)
-			realWRP, _ := wrpMsg.(*wrpRequest)
-			assert.Equal(test.expectedPartnerIDs, realWRP.WRPMessage.PartnerIDs)
+			assert.Equal(test.expectedPartnerIDs, wrpMsg.WRPMessage.PartnerIDs)
 		})
 	}
 }

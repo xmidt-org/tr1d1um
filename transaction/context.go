@@ -9,4 +9,8 @@ type contextKey int
 const (
 	ContextKeyRequestArrivalTime contextKey = iota
 	ContextKeyRequestTID
+
+	// ContextKeyResponseHeaders holds the http.Header of the written
+	// response; Handler sets it for its finalizer.
+	ContextKeyResponseHeaders
 )

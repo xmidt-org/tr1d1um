@@ -52,7 +52,7 @@ func TestDecodeRequest(t *testing.T) {
 
 		assert.Equal(&statRequest{
 			DeviceID: "mac:112233445566",
-		}, resp.(*statRequest))
+		}, resp)
 	})
 }
 

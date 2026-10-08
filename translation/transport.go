@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strings"
 
-	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/cast"
@@ -57,18 +56,14 @@ type Options struct {
 
 // ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
-	opts := []kithttp.ServerOption{
-		kithttp.ServerBefore(captureWDMPParameters),
-		kithttp.ServerErrorEncoder(transaction.ErrorLogEncoder(sallust.Get, encodeError)),
-		kithttp.ServerFinalizer(transaction.Log(c.ReducedLoggingResponseCodes)),
+	WRPHandler := transaction.Handler[*wrpRequest, *transaction.XmidtResponse]{
+		Before:      captureWDMPParameters,
+		Decode:      decodeValidServiceRequest(c.ValidServices, decodeRequest),
+		Serve:       makeTranslationEndpoint(c.S),
+		Encode:      encodeResponse,
+		EncodeError: transaction.ErrorLogEncoder(sallust.Get, encodeError),
+		Finalize:    transaction.Log(c.ReducedLoggingResponseCodes),
 	}
-
-	WRPHandler := kithttp.NewServer(
-		makeTranslationEndpoint(c.S),
-		decodeValidServiceRequest(c.ValidServices, decodeRequest),
-		encodeResponse,
-		opts...,
-	)
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
 
@@ -143,7 +138,7 @@ func getTID(ctx context.Context) string {
 }
 
 /* Request Decoding */
-func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest interface{}, err error) {
+func decodeRequest(ctx context.Context, r *http.Request) (decodedRequest *wrpRequest, err error) {
 	var (
 		payload    []byte
 		wrpMsg     *wrp.Message
@@ -205,9 +200,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 }
 
 /* Response Encoding */
-func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	var resp = response.(*transaction.XmidtResponse)
-
+func encodeResponse(ctx context.Context, w http.ResponseWriter, resp *transaction.XmidtResponse) (err error) {
 	//equivalent to forwarding all headers
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
