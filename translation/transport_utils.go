@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/tr1d1um/paramfilter"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"go.uber.org/zap"
 
@@ -141,28 +143,67 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 	return wdmp, nil
 }
 
-func captureWDMPParameters(ctx context.Context, r *http.Request) (nctx context.Context) {
-	nctx = ctx
-	logger := sallust.Get(ctx)
+func captureWDMPParameters(filters *paramfilter.Filters) transaction.RequestFunc {
+	return func(ctx context.Context, r *http.Request) context.Context {
+		logger := sallust.Get(ctx)
 
-	if r.Method == http.MethodPatch {
-		bodyBytes, _ := io.ReadAll(r.Body)
-		r.Body.Close()
-
-		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
-		if e == nil {
-
+		switch r.Method {
+		case http.MethodGet:
+			names := r.FormValue("names")
+			if names == "" {
+				return ctx
+			}
+			allNames := strings.Split(names, ",")
 			logger = logger.With(
-				zap.Any("command", wdmp.Command),
-				zap.Any("parameters", getParamNames(wdmp.Parameters)),
+				zap.String("command", CommandGet),
+				zap.Strings("parameters", allNames),
 			)
+			return sallust.With(ctx, logger)
 
-			nctx = sallust.With(ctx, logger)
+		case http.MethodPatch:
+			bodyBytes, _ := io.ReadAll(r.Body)
+			r.Body.Close()
+
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			wdmp, e := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+			if e == nil {
+				// Always log parameter names.
+				logger = logger.With(
+					zap.String("command", wdmp.Command),
+					zap.Strings("parameters", getParamNames(wdmp.Parameters)),
+				)
+
+				// Conditionally log parameter values based on the filter.
+				values := filterParamValues(wdmp.Parameters, filters.PatchFilter())
+				if len(values) > 0 {
+					logger = logger.With(zap.Any("parameterValues", values))
+				}
+
+				return sallust.With(ctx, logger)
+			}
+		}
+
+		return ctx
+	}
+}
+
+// filterParamValues returns a map of parameter name -> value for parameters
+// whose values the filter allows to be logged.  If the filter is nil, no
+// values are returned.
+func filterParamValues(params []setParam, f *paramfilter.Filter) map[string]any {
+	if f == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	for _, p := range params {
+		if p.Name != nil && f.ShouldLog(*p.Name) && p.Value != nil {
+			out[*p.Name] = p.Value
 		}
 	}
-
-	return
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func getParamNames(params []setParam) (paramNames []string) {

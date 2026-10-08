@@ -22,6 +22,7 @@ import (
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/auth"
+	"github.com/xmidt-org/tr1d1um/paramfilter"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
 )
@@ -49,6 +50,10 @@ type Options struct {
 	ReducedLoggingResponseCodes []int
 	BearerFingerprint           transaction.FingerprintConfig
 
+	// ParamFilters controls which TR-181 parameter values are included in
+	// log output for GET and PATCH operations.  A nil value logs none.
+	ParamFilters *paramfilter.Filters
+
 	// Tracing supplies the propagator and header prefix used to pick up
 	// trace context from incoming requests.
 	Tracing candlelight.Tracing
@@ -57,7 +62,7 @@ type Options struct {
 // ConfigHandler sets up the server that powers the translation service
 func ConfigHandler(c *Options) {
 	WRPHandler := transaction.Handler[*wrpRequest, *transaction.XmidtResponse]{
-		Before:      captureWDMPParameters,
+		Before:      captureWDMPParameters(c.ParamFilters),
 		Decode:      decodeValidServiceRequest(c.ValidServices, decodeRequest),
 		Serve:       makeTranslationEndpoint(c.S),
 		Encode:      encodeResponse,

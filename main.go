@@ -51,6 +51,7 @@ const (
 	webhookConfigKey                  = "webhook"
 	tracingConfigKey                  = "tracing"
 	fingerprintCredsKey               = "fingerprintCreds"
+	parameterLoggingKey               = "parameterLogging"
 )
 
 var (
