@@ -27,6 +27,7 @@ import (
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/internal/viperfx"
+	"github.com/xmidt-org/tr1d1um/paramfilter"
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
@@ -66,6 +67,7 @@ type primaryEndpointIn struct {
 	ReducedLoggingResponseCodes []int                         `name:"reducedLoggingResponseCodes"`
 	TranslationServices         []string                      `name:"supportedServices"`
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
+	ParamFilters                *paramfilter.Filters          `name:"paramFilters"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -222,6 +224,10 @@ func provideServers() fx.Option {
 				Target: viperfx.Unmarshal(fingerprintCredsKey, transaction.FingerprintConfig{}),
 			},
 			fx.Annotated{
+				Name:   "paramFilters",
+				Target: provideParamFilters,
+			},
+			fx.Annotated{
 				Name:   "api_router",
 				Target: provideAPIRouter,
 			},
@@ -280,6 +286,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		ValidServices:               in.TranslationServices,
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 		BearerFingerprint:           in.BearerFingerprint,
+		ParamFilters:                in.ParamFilters,
 		Tracing:                     in.Tracing,
 	})
 }
@@ -458,4 +465,12 @@ func buildMetricsRoutes(in metricsRoutesIn) {
 	if in.Router != nil && in.Handler != nil {
 		in.Router.Handle("/metrics", in.Handler).Methods("GET")
 	}
+}
+
+func provideParamFilters(v *viper.Viper) (*paramfilter.Filters, error) {
+	cfg, err := viperfx.Unmarshal(parameterLoggingKey, paramfilter.Config{})(v)
+	if err != nil {
+		return nil, err
+	}
+	return paramfilter.NewFilters(cfg), nil
 }

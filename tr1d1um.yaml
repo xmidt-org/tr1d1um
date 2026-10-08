@@ -131,6 +131,36 @@ logging:
 #   lastNdigits: 0
 
 ##############################################################################
+# Parameter Logging
+##############################################################################
+# parameterLogging controls which TR-181 parameter values are included in log
+# output.  Parameter names are always logged; this controls only values.
+# Separate rules can be configured for GET and PATCH operations.
+#
+# Each section supports two modes:
+#   - "never"  (default) -- log no values, except parameters matching the
+#     patterns in the except list (allowlist).
+#   - "always" -- log all values, except parameters matching the patterns
+#     in the except list (denylist).
+#
+# Pattern syntax (case-insensitive):
+#   - *  matches any characters except '.' (single level)
+#   - ** matches any characters including '.' (multi-level)
+#
+# Default: both GET and PATCH are "never" with no exceptions (log no values).
+# (Optional)
+# parameterLogging:
+#   get:
+#     mode: never
+#     except:
+#       - "Device.WiFi.**"
+#       - "Device.DeviceInfo.SerialNumber"
+#   patch:
+#     mode: always
+#     except:
+#       - "Device.Security.**"
+
+##############################################################################
 # Webhooks Related Configuration
 ##############################################################################
 # webhook provides configuration for storing and obtaining webhook
