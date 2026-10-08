@@ -333,8 +333,8 @@ auth:
 
   # outbound configures the credentials tr1d1um attaches to the requests it
   # makes.  fanout covers requests to the XMiDT cluster at targetURL, and
-  # webhook covers requests to Argus.  For each, exactly one of basic or jwt
-  # must be configured.
+  # webhook covers requests to Argus.  For each, exactly one of basic, jwt or
+  # spiffe must be configured.
   outbound:
     fanout:
       # basic is the base64-encoded "user:password" to send.
@@ -362,6 +362,46 @@ auth:
       #   # token.
       #   buffer: "2m"
 
+      # spiffe exchanges this workload's SPIFFE JWT-SVID for a bearer token,
+      # so no client secret is stored.  The issuer must have the workload's
+      # SPIFFE ID registered to clientID.  The token is reused until it nears
+      # expiration.
+      # spiffe:
+      #   # tokenURL is the issuer's token endpoint.
+      #   tokenURL: "https://issuer.example.com/v2/oauth/token"
+      #
+      #   # clientID is the issuer client the SPIFFE ID is registered to.
+      #   clientID: ""
+      #
+      #   # scopes are the capabilities to request.  The issuer grants no
+      #   # more than these, so list only what this kind of request needs,
+      #   # even when the client is approved for more.  When empty, the
+      #   # issuer decides.
+      #   scopes:
+      #     - ""
+      #
+      #   # (Optional) audience is the aud claim of the JWT-SVID.  Defaults
+      #   # to tokenURL.
+      #   audience: ""
+      #
+      #   # (Optional) assertionType is sent as client_assertion_type.
+      #   # Defaults to urn:ietf:params:oauth:client-assertion-type:spiffe-jwt.
+      #   assertionType: ""
+      #
+      #   # (Optional) socket is the SPIFFE Workload API address, as a
+      #   # unix:// or tcp:// URI or a bare unix socket path.  Defaults to the
+      #   # SPIFFE_ENDPOINT_SOCKET environment variable.  tr1d1um refuses to
+      #   # start if neither is set.
+      #   socket: "unix:///run/spire/sockets/agent.sock"
+      #
+      #   # timeout bounds fetching the SVID and exchanging it.  Defaults to
+      #   # 30s.
+      #   timeout: "30s"
+      #
+      #   # buffer is the length of time before a token expires to get a new
+      #   # token.
+      #   buffer: "2m"
+
     webhook:
       # basic is the base64-encoded "user:password" to send.
       basic: "dXNlcjpwYXNz"
@@ -374,6 +414,14 @@ auth:
       #     "": ""
       #   timeout: "1m"
       #   buffer: "2m"
+
+      # spiffe takes the same fields as auth.outbound.fanout.spiffe.  Request
+      # only the scopes webhook registration needs.
+      # spiffe:
+      #   tokenURL: "https://issuer.example.com/v2/oauth/token"
+      #   clientID: ""
+      #   scopes:
+      #     - ""
 
 
 ##############################################################################

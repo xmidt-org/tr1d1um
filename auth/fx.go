@@ -217,8 +217,8 @@ type decoratorIn struct {
 }
 
 func provideDecorators(in decoratorIn) (Decorator, auth.Decorator, error) {
-	fod, err := NewDecorator(in.Cfg.Fanout, in.V, fanoutJWTConfigKey, fanoutBasicConfigKey, in.PraseOpts...)
-	wd, err1 := NewDecorator(in.Cfg.Webhook, in.V, webhookJWTConfigKey, webhookBascicConfigKey, in.PraseOpts...)
+	fod, err := NewDecorator(in.Cfg.Fanout, in.V, fanoutConfigKey, in.PraseOpts...)
+	wd, err1 := NewDecorator(in.Cfg.Webhook, in.V, webhookConfigKey, in.PraseOpts...)
 
 	return fod, wd, multierr.Append(err, err1)
 }

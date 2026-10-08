@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,11 +20,9 @@ import (
 )
 
 const (
-	outboundConfigKey      = "auth.outbound"
-	fanoutJWTConfigKey     = "auth.outbound.fanout.JWT"
-	fanoutBasicConfigKey   = "auth.outbound.fanout.Basic"
-	webhookJWTConfigKey    = "auth.outbound.webhook.JWT"
-	webhookBascicConfigKey = "auth.outbound.webhook.Basic"
+	outboundConfigKey = "auth.outbound"
+	fanoutConfigKey   = "auth.outbound.fanout"
+	webhookConfigKey  = "auth.outbound.webhook"
 )
 
 var (
@@ -43,8 +42,9 @@ type outboundConfig struct {
 }
 
 type decoratorConfig struct {
-	JWT   bearerDecoratorConfig
-	Basic string
+	JWT    bearerDecoratorConfig
+	Basic  string
+	SPIFFE spiffeDecoratorConfig
 }
 
 type bearerDecoratorConfig struct {
@@ -55,12 +55,24 @@ type bearerDecoratorConfig struct {
 	RequestHeaders map[string]string
 }
 
-func NewDecorator(cfg decoratorConfig, v *viper.Viper, jwtKey, basicKey string, opts ...jwt.ParseOption) (Decorator, error) {
-	if v.IsSet(jwtKey) && v.IsSet(basicKey) {
-		return nil, fmt.Errorf("`%s` and `%s` can't both be set", jwtKey, basicKey)
+// NewDecorator builds the decorator configured under key, which must set
+// exactly one of its jwt, basic or spiffe sections.
+func NewDecorator(cfg decoratorConfig, v *viper.Viper, key string, opts ...jwt.ParseOption) (Decorator, error) {
+	jwtKey, basicKey, spiffeKey := key+".JWT", key+".Basic", key+".SPIFFE"
+
+	var set []string
+	for _, k := range []string{jwtKey, basicKey, spiffeKey} {
+		if v.IsSet(k) {
+			set = append(set, fmt.Sprintf("`%s`", k))
+		}
+	}
+	if len(set) != 1 {
+		return nil, fmt.Errorf("exactly one of `%s`, `%s` or `%s` must be set, found: [%s]",
+			jwtKey, basicKey, spiffeKey, strings.Join(set, ", "))
 	}
 
-	if v.IsSet(jwtKey) {
+	switch {
+	case v.IsSet(jwtKey):
 		if len(cfg.JWT.RequestHeaders) == 0 {
 			return nil, fmt.Errorf("%w: `%s`", ErrEmptyAuthCredentials, jwtKey)
 		} else if len(cfg.JWT.AuthURL) == 0 {
@@ -78,15 +90,15 @@ func NewDecorator(cfg decoratorConfig, v *viper.Viper, jwtKey, basicKey string, 
 			},
 			parseOpts: opts,
 		}, nil
-	} else if v.IsSet(basicKey) {
+	case v.IsSet(basicKey):
 		if len(cfg.Basic) == 0 {
 			return nil, fmt.Errorf("%w: `%s`", ErrEmptyAuthCredentials, basicKey)
 		}
 
 		return &basicDecorator{value: cfg.Basic}, nil
+	default:
+		return newSPIFFEDecorator(cfg.SPIFFE, spiffeKey, nil)
 	}
-
-	return nil, fmt.Errorf("either `%s` or `%s` must be set, but not both", jwtKey, basicKey)
 }
 
 // bearerDecorator implements Decorator and fetches the tokens from a remote location with caching strategy.
