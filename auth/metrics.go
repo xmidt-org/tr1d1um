@@ -25,7 +25,8 @@ const Wildcard = "*"
 
 // Names for our metrics
 const (
-	AuthCapabilityCheckCount = "auth_capability_check"
+	AuthCapabilityCheckCount   = "auth_capability_check"
+	AuthCapabilityWarningCount = "auth_capability_warning"
 )
 
 // labels
@@ -36,6 +37,7 @@ const (
 	PartnerIDLabel = "partnerid"
 	EndpointLabel  = "endpoint"
 	MethodLabel    = "method"
+	KindLabel      = "kind"
 )
 
 // label values
@@ -73,6 +75,9 @@ const (
 	AuthBadCreds        = "bad_creds"
 	AuthMissingCreds    = "missing_creds"
 	NoCapabilitiesMatch = "no_capabilities_match"
+	NoCIDRCapability    = "no_cidr_capability"
+	OriginNotAllowed    = "origin_not_allowed"
+	UnknownOrigin       = "unknown_origin"
 	// partners
 	NonePartner     = "none"
 	WildcardPartner = "wildcard"
@@ -158,6 +163,7 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 type authorizerEvent struct {
 	l         *zap.Logger
 	counter   *prometheus.CounterVec
+	warnings  *prometheus.CounterVec
 	endpoints []*regexp.Regexp
 }
 
@@ -181,6 +187,53 @@ func (ae authorizerEvent) OnEvent(e bascule.AuthorizeEvent[*http.Request]) {
 	}
 
 	ae.counter.With(ls).Add(1)
+	ae.recordWarnings(e)
+}
+
+// recordWarnings counts and logs the capability warnings raised while
+// authorizing a request.  A check in permissive mode lets a failing request
+// through, so this is the only record that it would have been rejected.  The
+// capability or origin a warning names is logged but kept out of the labels,
+// since it comes from the token or the request.
+func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]) {
+	if len(e.Warnings) == 0 {
+		return
+	}
+
+	client := e.Token.Principal()
+	partner := determinePartnerID(e.Token)
+	for _, w := range e.Warnings {
+		kind, reason := warningKindReason(w)
+		ae.warnings.With(prometheus.Labels{
+			KindLabel:     kind,
+			ReasonLabel:   reason,
+			ClientIDLabel: client,
+		}).Add(1)
+
+		ae.l.Info("authorizer event: capability warning",
+			zap.String("sat_client_id", client),
+			zap.String("sat_partner_id", partner),
+			zap.String("warning", w.String()))
+	}
+}
+
+// warningKindReason extracts the capability kind and the reason of a warning
+// for use as metric labels.  A warning that would have rejected the request
+// carries its reason as an attribute; any other warning's reason is the
+// warning itself, e.g. malformed.  Hyphens become underscores to match the
+// other label values.
+func warningKindReason(w bascule.Warning) (kind, reason string) {
+	kind, reason = UnknownReason, w.Reason
+	for _, attr := range w.Attrs {
+		switch attr.Key {
+		case "kind":
+			kind = attr.Value
+		case "reason":
+			reason = attr.Value
+		}
+	}
+
+	return strings.ReplaceAll(kind, "-", "_"), strings.ReplaceAll(reason, "-", "_")
 }
 
 func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) prometheus.Labels {
@@ -190,6 +243,12 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	reason := ""
 	if errors.Is(e.Err, bascule.ErrBadCredentials) {
 		reason = AuthBadCreds
+	} else if errors.Is(e.Err, basculehttp.ErrNoCIDRCapability) {
+		reason = NoCIDRCapability
+	} else if errors.Is(e.Err, basculehttp.ErrOriginNotAllowed) {
+		reason = OriginNotAllowed
+	} else if errors.Is(e.Err, basculehttp.ErrUnknownOrigin) {
+		reason = UnknownOrigin
 	} else if errors.Is(e.Err, bascule.ErrUnauthorized) {
 		reason = NoCapabilitiesMatch
 	} else if errors.Is(e.Err, errAuthMissingClaims) {
