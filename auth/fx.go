@@ -75,17 +75,28 @@ func Provide(v *viper.Viper) fx.Option {
 }
 
 func provideMetrics() fx.Option {
-	return touchstone.CounterVec(
-		prometheus.CounterOpts{
-			Name: AuthCapabilityCheckCount,
-			Help: "Counter for the capability check, providing outcome information by client, partner, and endpoint",
-		},
-		OutcomeLabel,
-		ReasonLabel,
-		ClientIDLabel,
-		PartnerIDLabel,
-		EndpointLabel,
-		MethodLabel,
+	return fx.Options(
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: AuthCapabilityCheckCount,
+				Help: "Counter for the capability check, providing outcome information by client, partner, and endpoint",
+			},
+			OutcomeLabel,
+			ReasonLabel,
+			ClientIDLabel,
+			PartnerIDLabel,
+			EndpointLabel,
+			MethodLabel,
+		),
+		touchstone.CounterVec(
+			prometheus.CounterOpts{
+				Name: AuthCapabilityWarningCount,
+				Help: "Counter for capability warnings raised while authorizing a request, such as a malformed capability or a check that would have rejected the request in enforce mode, by kind, reason and client",
+			},
+			KindLabel,
+			ReasonLabel,
+			ClientIDLabel,
+		),
 	)
 }
 
@@ -193,7 +204,8 @@ type chainIn struct {
 	// authentication is not configured.
 	KeyProvider jws.KeyProvider `optional:"true"`
 
-	Counter *prometheus.CounterVec `name:"auth_capability_check"`
+	Counter  *prometheus.CounterVec `name:"auth_capability_check"`
+	Warnings *prometheus.CounterVec `name:"auth_capability_warning"`
 }
 
 type chainOut struct {
@@ -203,7 +215,7 @@ type chainOut struct {
 }
 
 func provideMiddleware(in chainIn) (chainOut, error) {
-	middle, err := NewMiddleware(in.Cfg, in.V, in.KeyProvider, in.Logger, in.Counter)
+	middle, err := NewMiddleware(in.Cfg, in.V, in.KeyProvider, in.Logger, in.Counter, in.Warnings)
 
 	return chainOut{Middleware: middle}, err
 }

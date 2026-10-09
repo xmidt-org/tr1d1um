@@ -320,6 +320,57 @@ auth:
     #     - "device/.*/stat\\b"
     #     - "device/.*/config\\b"
     #
+    #   # cidr holds a token's bearer to the networks its CIDR capabilities
+    #   # name, for example "x1:webpa:cidr:96.44.169.0/24".  The caller
+    #   # origin (see trustedProxies below) must be inside at least one of
+    #   # them.
+    #   # CIDR capabilities only limit access; a token with none is
+    #   # unrestricted unless required is set.  A capability whose network
+    #   # cannot be parsed, including a bare address without /bits, still
+    #   # counts as present but matches nothing, so a typo never removes a
+    #   # limit.  Every problem is reported to the caller in an
+    #   # X-Webpa-Capability-Warning header, whether or not the request was
+    #   # blocked, and counted in the auth_capability_warning metric.
+    #   # (Optional). When absent, CIDR capabilities are not checked.
+    #   cidr:
+    #     # prefixes select a token's CIDR capabilities.  A capability with
+    #     # any other prefix is ignored.  Required.
+    #     prefixes: ["x1:webpa:cidr:"]
+    #
+    #     # required rejects a token that carries no CIDR capability.
+    #     # (Optional). Defaults to false: such a token is unrestricted.
+    #     required: false
+    #
+    #     # mode is "enforce", which rejects a request that fails the check
+    #     # with a 403, or "permissive", which lets it through and reports
+    #     # what would have been rejected in the warning header, the log and
+    #     # the metric.  Use permissive to try the check, or required,
+    #     # against real traffic before enforcing it.
+    #     # (Optional). Defaults to "enforce".
+    #     mode: "enforce"
+    #
+    #     # cacheSize bounds how many parsed CIDR capabilities are retained.
+    #     # (Optional). Defaults to 1024.
+    #     cacheSize: 1024
+    #
+    #     # trustedProxies are the networks of the hops this deployment
+    #     # operates, such as load balancers, and trusts to report the
+    #     # address they received a request from.  The caller origin of a
+    #     # request is the nearest hop that is not one of them: when the peer
+    #     # is a trusted proxy, the Forwarded header (RFC 7239), or
+    #     # X-Forwarded-For when there is no Forwarded for=, is walked from
+    #     # the right past every trusted proxy.  When the peer is not a
+    #     # trusted proxy, the forwarding headers are ignored, since anyone
+    #     # can set them.  Every entry must be a network: a single host is
+    #     # written /32 or /128.
+    #     #
+    #     # Trusted proxies are deployment configuration; a token never
+    #     # names them.
+    #     # (Optional). Defaults to none, so the caller origin is always the
+    #     # peer.
+    #     trustedProxies:
+    #       - "10.0.0.0/8"
+    #
     #   # clortho configures where the keys that verify tokens come from.  At
     #   # least one provider, of any kind, is required.  Every field of the
     #   # provider configurations is accepted here; see
