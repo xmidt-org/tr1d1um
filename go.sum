@@ -115,8 +115,8 @@ github.com/xmidt-org/urlegit v0.1.31 h1:1e1SKFG5v9xjEUZrZpkkN6Njc4EefIJpaO0tEou4
 github.com/xmidt-org/urlegit v0.1.31/go.mod h1:dBxr5GgVGhASxE7hFZuuN/oTL41VGJiiMRbHj/4Cb5c=
 github.com/xmidt-org/webhook-schema v0.2.6 h1:IuFbgzmBAao8fAvbHuED/8G/9DKBqQJ1MX86aV1miaU=
 github.com/xmidt-org/webhook-schema v0.2.6/go.mod h1:CW38BBM0LbucZVcEuaGJd/TpC3rkbscgNjKhMI+Hj5o=
-github.com/xmidt-org/wrp-go/v5 v5.4.6 h1:7v2jrC+42617ooTfCHzsYDLVXj5oM7njVqtGbNbTijM=
-github.com/xmidt-org/wrp-go/v5 v5.4.6/go.mod h1:qciLrhMJl22nZSqDNC7K1tH8S1HDmLBx2TtU4O6rL4Q=
+github.com/xmidt-org/wrp-go/v5 v5.4.7 h1:BJuz1doC6emDJPli9vmXTsroKciU4CsBedu3YJYamv8=
+github.com/xmidt-org/wrp-go/v5 v5.4.7/go.mod h1:9yUu4CPck8WP5uzrEVmXMPBtvsTLEzaHWkzG/dtjlmI=
 github.com/xmidt-org/wrphttp v0.4.0 h1:iCDeDHnOjWSuUuJpni4GTCD0DOKEdeN5ddNIfQVd+/4=
 github.com/xmidt-org/wrphttp v0.4.0/go.mod h1:ZUlfeHIPYCLxoqUfURMNaH8XHoH6mfFlT+anLcjUpAQ=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
