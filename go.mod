@@ -20,7 +20,7 @@ require (
 	github.com/xmidt-org/arrange v0.5.10
 	github.com/xmidt-org/bascule v1.5.0
 	github.com/xmidt-org/candlelight v0.4.1
-	github.com/xmidt-org/clortho v0.5.0
+	github.com/xmidt-org/clortho v0.5.1
 	github.com/xmidt-org/httpaux v0.4.5
 	github.com/xmidt-org/retry v0.0.8
 	github.com/xmidt-org/sallust v0.2.10
