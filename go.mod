@@ -27,7 +27,7 @@ require (
 	github.com/xmidt-org/touchstone v0.1.8
 	github.com/xmidt-org/webhook-schema v0.2.6
 	github.com/xmidt-org/wrp-go/v5 v5.4.7
-	github.com/xmidt-org/wrphttp v0.4.0
+	github.com/xmidt-org/wrphttp v0.4.1
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.72.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
 	go.opentelemetry.io/otel/trace v1.47.0
