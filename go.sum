@@ -117,8 +117,8 @@ github.com/xmidt-org/webhook-schema v0.2.6 h1:IuFbgzmBAao8fAvbHuED/8G/9DKBqQJ1MX
 github.com/xmidt-org/webhook-schema v0.2.6/go.mod h1:CW38BBM0LbucZVcEuaGJd/TpC3rkbscgNjKhMI+Hj5o=
 github.com/xmidt-org/wrp-go/v5 v5.4.7 h1:BJuz1doC6emDJPli9vmXTsroKciU4CsBedu3YJYamv8=
 github.com/xmidt-org/wrp-go/v5 v5.4.7/go.mod h1:9yUu4CPck8WP5uzrEVmXMPBtvsTLEzaHWkzG/dtjlmI=
-github.com/xmidt-org/wrphttp v0.4.0 h1:iCDeDHnOjWSuUuJpni4GTCD0DOKEdeN5ddNIfQVd+/4=
-github.com/xmidt-org/wrphttp v0.4.0/go.mod h1:ZUlfeHIPYCLxoqUfURMNaH8XHoH6mfFlT+anLcjUpAQ=
+github.com/xmidt-org/wrphttp v0.4.1 h1:ksg11DanRjNti61XSxg3huzy3TMJdwgJRjRsDKLmHR8=
+github.com/xmidt-org/wrphttp v0.4.1/go.mod h1:ZUlfeHIPYCLxoqUfURMNaH8XHoH6mfFlT+anLcjUpAQ=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.72.0 h1:OB2Uj/zVI03+FrzEvEcw8PwFLlGzzCjcxbsCWuCcG3I=
