@@ -95,8 +95,8 @@ github.com/xmidt-org/arrange v0.5.10 h1:nB3ufAq8wzZhD7CvJCJWDQ1v+AwMo7TFlR9v7azU
 github.com/xmidt-org/arrange v0.5.10/go.mod h1:c4aEwqmzU2UaJ8wJ4vW0cV3MWwxwtzvNpss12KN8tkA=
 github.com/xmidt-org/bascule v1.5.0 h1:N8IlAgC3JJxNOls42vU/OIISxZ7CYPj2qljuzv6fO3A=
 github.com/xmidt-org/bascule v1.5.0/go.mod h1:qjlmurwfOj2M6f400osg3sQqnrZe+1bNxIfuvJdioOw=
-github.com/xmidt-org/candlelight v0.4.1 h1:K2k7/6ZkiH7Xj1v9EHaDQndTI64vmboQjZsaxsY62k8=
-github.com/xmidt-org/candlelight v0.4.1/go.mod h1:LSA3LMWo4SPotzxj/AmB1l3sRy7O+QdXahmWRyx2lCI=
+github.com/xmidt-org/candlelight v0.4.2 h1:MsvITBvPUA7T0TNrYsX6gEUFc7Cq+kbRwkO6J1BRmdY=
+github.com/xmidt-org/candlelight v0.4.2/go.mod h1:34U8aDDMxDUrcF+BlY6cmtw5WUq3PsTUv6Q0r5rV6vE=
 github.com/xmidt-org/chronon v0.1.15 h1:S+NbNO1WeFy+39T8bTrrX+7p9fKwzenejAvJaqbkOIo=
 github.com/xmidt-org/chronon v0.1.15/go.mod h1:EvhpdKGQtWk1Q4lKy8ymDa0oVoqa931Be7sc7Uf0Jek=
 github.com/xmidt-org/clortho v0.5.1 h1:brzBLR77PMDxSIR0NNYRZgSWCVGWZ7PO2P0GBAG2eW8=
