@@ -78,6 +78,8 @@ const (
 	NoCIDRCapability    = "no_cidr_capability"
 	OriginNotAllowed    = "origin_not_allowed"
 	UnknownOrigin       = "unknown_origin"
+	RateExceeded        = "rate_exceeded"
+	RateDenied          = "rate_denied"
 	// partners
 	NonePartner     = "none"
 	WildcardPartner = "wildcard"

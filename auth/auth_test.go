@@ -10,8 +10,10 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +39,9 @@ const (
 
 	// capabilitiesClaim is the claim basculejwt reads capabilities from.
 	capabilitiesClaim = "capabilities"
+
+	// unknownMode is a mode no check accepts.
+	unknownMode = "audit"
 
 	// viper keys whose presence selects the inbound mode.
 	basicKey        = basicConfigKey
@@ -77,14 +82,26 @@ func newTestKeys(t *testing.T) testKeys {
 	return testKeys{private: private, provider: provider}
 }
 
-// sign produces a compact JWT naming kid, carrying claims on top of the
-// standard ones.  A caller that wants the token unverifiable signs with
-// another key.
+// sign produces a compact JWT for testPrincipal naming kid, carrying claims
+// on top of the standard ones.  A caller that wants the token unverifiable
+// signs with another key.
 func (k testKeys) sign(t *testing.T, kid string, exp time.Time, claims map[string]any) string {
 	t.Helper()
 
+	return k.signAs(t, testPrincipal, exp, claims, kid)
+}
+
+// signAs is sign for any principal.  kid defaults to testKeyID.
+func (k testKeys) signAs(t *testing.T, principal string, exp time.Time, claims map[string]any, kid ...string) string {
+	t.Helper()
+
+	keyID := testKeyID
+	if len(kid) > 0 {
+		keyID = kid[0]
+	}
+
 	builder := jwt.NewBuilder().
-		Subject(testPrincipal).
+		Subject(principal).
 		Issuer("https://issuer.example").
 		IssuedAt(time.Now().Add(-time.Minute)).
 		Expiration(exp)
@@ -96,7 +113,7 @@ func (k testKeys) sign(t *testing.T, kid string, exp time.Time, claims map[strin
 	require.NoError(t, err)
 
 	headers := jws.NewHeaders()
-	require.NoError(t, headers.Set(jws.KeyIDKey, kid))
+	require.NoError(t, headers.Set(jws.KeyIDKey, keyID))
 
 	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), k.private, jws.WithProtectedHeaders(headers)))
 	require.NoError(t, err)
@@ -374,8 +391,7 @@ func TestNewMiddleware_Config(t *testing.T) {
 					Prefixes: []string{testPrefix},
 					CIDR: cidrConfig{
 						Prefixes:       []string{testCIDRPrefix},
-						Required:       true,
-						Mode:           "Permissive",
+						Mode:           "PermissiveRequired",
 						CacheSize:      10,
 						TrustedProxies: []string{"10.0.0.0/8", " 2001:db8::/32 ", ""},
 					},
@@ -384,6 +400,77 @@ func TestNewMiddleware_Config(t *testing.T) {
 			kp:    keys.provider,
 			valid: true,
 		}, {
+			name: "jwt with rate",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Rate: rateConfig{
+					Prefixes:  []string{testRatePrefix},
+					Mode:      "PermissiveWithWarnings",
+					Overrides: map[string][]string{"a": {"50/1m", " 100/24h "}, "b": {}},
+				},
+			}},
+			kp:    keys.provider,
+			valid: true,
+		}, {
+			name: "rate without prefixes",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, rateModeKey: ModeEnforce},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Mode: ModeEnforce}}},
+			kp:   keys.provider,
+		}, {
+			name: "rate with an empty prefix",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{""}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Prefixes: []string{""}}}},
+			kp:   keys.provider,
+		}, {
+			name: "rate with an unknown mode",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Prefixes: []string{testRatePrefix}, Mode: unknownMode}}},
+			kp:   keys.provider,
+		}, {
+			name: "jwt with rate defaults",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Rate:     rateConfig{Prefixes: []string{testRatePrefix}, Defaults: []string{"400/1m", " 50000/24h "}},
+			}},
+			kp:    keys.provider,
+			valid: true,
+		}, {
+			name: "rate has no required mode",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModeRequired}}},
+			kp:   keys.provider,
+		}, {
+			name: "rate has no permissive required mode",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModePermissiveRequired}}},
+			kp:   keys.provider,
+		}, {
+			name: "rate default is malformed",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Rate:     rateConfig{Prefixes: []string{testRatePrefix}, Defaults: []string{"600/1d"}},
+			}},
+			kp: keys.provider,
+		}, {
+			name: "rate window bounds are inverted",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Rate:     rateConfig{Prefixes: []string{testRatePrefix}, MinWindow: time.Hour, MaxWindow: time.Minute},
+			}},
+			kp: keys.provider,
+		}, {
+			name: "rate override is malformed",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Rate:     rateConfig{Prefixes: []string{testRatePrefix}, Overrides: map[string][]string{"a": {"50/1d"}}},
+			}},
+			kp: keys.provider,
+		}, {
 			name: "cidr without prefixes",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrModeKey: ModeEnforce},
 			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Mode: ModeEnforce}}},
@@ -391,7 +478,7 @@ func TestNewMiddleware_Config(t *testing.T) {
 		}, {
 			name: "cidr with an unknown mode",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrPrefixesKey: []string{testCIDRPrefix}},
-			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: "audit"}}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: unknownMode}}},
 			kp:   keys.provider,
 		}, {
 			name: "cidr with a bad prefix regex",
@@ -475,17 +562,18 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		})
 	}
 
-	permissive := func(required bool) cidrConfig {
-		return cidrConfig{Prefixes: []string{testCIDRPrefix}, Required: required, Mode: ModePermissive}
+	withMode := func(mode string) cidrConfig {
+		return cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: mode}
 	}
-	enforcing := func(required bool) cidrConfig {
-		return cidrConfig{Prefixes: []string{testCIDRPrefix}, Required: required}
-	}
+
+	// malformed is how every malformed cidr warning starts
+	const malformed = "malformed; kind=cidr"
 
 	cases := []struct {
 		name           string
 		cidr           cidrConfig
 		cidrConfigured bool // whether the cidr section is present at all
+		silent         bool // the mode keeps wantWarnings from the caller; they are only counted
 		trustedProxies []string
 		remoteAddr     string
 		headers        map[string]string
@@ -501,65 +589,97 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "correct if present: no cidr capability is unrestricted",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(),
 			wantStatus:     http.StatusOK,
 		}, {
 			name:           "correct if present: origin inside",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix + "192.0.2.0/24"),
 			wantStatus:     http.StatusOK,
 		}, {
 			name:           "correct if present: origin outside",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     OriginNotAllowed,
 		}, {
 			name:           "correct if present: origin inside one of several",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix+"203.0.113.0/24", testCIDRPrefix+"192.0.2.0/24"),
 			wantStatus:     http.StatusOK,
 		}, {
 			name:           "required: no cidr capability",
 			cidrConfigured: true,
-			cidr:           enforcing(true),
+			cidr:           withMode(ModeRequired),
 			authorization:  token(),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     NoCIDRCapability,
 		}, {
 			name:           "required: origin inside",
 			cidrConfigured: true,
-			cidr:           enforcing(true),
+			cidr:           withMode(ModeRequired),
 			authorization:  token(testCIDRPrefix + "192.0.2.0/24"),
 			wantStatus:     http.StatusOK,
 		}, {
-			name:           "permissive required: no cidr capability warns",
+			name:           "permissive required with warnings: no cidr capability warns",
 			cidrConfigured: true,
-			cidr:           permissive(true),
+			cidr:           withMode(ModePermissiveRequiredWithWarnings),
 			authorization:  token(),
 			wantStatus:     http.StatusOK,
 			wantWarnings:   []string{"would-reject; kind=cidr; reason=no-cidr-capability"},
 		}, {
 			name:           "permissive correct if present: no cidr capability is silent",
 			cidrConfigured: true,
-			cidr:           permissive(false),
+			cidr:           withMode(ModePermissive),
 			authorization:  token(),
 			wantStatus:     http.StatusOK,
 		}, {
-			name:           "permissive correct if present: origin outside warns",
+			name:           "permissive with warnings: origin outside warns",
 			cidrConfigured: true,
-			cidr:           permissive(false),
+			cidr:           withMode(ModePermissiveWithWarnings),
 			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
 			wantStatus:     http.StatusOK,
 			wantWarnings:   []string{"would-reject; kind=cidr; reason=origin-not-allowed; origin=192.0.2.1"},
 		}, {
+			name:           "permissive: origin outside is counted but the caller is not told",
+			cidrConfigured: true,
+			cidr:           withMode(ModePermissive),
+			silent:         true,
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusOK,
+			wantWarnings:   []string{"would-reject; kind=cidr; reason=origin-not-allowed"},
+		}, {
+			name:           "permissive: a malformed capability is counted but the caller is not told",
+			cidrConfigured: true,
+			cidr:           withMode(ModePermissive),
+			silent:         true,
+			authorization:  token(testCIDRPrefix+"192.0.2.0/33", testCIDRPrefix+"192.0.2.0/24"),
+			wantStatus:     http.StatusOK,
+			wantWarnings:   []string{malformed},
+		}, {
+			name:           "the default mode is permissive",
+			cidrConfigured: true,
+			cidr:           cidrConfig{Prefixes: []string{testCIDRPrefix}},
+			silent:         true,
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusOK,
+			wantWarnings:   []string{"would-reject; kind=cidr; reason=origin-not-allowed"},
+		}, {
+			name:           "permissive required: no cidr capability is counted but the caller is not told",
+			cidrConfigured: true,
+			cidr:           withMode(ModePermissiveRequired),
+			silent:         true,
+			authorization:  token(),
+			wantStatus:     http.StatusOK,
+			wantWarnings:   []string{"would-reject; kind=cidr; reason=no-cidr-capability"},
+		}, {
 			name:           "only a malformed capability is not unrestricted",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix + "192.0.2.0/33"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     OriginNotAllowed,
@@ -567,22 +687,22 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "a bare address is malformed",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix + "192.0.2.1"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     OriginNotAllowed,
-			wantWarnings:   []string{"malformed; kind=cidr"},
+			wantWarnings:   []string{malformed},
 		}, {
 			name:           "a malformed capability beside a matching one warns on success",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix+"192.0.2.0/33", testCIDRPrefix+"192.0.2.0/24"),
 			wantStatus:     http.StatusOK,
-			wantWarnings:   []string{"malformed; kind=cidr"},
+			wantWarnings:   []string{malformed},
 		}, {
 			name:           "trusted proxy: x-forwarded-for gives the origin",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			headers:        map[string]string{xForwardedFor: forwarded + ", 10.0.0.2"},
@@ -591,7 +711,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "trusted proxy: forwarded gives the origin",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			headers:        map[string]string{"Forwarded": `for="` + forwarded + `:4711";proto=https`},
@@ -600,7 +720,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "trusted proxy: forwarded origin outside",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			headers:        map[string]string{xForwardedFor: forwarded},
@@ -610,7 +730,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "trusted proxy: the proxy's own address is not the origin",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			headers:        map[string]string{xForwardedFor: forwarded},
@@ -620,7 +740,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "untrusted peer: forwarding headers are ignored",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     peer,
 			headers:        map[string]string{xForwardedFor: forwarded},
@@ -630,7 +750,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "trusted proxy forwarding nothing: origin unknown",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			authorization:  token(testCIDRPrefix + proxyNetwork),
@@ -639,15 +759,15 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "trusted proxy forwarding nothing: unrestricted token is still fine",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			authorization:  token(),
 			wantStatus:     http.StatusOK,
 		}, {
-			name:           "permissive: unknown origin warns",
+			name:           "permissive with warnings: unknown origin warns",
 			cidrConfigured: true,
-			cidr:           permissive(false),
+			cidr:           withMode(ModePermissiveWithWarnings),
 			trustedProxies: []string{proxyNetwork},
 			remoteAddr:     proxy,
 			authorization:  token(testCIDRPrefix + proxyNetwork),
@@ -656,21 +776,21 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		}, {
 			name:           "ipv6 origin",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			remoteAddr:     "[2001:db8::1]:443",
 			authorization:  token(testCIDRPrefix + "2001:db8::/32"),
 			wantStatus:     http.StatusOK,
 		}, {
 			name:           "ipv4-mapped ipv6 origin matches an ipv4 network",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			remoteAddr:     "[::ffff:192.0.2.1]:443",
 			authorization:  token(testCIDRPrefix + "192.0.2.0/24"),
 			wantStatus:     http.StatusOK,
 		}, {
 			name:           "ipv4 origin does not match an ipv6 network",
 			cidrConfigured: true,
-			cidr:           enforcing(false),
+			cidr:           withMode(ModeEnforce),
 			authorization:  token(testCIDRPrefix + "2001:db8::/32"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     OriginNotAllowed,
@@ -703,12 +823,16 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 			assert.Equal(t, tc.wantStatus == http.StatusOK, reached(rec))
 
 			got := rec.Header().Values(WarningHeader)
-			require.Len(t, got, len(tc.wantWarnings), "warnings: %v", got)
-			for i, want := range tc.wantWarnings {
-				assert.True(t, strings.HasPrefix(got[i], want), "warning %q should start with %q", got[i], want)
+			if tc.silent {
+				assert.Empty(t, got, "a silent mode writes no warning header")
+			} else {
+				require.Len(t, got, len(tc.wantWarnings), "warnings: %v", got)
+				for i, want := range tc.wantWarnings {
+					assert.True(t, strings.HasPrefix(got[i], want), "warning %q should start with %q", got[i], want)
+				}
 			}
 
-			// every warning header is also counted, under its own reason
+			// every warning is counted, under its own reason, told or not
 			assert.Equal(t, len(tc.wantWarnings), testutil.CollectAndCount(warnings))
 
 			if tc.wantStatus == http.StatusForbidden {
@@ -767,8 +891,7 @@ auth:
       prefixes: ["x1:webpa:api:"]
       cidr:
         prefixes: ["x1:webpa:cidr:"]
-        required: true
-        mode: permissive
+        mode: permissiveRequiredWithWarnings
         cacheSize: 256
         trustedProxies: ["10.0.0.0/8", "2001:db8::/32"]
 `
@@ -783,7 +906,68 @@ auth:
 	assert.True(t, v.IsSet(cidrConfigKey))
 	assert.Equal(t, []string{"10.0.0.0/8", "2001:db8::/32"}, cfg.JWT.CIDR.TrustedProxies)
 	assert.Equal(t, []string{"x1:webpa:cidr:"}, cfg.JWT.CIDR.Prefixes)
-	assert.True(t, cfg.JWT.CIDR.Required)
-	assert.Equal(t, ModePermissive, cfg.JWT.CIDR.Mode)
+	assert.Equal(t, ModePermissiveRequiredWithWarnings, cfg.JWT.CIDR.Mode)
 	assert.Equal(t, 256, cfg.JWT.CIDR.CacheSize)
+}
+
+var allModes = []string{
+	ModePermissive, ModePermissiveWithWarnings, ModeEnforce, ModeRequired,
+	ModePermissiveRequired, ModePermissiveRequiredWithWarnings,
+}
+
+func TestParseMode(t *testing.T) {
+	rateModes := []string{ModePermissive, ModePermissiveWithWarnings, ModeEnforce}
+
+	cases := []struct {
+		mode     string
+		accepted []string
+		want     checkMode
+		valid    bool
+	}{
+		{mode: "", accepted: allModes, want: checkMode{permissive: true}, valid: true},
+		{mode: "permissive", accepted: allModes, want: checkMode{permissive: true}, valid: true},
+		{mode: " Permissive ", accepted: allModes, want: checkMode{permissive: true}, valid: true},
+		{mode: "permissiveWithWarnings", accepted: allModes, want: checkMode{permissive: true, warnings: true}, valid: true},
+		{mode: "PERMISSIVEWITHWARNINGS", accepted: allModes, want: checkMode{permissive: true, warnings: true}, valid: true},
+		{mode: "enforce", accepted: allModes, want: checkMode{warnings: true}, valid: true},
+		{mode: "required", accepted: allModes, want: checkMode{warnings: true, required: true}, valid: true},
+		{mode: "permissiveRequired", accepted: allModes, want: checkMode{permissive: true, required: true}, valid: true},
+		{mode: "permissiveRequiredWithWarnings", accepted: allModes, want: checkMode{permissive: true, warnings: true, required: true}, valid: true},
+		{mode: "permissive-required"},
+		{mode: unknownMode, accepted: allModes},
+		{mode: "true", accepted: allModes},
+		{mode: "", accepted: rateModes, want: checkMode{permissive: true}, valid: true},
+		{mode: "Enforce", accepted: rateModes, want: checkMode{warnings: true}, valid: true},
+		{mode: "required", accepted: rateModes},
+		{mode: "permissiveRequired", accepted: rateModes},
+		{mode: "permissiveRequiredWithWarnings", accepted: rateModes},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%q of %d", tc.mode, len(tc.accepted)), func(t *testing.T) {
+			got, err := parseMode(tc.mode, "key", tc.accepted...)
+			if !tc.valid {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "`key.Mode`")
+				for _, a := range tc.accepted {
+					assert.Contains(t, err.Error(), strconv.Quote(a), "the error lists the accepted modes")
+				}
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestCheckModeString(t *testing.T) {
+	for _, mode := range allModes {
+		parsed, err := parseMode(mode, "key", allModes...)
+		require.NoError(t, err)
+		assert.Equal(t, mode, parsed.String())
+	}
+
+	assert.Equal(t, "", checkMode{required: true}.String(), "a combination that is not a mode")
 }

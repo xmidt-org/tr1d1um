@@ -325,29 +325,40 @@ auth:
     #   # origin (see trustedProxies below) must be inside at least one of
     #   # them.
     #   # CIDR capabilities only limit access; a token with none is
-    #   # unrestricted unless required is set.  A capability whose network
+    #   # unrestricted unless mode requires one.  A capability whose network
     #   # cannot be parsed, including a bare address without /bits, still
     #   # counts as present but matches nothing, so a typo never removes a
-    #   # limit.  Every problem is reported to the caller in an
-    #   # X-Webpa-Capability-Warning header, whether or not the request was
-    #   # blocked, and counted in the auth_capability_warning metric.
+    #   # limit.  Every problem is logged and counted in the
+    #   # auth_capability_warning metric, and, in a mode with warnings,
+    #   # reported to the caller in an X-Webpa-Capability-Warning header,
+    #   # whether or not the request was blocked.
     #   # (Optional). When absent, CIDR capabilities are not checked.
     #   cidr:
     #     # prefixes select a token's CIDR capabilities.  A capability with
     #     # any other prefix is ignored.  Required.
     #     prefixes: ["x1:webpa:cidr:"]
     #
-    #     # required rejects a token that carries no CIDR capability.
-    #     # (Optional). Defaults to false: such a token is unrestricted.
-    #     required: false
-    #
-    #     # mode is "enforce", which rejects a request that fails the check
-    #     # with a 403, or "permissive", which lets it through and reports
-    #     # what would have been rejected in the warning header, the log and
-    #     # the metric.  Use permissive to try the check, or required,
-    #     # against real traffic before enforcing it.
-    #     # (Optional). Defaults to "enforce".
-    #     mode: "enforce"
+    #     # mode decides what a failure does, whether the caller is told,
+    #     # and what a token with no CIDR capability means.  Every mode logs
+    #     # and counts what it finds.
+    #     #   permissive              nothing is rejected and the caller is
+    #     #                           told nothing; a token with no CIDR
+    #     #                           capability is unrestricted.
+    #     #   permissiveWithWarnings  permissive, and the caller is told in
+    #     #                           the warning header what enforce would
+    #     #                           have rejected and which capabilities
+    #     #                           are malformed.
+    #     #   enforce                 a failure is a 403, and the caller is
+    #     #                           told about malformed capabilities.
+    #     #   required                enforce, and a token with no CIDR
+    #     #                           capability is also a 403.
+    #     #   permissiveRequired      permissive for required.
+    #     #   permissiveRequiredWithWarnings
+    #     #                           permissiveWithWarnings for required.
+    #     # A newly configured check starts as a trial run; switch to
+    #     # enforce or required once the log and metric are quiet.
+    #     # (Optional). Defaults to "permissive".
+    #     mode: "permissive"
     #
     #     # cacheSize bounds how many parsed CIDR capabilities are retained.
     #     # (Optional). Defaults to 1024.
@@ -370,6 +381,80 @@ auth:
     #     # peer.
     #     trustedProxies:
     #       - "10.0.0.0/8"
+    #
+    #   # rate holds a token's bearer to the rates its rate capabilities
+    #   # name, for example "x1:webpa:rate:50/1m": at most <count> calls per
+    #   # <window> against this instance.  The window is a Go duration such
+    #   # as 1m, 1h30m or 24h; days are not a unit.  Windows outside
+    #   # minWindow and maxWindow are held at that bound at the same calls
+    #   # per second, so by default 100/1s is held as 6000/1m.  A caller is held
+    #   # to every rate on every token they have presented recently, so a
+    #   # cut takes effect the first time the new token is used, while a
+    #   # raise waits until the old rate has not been seen for twice its
+    #   # window.  Limits are per instance: with N instances behind a load
+    #   # balancer the caller gets roughly N times the rate overall.
+    #   #
+    #   # Rate capabilities only limit access; a token with none is held
+    #   # to defaults, or unrestricted when there are none.  A capability
+    #   # whose rate cannot be parsed still counts as present but allows
+    #   # nothing, so a typo never removes a limit.  Every problem is logged
+    #   # and counted in the auth_capability_warning metric, and, in a mode
+    #   # with warnings, reported to the caller in an
+    #   # X-Webpa-Capability-Warning header, whether or not the request was
+    #   # blocked.  Over the rate, the caller gets a 429 with Retry-After.
+    #   # (Optional). When absent, rate capabilities are not checked.
+    #   rate:
+    #     # prefixes select a token's rate capabilities, matched literally.
+    #     # A capability with any other prefix is ignored.  Required.
+    #     prefixes: ["x1:webpa:rate:"]
+    #
+    #     # mode decides what a failure does and whether the caller is
+    #     # told.  Every mode logs and counts what it finds.
+    #     #   permissive              nothing is rejected and the caller is
+    #     #                           told nothing.
+    #     #   permissiveWithWarnings  permissive, and the caller is told in
+    #     #                           the warning header what enforce would
+    #     #                           have rejected and which capabilities
+    #     #                           are malformed.
+    #     #   enforce                 over the rate is a 429 with
+    #     #                           Retry-After, and the caller is told
+    #     #                           about malformed capabilities.
+    #     # There is no required mode: to limit every caller, set defaults,
+    #     # as slow as you like.  A newly configured check starts as a trial
+    #     # run; switch to enforce once the log and metric are quiet.
+    #     # (Optional). Defaults to "permissive".
+    #     mode: "permissive"
+    #
+    #     # defaults are the rates a caller is held to when their token
+    #     # carries no rate capability and they have no override.  Each
+    #     # caller gets their own allowance at these rates.  Set this to
+    #     # hold every caller to something before issuers add rates to
+    #     # tokens.  A token whose rate is malformed is not rateless: it is
+    #     # held to zero, not to the defaults.  Used as written: minWindow
+    #     # and maxWindow do not apply.
+    #     # (Optional). With none, such a token is unrestricted.
+    #     defaults: ["600/1m", "50000/24h"]
+    #
+    #     # minWindow and maxWindow bound the window a token's rate is held
+    #     # at.  A rate with a window outside them is rescaled to the nearer
+    #     # bound at the same calls per second, rounded to the nearest call
+    #     # but never below one.  A short bound lets a tiny window churn
+    #     # state; a long one lets a huge window grant a huge burst.
+    #     # (Optional). The defaults are shown.
+    #     minWindow: 1m
+    #     maxWindow: 24h
+    #
+    #     # overrides set the rates for particular callers here, by the
+    #     # token's principal (sub).  An override replaces whatever the
+    #     # caller's tokens say, looser or stricter, and takes precedence
+    #     # over defaults.  An empty list makes the
+    #     # caller unrestricted.  Overrides are
+    #     # trusted and used as written: minWindow and maxWindow do not
+    #     # apply to them.
+    #     # (Optional)
+    #     overrides:
+    #       "partner-x": ["50/1m", "10000/24h"]
+    #       "exempt-caller": []
     #
     #   # clortho configures where the keys that verify tokens come from.  At
     #   # least one provider, of any kind, is required.  Every field of the

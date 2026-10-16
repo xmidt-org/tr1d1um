@@ -24,6 +24,7 @@ require (
 	github.com/xmidt-org/httpaux v0.4.5
 	github.com/xmidt-org/retry v0.0.8
 	github.com/xmidt-org/sallust v0.2.10
+	github.com/xmidt-org/tokenrate v0.1.0
 	github.com/xmidt-org/touchstone v0.1.8
 	github.com/xmidt-org/webhook-schema v0.2.6
 	github.com/xmidt-org/wrp-go/v5 v5.4.7

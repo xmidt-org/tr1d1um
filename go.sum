@@ -109,6 +109,8 @@ github.com/xmidt-org/retry v0.0.8 h1:L9yHrtetRvew/0YvEBnrbjzVARYGCHGJJA20SeVIuBQ
 github.com/xmidt-org/retry v0.0.8/go.mod h1:oGAxU4FN/EKp4eGhuiwmIRARo6ItURCneMuyJoR1Tm0=
 github.com/xmidt-org/sallust v0.2.10 h1:q5RR3zZ22+FHIGGLNTlARdSqGKYVIQeWL320NybHhxk=
 github.com/xmidt-org/sallust v0.2.10/go.mod h1:SWs5tDl0oyi1bBgvVU8ucxaR1qjPO66ecyLW8/cAzUk=
+github.com/xmidt-org/tokenrate v0.1.0 h1:DhXaQZVv+hnIUUB9yS2vvGrT/DlOWHU5+iCl6QHSdtQ=
+github.com/xmidt-org/tokenrate v0.1.0/go.mod h1:2PQhKzmt1Wr0WHdhIs8DdpOQu4VnBkhe5P/FowPQaWk=
 github.com/xmidt-org/touchstone v0.1.8 h1:jpA7j2pPtuP6hFr/LcT25cvfYkztWOp3Tj1ZCvqIvMw=
 github.com/xmidt-org/touchstone v0.1.8/go.mod h1:3nKZJlgWCDDThy/djXF2/wiwmRyCcDBSWBrSuUSy3ME=
 github.com/xmidt-org/urlegit v0.1.31 h1:1e1SKFG5v9xjEUZrZpkkN6Njc4EefIJpaO0tEou4ThY=
