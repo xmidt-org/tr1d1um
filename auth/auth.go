@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/justinas/alice"
@@ -38,15 +39,98 @@ const (
 // whether or not the request was blocked.
 const WarningHeader = "X-Webpa-Capability-Warning"
 
-// The enforcement modes of a capability kind.
+// The modes of a capability kind's check.  Three things make up a mode:
+// whether a failure rejects the request or only records that it would have,
+// whether the caller is told about problems in a warning header, and whether
+// a token with no capability of the kind is unrestricted or rejected.
+//
+// Every mode logs and counts what it finds; the modes differ in what the
+// caller sees.
 const (
-	// ModeEnforce rejects a request that fails the check.  The default.
+	// ModePermissive never rejects, and tells the caller nothing.  Every
+	// request ModeEnforce would have rejected is logged and counted.  The
+	// default, so that a newly configured check is a trial run.
+	ModePermissive = "permissive"
+
+	// ModePermissiveWithWarnings is ModePermissive, and also tells the
+	// caller, in a warning header, what would have been rejected and which
+	// of their capabilities are malformed.
+	ModePermissiveWithWarnings = "permissiveWithWarnings"
+
+	// ModeEnforce rejects a request that fails the check, and tells the
+	// caller which of their capabilities are malformed.  A token with no
+	// capability of the kind is unrestricted.
 	ModeEnforce = "enforce"
 
-	// ModePermissive lets a request that fails the check through, and
-	// records that it would have been rejected.
-	ModePermissive = "permissive"
+	// ModeRequired is ModeEnforce, and also rejects a token with no
+	// capability of the kind.
+	ModeRequired = "required"
+
+	// ModePermissiveRequired is ModePermissive for ModeRequired: nothing is
+	// rejected, and every request ModeRequired would have rejected is
+	// logged and counted.
+	ModePermissiveRequired = "permissiveRequired"
+
+	// ModePermissiveRequiredWithWarnings is ModePermissiveRequired, and
+	// also tells the caller.
+	ModePermissiveRequiredWithWarnings = "permissiveRequiredWithWarnings"
 )
+
+// checkMode is a parsed mode.
+type checkMode struct {
+	// permissive records a failure instead of rejecting the request.
+	permissive bool
+
+	// warnings tells the caller about problems in a warning header.
+	warnings bool
+
+	// required rejects a token with no capability of the kind.
+	required bool
+}
+
+// checkModes maps each mode's configuration value to its meaning.
+var checkModes = map[string]checkMode{
+	ModePermissive:                     {permissive: true},
+	ModePermissiveWithWarnings:         {permissive: true, warnings: true},
+	ModeEnforce:                        {warnings: true},
+	ModeRequired:                       {warnings: true, required: true},
+	ModePermissiveRequired:             {permissive: true, required: true},
+	ModePermissiveRequiredWithWarnings: {permissive: true, warnings: true, required: true},
+}
+
+// parseMode parses a configured mode, which must be one of accepted.  An
+// unset mode is ModePermissive.  The comparison ignores case; key names the
+// setting in an error.
+func parseMode(mode, key string, accepted ...string) (checkMode, error) {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	if normalized == "" {
+		normalized = strings.ToLower(ModePermissive)
+	}
+
+	for _, a := range accepted {
+		if normalized == strings.ToLower(a) {
+			return checkModes[a], nil
+		}
+	}
+
+	quoted := make([]string, len(accepted))
+	for i, a := range accepted {
+		quoted[i] = strconv.Quote(a)
+	}
+
+	return checkMode{}, fmt.Errorf("`%s.Mode`: expected one of %s, got %q", key, strings.Join(quoted, ", "), mode)
+}
+
+// String returns the mode's configuration value.
+func (m checkMode) String() string {
+	for name, mode := range checkModes {
+		if mode == m {
+			return name
+		}
+	}
+
+	return ""
+}
 
 var stripAPIVersionRegex = regexp.MustCompile(`^/api/v[0-9]+`)
 
@@ -61,6 +145,7 @@ type jwtConfig struct {
 	Prefixes        []string
 	EndpointBuckets []string
 	CIDR            cidrConfig
+	Rate            rateConfig
 }
 
 // cidrConfig is the auth.inbound.JWT.CIDR section: how a token's CIDR
@@ -71,11 +156,11 @@ type cidrConfig struct {
 	// At least one is required.
 	Prefixes []string
 
-	// Required rejects a token that carries no CIDR capability.  By default
-	// such a token is unrestricted: no network limit applies to it.
-	Required bool
-
-	// Mode is ModeEnforce or ModePermissive.  Defaults to ModeEnforce.
+	// Mode is one of ModePermissive (the default), ModePermissiveWithWarnings,
+	// ModeEnforce, ModeRequired, ModePermissiveRequired or
+	// ModePermissiveRequiredWithWarnings.  Outside the required modes, a
+	// token with no CIDR capability is unrestricted: no network limit
+	// applies to it.
 	Mode string
 
 	// CacheSize bounds how many parsed capabilities are retained.
@@ -96,6 +181,8 @@ type cidrConfig struct {
 // against a key the provider supplies, carry a capability granting the
 // request, state the partner IDs its bearer may act for, and, when the CIDR
 // check is configured, be used from a network its CIDR capabilities name.
+// When the rate check is configured, its bearer is also held to the rates
+// its rate capabilities state.
 //
 // Warnings raised while authorizing a request are returned to the caller in
 // WarningHeader and counted in warnings.
@@ -106,6 +193,12 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		validatorOpts           []bascule.Validator[*http.Request]
 		jwtParseOpts            []jwt.ParseOption
 		endpointBuckets         []*regexp.Regexp
+		limiter                 *rateLimiter
+
+		// tellCaller is whether bascule's middleware writes the warnings
+		// its approvers raise to the caller.  The CIDR approver is the
+		// only source of warnings inside bascule, so its mode decides.
+		tellCaller = true
 	)
 
 	if v.IsSet(basicConfigKey) && v.IsSet(jwtConfigKey) {
@@ -145,20 +238,6 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 			bascule.WithApprovers(approver),
 			bascule.WithApproverFuncs(jwtClaimPartnerIDsValidator))
 
-		if v.IsSet(cidrConfigKey) {
-			cidr, err := newCIDRApprover(cfg.JWT.CIDR)
-			if err != nil {
-				return alice.Chain{}, fmt.Errorf("error setting up JWT cidr capability checks: %v", err)
-			}
-
-			authorizerOpts = append(authorizerOpts, bascule.WithApprovers(cidr))
-
-			l.Info("inbound cidr capability checks enabled",
-				zap.Bool("required", cfg.JWT.CIDR.Required),
-				zap.String("mode", enforcementMode(cfg.JWT.CIDR.Mode)),
-				zap.Strings("trustedProxies", cfg.JWT.CIDR.TrustedProxies))
-		}
-
 		for _, pattern := range cfg.JWT.EndpointBuckets {
 			re, err := regexp.Compile(pattern)
 			if err != nil {
@@ -167,6 +246,32 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 			}
 
 			endpointBuckets = append(endpointBuckets, re)
+		}
+
+		if v.IsSet(cidrConfigKey) {
+			cidr, err := newCIDRApprover(cfg.JWT.CIDR)
+			if err != nil {
+				return alice.Chain{}, fmt.Errorf("error setting up JWT cidr capability checks: %v", err)
+			}
+
+			authorizerOpts = append(authorizerOpts, bascule.WithApprovers(cidr.approver))
+			tellCaller = cidr.mode.warnings
+
+			l.Info("inbound cidr capability checks enabled",
+				zap.String("mode", cidr.mode.String()),
+				zap.Strings("trustedProxies", cfg.JWT.CIDR.TrustedProxies))
+		}
+
+		if v.IsSet(rateConfigKey) {
+			limiter, err = newRateLimiter(cfg.JWT.Rate, l, counter, warnings, endpointBuckets)
+			if err != nil {
+				return alice.Chain{}, fmt.Errorf("error setting up JWT rate capability checks: %v", err)
+			}
+
+			l.Info("inbound rate capability checks enabled",
+				zap.String("mode", limiter.mode.String()),
+				zap.Strings("defaults", cfg.JWT.Rate.Defaults),
+				zap.Int("overrides", len(cfg.JWT.Rate.Overrides)))
 		}
 	} else {
 		return alice.Chain{}, fmt.Errorf("either `%s` or `%s` must be set, but not both", basicConfigKey, jwtConfigKey)
@@ -185,7 +290,12 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 				counter:   counter,
 				warnings:  warnings,
 				endpoints: endpointBuckets}))
-	auth, err := basculehttp.NewMiddleware(
+	middlewareOpts := make([]basculehttp.MiddlewareOption, 0, 3)
+	if tellCaller {
+		middlewareOpts = append(middlewareOpts, basculehttp.WithWarningHeader(WarningHeader))
+	}
+
+	middlewareOpts = append(middlewareOpts,
 		basculehttp.UseAuthenticator(basculehttp.NewAuthenticator(
 			bascule.WithTokenParsers(tp),
 			bascule.WithValidators(validatorOpts...),
@@ -197,13 +307,20 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 					endpoints:  endpointBuckets}),
 		)),
 		basculehttp.UseAuthorizer(basculehttp.NewAuthorizer(authorizerOpts...)),
-		basculehttp.WithWarningHeader(WarningHeader),
 	)
+	auth, err := basculehttp.NewMiddleware(middlewareOpts...)
 	if err != nil {
 		return alice.Chain{}, fmt.Errorf("failed to create auth middleware: %v", err)
 	}
 
-	return alice.New(setLogger(l), auth.Then), nil
+	// The limiter keeps state per principal, so it must run only once the
+	// token has been verified: after auth, never before.
+	constructors := []alice.Constructor{setLogger(l), auth.Then}
+	if limiter != nil {
+		constructors = append(constructors, limiter.handle)
+	}
+
+	return alice.New(constructors...), nil
 }
 
 // decodeBasicCredentials turns the configured list of base64 "user:password"
@@ -263,72 +380,63 @@ func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
 	return networks, nil
 }
 
+// cidrCheck is the configured CIDR approver and the mode it runs in.
+type cidrCheck struct {
+	approver *basculehttp.CIDRApprover
+	mode     checkMode
+}
+
 // newCIDRApprover builds the approver that holds a token's bearer to the
 // networks its CIDR capabilities name.  The caller origin is resolved past
 // the configured trusted proxies.
-func newCIDRApprover(cfg cidrConfig) (*basculehttp.CIDRApprover, error) {
+func newCIDRApprover(cfg cidrConfig) (cidrCheck, error) {
 	trustedProxies, err := parseTrustedProxies(cfg.TrustedProxies)
 	if err != nil {
-		return nil, err
+		return cidrCheck{}, err
 	}
 
 	resolver, err := basculehttp.NewOriginResolver(basculehttp.WithTrustedProxies(trustedProxies...))
 	if err != nil {
-		return nil, err
+		return cidrCheck{}, err
 	}
 
-	mode, err := cidrMode(cfg)
+	mode, err := parseMode(cfg.Mode, cidrConfigKey,
+		ModePermissive, ModePermissiveWithWarnings, ModeEnforce, ModeRequired,
+		ModePermissiveRequired, ModePermissiveRequiredWithWarnings)
 	if err != nil {
-		return nil, err
+		return cidrCheck{}, err
 	}
 
 	opts := []basculehttp.CIDRApproverOption{
 		basculehttp.WithCIDRPrefixes(cfg.Prefixes...),
 		basculehttp.WithOriginResolver(resolver),
-		mode,
+		cidrModeOption(mode),
 	}
 
 	if cfg.CacheSize > 0 {
 		opts = append(opts, basculehttp.WithCIDRCacheSize(cfg.CacheSize))
 	}
 
-	return basculehttp.NewCIDRApprover(opts...)
-}
-
-// cidrMode maps the required flag and the enforcement mode onto one of the
-// approver's four modes.
-func cidrMode(cfg cidrConfig) (basculehttp.CIDRApproverOption, error) {
-	var permissive bool
-	switch enforcementMode(cfg.Mode) {
-	case ModeEnforce:
-	case ModePermissive:
-		permissive = true
-	default:
-		return nil, fmt.Errorf("`%s.Mode`: expected %q or %q, got %q", cidrConfigKey, ModeEnforce, ModePermissive, cfg.Mode)
+	approver, err := basculehttp.NewCIDRApprover(opts...)
+	if err != nil {
+		return cidrCheck{}, err
 	}
 
+	return cidrCheck{approver: approver, mode: mode}, nil
+}
+
+// cidrModeOption maps a mode onto the approver's option for it.
+func cidrModeOption(mode checkMode) basculehttp.CIDRApproverOption {
 	switch {
-	case cfg.Required && permissive:
-		return basculehttp.WithCIDRPermissiveRequired(), nil
-	case cfg.Required:
-		return basculehttp.WithCIDRRequired(), nil
-	case permissive:
-		return basculehttp.WithCIDRPermissiveCorrectIfPresent(), nil
+	case mode.required && mode.permissive:
+		return basculehttp.WithCIDRPermissiveRequired()
+	case mode.required:
+		return basculehttp.WithCIDRRequired()
+	case mode.permissive:
+		return basculehttp.WithCIDRPermissiveCorrectIfPresent()
 	default:
-		return basculehttp.WithCIDRCorrectIfPresent(), nil
+		return basculehttp.WithCIDRCorrectIfPresent()
 	}
-}
-
-// enforcementMode normalizes a configured enforcement mode.  An unset mode is
-// ModeEnforce.  Anything unrecognized is returned as written so that it can
-// be reported.
-func enforcementMode(mode string) string {
-	normalized := strings.ToLower(strings.TrimSpace(mode))
-	if normalized == "" {
-		return ModeEnforce
-	}
-
-	return normalized
 }
 
 // capabilityOptions builds the capability approver's options.  The approver
