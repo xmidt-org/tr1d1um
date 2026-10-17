@@ -27,8 +27,10 @@ const (
 	deviceInfo = "Device.DeviceInfo.**"
 	anything   = "Device.**"
 	notAllowed = "would-reject; kind=param; reason=parameter-not-allowed"
-	rejected   = "rejected; kind=param; reason=parameter-not-allowed"
-	malformed  = "malformed; kind=param"
+	// malformedAnything is a capability with a typo in its operation.
+	malformedAnything = anything + ":wirte"
+	rejected          = "rejected; kind=param; reason=parameter-not-allowed"
+	malformed         = "malformed; kind=param"
 )
 
 // protectParams builds the chain with the parameter check applied to a
@@ -89,7 +91,7 @@ func TestNewMiddleware_Param(t *testing.T) {
 			req:             write(modelName),
 			wantStatus:      http.StatusOK,
 		}, {
-			name:            "another prefix is ignored",
+			name:            "another parameter prefix is ignored",
 			paramConfigured: true,
 			cfg:             enforcing,
 			caps:            []string{"other:param:Device.Nothing:read"},
@@ -363,6 +365,17 @@ func TestNewMiddleware_Param(t *testing.T) {
 			req:        write(modelName),
 			wantStatus: http.StatusOK,
 		}, {
+			name:            "an override matches the principal without regard to case",
+			paramConfigured: true,
+			cfg: paramConfig{
+				Prefixes:  []string{testParamPrefix},
+				Mode:      ModeEnforce,
+				Overrides: map[string][]string{strings.ToUpper(testPrincipal): {deviceInfo + ":read"}},
+			},
+			caps:       []string{testParamPrefix + anything},
+			req:        write(modelName),
+			wantStatus: http.StatusForbidden,
+		}, {
 			name:            "an override for another caller does not apply",
 			paramConfigured: true,
 			cfg: paramConfig{
@@ -474,14 +487,14 @@ func TestParseParamCapability(t *testing.T) {
 		wantErr           bool
 		matches, rejected []string
 	}{
-		{text: "Device.**", wantRead: true, wantWrite: true, wantSubtree: true, matches: []string{"Device.", "device.x.y"}},
-		{text: "Device.**:all", wantRead: true, wantWrite: true, wantSubtree: true},
-		{text: "Device.**:read", wantRead: true, wantSubtree: true},
-		{text: "Device.**:write", wantWrite: true, wantSubtree: true},
+		{text: anything, wantRead: true, wantWrite: true, wantSubtree: true, matches: []string{"Device.", "device.x.y"}},
+		{text: anything + ":all", wantRead: true, wantWrite: true, wantSubtree: true},
+		{text: anything + ":read", wantRead: true, wantSubtree: true},
+		{text: anything + ":write", wantWrite: true, wantSubtree: true},
 		{text: "Device.*:read", wantRead: true, matches: []string{"Device.X"}, rejected: []string{"Device.X.Y"}},
 		{text: "Device.Foo.**.Bar", wantRead: true, wantWrite: true, matches: []string{"Device.Foo.1.Bar"}, rejected: []string{"Device.Foo.Bar"}},
-		{text: "Device.**:READ", wantErr: true},
-		{text: "Device.**:wirte", wantErr: true},
+		{text: anything + ":READ", wantErr: true},
+		{text: malformedAnything, wantErr: true},
 		{text: ":read", wantErr: true},
 		{text: "", wantErr: true},
 	}
