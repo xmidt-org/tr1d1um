@@ -153,7 +153,7 @@ type jwtConfig struct {
 // capabilities limit where its bearer may call from.  The check runs only
 // when the section is present.
 type cidrConfig struct {
-	// Prefixes select a token's CIDR capabilities, e.g. x1:webpa:cidr:.
+	// Prefixes select a token's CIDR capabilities, e.g. webpa-prefix:cidr:.
 	// At least one is required.
 	Prefixes []string
 
