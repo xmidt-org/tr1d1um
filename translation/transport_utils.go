@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/wrp-go/v5"
 )
 
@@ -149,11 +150,10 @@ func captureWDMPParameters(filters *paramfilter.Filters) transaction.RequestFunc
 
 		switch r.Method {
 		case http.MethodGet:
-			names := r.FormValue("names")
-			if names == "" {
+			allNames := splitNames(r.FormValue("names"))
+			if len(allNames) == 0 {
 				return ctx
 			}
-			allNames := strings.Split(names, ",")
 			logger = logger.With(
 				zap.String("command", CommandGet),
 				zap.Strings("parameters", allNames),
@@ -204,6 +204,75 @@ func filterParamValues(params []setParam, f *paramfilter.Filter) map[string]any 
 		return nil
 	}
 	return out
+}
+
+// extractParameters is the auth.ParamExtractor for the device routes: the
+// TR-181 parameters a request names and what it does to them.  A GET reads
+// the names it lists (values or attributes); a PATCH writes the parameters
+// in its body; a POST, PUT or DELETE writes the table or row in its path,
+// taken as a partial path.  A request this cannot read is left for the
+// handler to reject.
+func extractParameters(r *http.Request) (auth.ParamRequest, bool) {
+	switch r.Method {
+	case http.MethodGet:
+		names := splitNames(r.FormValue("names"))
+		if len(names) == 0 {
+			return auth.ParamRequest{}, false
+		}
+
+		return auth.ParamRequest{Operation: auth.OperationRead, Names: names}, true
+
+	case http.MethodPatch:
+		bodyBytes, err := io.ReadAll(r.Body)
+		r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return auth.ParamRequest{}, false
+		}
+
+		wdmp, err := loadWDMP(bodyBytes, r.Header.Get(HeaderWPASyncNewCID), r.Header.Get(HeaderWPASyncOldCID), r.Header.Get(HeaderWPASyncCMC))
+		if err != nil {
+			return auth.ParamRequest{}, false
+		}
+
+		return auth.ParamRequest{Operation: auth.OperationWrite, Names: getParamNames(wdmp.Parameters)}, true
+
+	case http.MethodPost, http.MethodPut, http.MethodDelete:
+		path := strings.TrimSpace(mux.Vars(r)["parameter"])
+		if path == "" {
+			return auth.ParamRequest{}, false
+		}
+
+		return auth.ParamRequest{Operation: auth.OperationWrite, Names: []string{asPartialPath(path)}}, true
+	}
+
+	return auth.ParamRequest{}, false
+}
+
+// splitNames splits the names query of a GET into parameter names.  Each
+// name is trimmed of surrounding whitespace and empty ones are dropped, so
+// "a, b" and "a,,b" both name a and b.  The result is nil when nothing is
+// left.  Every reader of the query uses this, so the names checked, logged
+// and forwarded are the same.
+func splitNames(names string) []string {
+	var out []string
+	for name := range strings.SplitSeq(names, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			out = append(out, name)
+		}
+	}
+
+	return out
+}
+
+// asPartialPath gives a table or row name its trailing ".", so that it
+// refers to everything beneath it.
+func asPartialPath(name string) string {
+	if strings.HasSuffix(name, ".") {
+		return name
+	}
+
+	return name + "."
 }
 
 func getParamNames(params []setParam) (paramNames []string) {

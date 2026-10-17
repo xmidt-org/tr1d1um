@@ -213,6 +213,28 @@ func TestRequestGetPayload(t *testing.T) {
 		assert.EqualValues(expectedBytes, p)
 	})
 
+	t.Run("NamesAreTrimmed", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestGetPayload(" n0 ,, n1,", "")
+		assert.Nil(e)
+
+		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGet, Names: []string{"n0", "n1"}})
+		if err != nil {
+			panic(err)
+		}
+
+		assert.EqualValues(expectedBytes, p)
+	})
+
+	t.Run("OnlyBlankNames", func(t *testing.T) {
+		assert := assert.New(t)
+
+		p, e := requestGetPayload(" , ", "")
+		assert.EqualValues(ErrEmptyNames, e)
+		assert.Nil(p)
+	})
+
 	t.Run("GETAttrs", func(t *testing.T) {
 		assert := assert.New(t)
 

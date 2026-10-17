@@ -1,0 +1,469 @@
+// SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
+// SPDX-License-Identifier: Apache-2.0
+
+package auth
+
+import (
+	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/xmidt-org/bascule"
+	"github.com/xmidt-org/tr1d1um/paramfilter"
+	"go.uber.org/zap"
+)
+
+const paramConfigKey = "auth.inbound.JWT.Param"
+
+// paramWarningKind identifies the warnings the parameter check raises.
+const paramWarningKind = "param"
+
+// DefaultParamCacheSize is the number of parsed parameter capabilities a
+// ParamCheck retains by default.
+const DefaultParamCacheSize = 1024
+
+// Operation is what a request does to the parameters it names.
+type Operation string
+
+const (
+	// OperationRead covers getting values and attributes.
+	OperationRead Operation = "read"
+
+	// OperationWrite covers setting values and attributes and adding,
+	// replacing or deleting table rows.
+	OperationWrite Operation = "write"
+
+	// operationAll is the capability suffix, and the meaning of no suffix,
+	// that allows both operations.
+	operationAll = "all"
+)
+
+// ParamRequest is what a device request does, and to which TR-181
+// parameters.  A name ending in "." is a partial path: everything beneath
+// it.
+type ParamRequest struct {
+	Operation Operation
+	Names     []string
+}
+
+// ParamExtractor finds the parameters a request names.  ok is false when the
+// request names none that can be checked, because the route carries no
+// parameters or the request is malformed; the request then goes on to the
+// handler, which rejects a malformed one itself.
+type ParamExtractor func(*http.Request) (req ParamRequest, ok bool)
+
+// paramConfig is the auth.inbound.JWT.Param section: how a token's parameter
+// capabilities narrow which TR-181 parameters its bearer may touch.  The
+// check runs only when the section is present.
+type paramConfig struct {
+	// Prefixes select a token's parameter capabilities, e.g.
+	// x1:webpa:param:.  A prefix is matched literally.  At least one is
+	// required.
+	Prefixes []string
+
+	// Mode is ModePermissive (the default), ModePermissiveWithWarnings or
+	// ModeEnforce.  A token with no parameter capability is unrestricted:
+	// it may touch any parameter its endpoint capabilities allow.
+	Mode string
+
+	// Overrides are parameter capabilities, without the prefix, set here
+	// for particular callers by principal.  An override replaces whatever
+	// the caller's tokens say, looser or stricter.  An empty list makes the
+	// caller unrestricted.
+	Overrides map[string][]string
+
+	// CacheSize bounds how many parsed capabilities are retained.
+	CacheSize int
+}
+
+// paramCapability is one parsed parameter capability.
+type paramCapability struct {
+	// pattern matches lowercased parameter names.
+	pattern *regexp.Regexp
+
+	// subtree is whether the pattern ends in **, so that it covers every
+	// parameter beneath any partial path it matches.
+	subtree bool
+
+	read, write bool
+}
+
+// allows reports whether the capability lets op be done to name.
+func (c paramCapability) allows(op Operation, name string) bool {
+	switch op {
+	case OperationRead:
+		if !c.read {
+			return false
+		}
+	case OperationWrite:
+		if !c.write {
+			return false
+		}
+	default:
+		return false
+	}
+
+	if isPartialPath(name) && !c.subtree {
+		return false
+	}
+
+	return c.pattern.MatchString(strings.ToLower(name))
+}
+
+// isPartialPath reports whether a name refers to everything beneath it.
+func isPartialPath(name string) bool {
+	return strings.HasSuffix(name, ".")
+}
+
+// parseParamCapability parses the remainder of a parameter capability after
+// its prefix: <pattern>[:read|:write|:all].
+func parseParamCapability(text string) (paramCapability, error) {
+	pattern, op := text, operationAll
+	if i := strings.LastIndexByte(text, ':'); i >= 0 {
+		pattern, op = text[:i], text[i+1:]
+	}
+
+	if pattern == "" {
+		return paramCapability{}, fmt.Errorf("empty pattern in %q", text)
+	}
+
+	cap := paramCapability{subtree: strings.HasSuffix(pattern, "**")}
+	switch Operation(op) {
+	case OperationRead:
+		cap.read = true
+	case OperationWrite:
+		cap.write = true
+	case operationAll:
+		cap.read, cap.write = true, true
+	default:
+		return paramCapability{}, fmt.Errorf("unknown operation %q in %q", op, text)
+	}
+
+	re, err := paramfilter.CompileGlob(pattern)
+	if err != nil {
+		return paramCapability{}, fmt.Errorf("bad pattern %q: %w", pattern, err)
+	}
+
+	cap.pattern = re
+
+	return cap, nil
+}
+
+// parsedParamCapability is a capability string matched against the prefixes.
+type parsedParamCapability struct {
+	selected  bool // a prefix matched
+	malformed bool
+	paramCapability
+}
+
+// ParamCheck holds a token's bearer to the TR-181 parameters its parameter
+// capabilities name.  It is applied to the device routes by a middleware
+// that knows how to find the parameters in each kind of request; the check
+// runs after bascule's middleware has verified the token.
+//
+// A nil ParamCheck, or one built from no configuration, checks nothing.
+type ParamCheck struct {
+	prefixes  []string
+	mode      checkMode
+	overrides map[string][]paramCapability
+	l         *zap.Logger
+	counter   *prometheus.CounterVec
+	warnings  *prometheus.CounterVec
+	endpoints []*regexp.Regexp
+
+	// cache holds capabilities already matched against the prefixes and
+	// parsed.  Capabilities come from tokens, so it is bounded: when full,
+	// it is emptied.
+	cacheSize int
+	cacheLock sync.Mutex
+	cache     map[string]parsedParamCapability
+}
+
+func newParamCheck(cfg paramConfig, l *zap.Logger, counter, warnings *prometheus.CounterVec, endpoints []*regexp.Regexp) (*ParamCheck, error) {
+	mode, err := parseMode(cfg.Mode, paramConfigKey, ModePermissive, ModePermissiveWithWarnings, ModeEnforce)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cfg.Prefixes) == 0 {
+		return nil, fmt.Errorf("`%s.Prefixes`: at least one parameter capability prefix is required", paramConfigKey)
+	}
+
+	for _, p := range cfg.Prefixes {
+		if p == "" {
+			return nil, fmt.Errorf("`%s.Prefixes`: a prefix cannot be empty", paramConfigKey)
+		}
+	}
+
+	overrides := make(map[string][]paramCapability, len(cfg.Overrides))
+	for principal, texts := range cfg.Overrides {
+		caps := make([]paramCapability, 0, len(texts))
+		for i, text := range texts {
+			cap, err := parseParamCapability(strings.TrimSpace(text))
+			if err != nil {
+				return nil, fmt.Errorf("`%s.Overrides[%q][%d]`: %w", paramConfigKey, principal, i, err)
+			}
+
+			caps = append(caps, cap)
+		}
+
+		overrides[principal] = caps
+	}
+
+	cacheSize := cfg.CacheSize
+	if cacheSize <= 0 {
+		cacheSize = DefaultParamCacheSize
+	}
+
+	return &ParamCheck{
+		prefixes:  cfg.Prefixes,
+		mode:      mode,
+		overrides: overrides,
+		l:         l,
+		counter:   counter,
+		warnings:  warnings,
+		endpoints: endpoints,
+		cacheSize: cacheSize,
+		cache:     make(map[string]parsedParamCapability),
+	}, nil
+}
+
+// Middleware applies the check to a route, finding each request's parameters
+// with extract.  A nil ParamCheck leaves the route as it is.
+func (c *ParamCheck) Middleware(extract ParamExtractor) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if c == nil {
+			return next
+		}
+
+		if extract == nil {
+			panic("auth: a ParamCheck needs an extractor")
+		}
+
+		return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			req, ok := extract(request)
+			if !ok {
+				next.ServeHTTP(response, request)
+				return
+			}
+
+			token, _ := bascule.Get(request.Context())
+			d := c.check(token, req)
+			c.record(response.Header(), request, token, req, d)
+
+			if d.allowed || c.mode.permissive {
+				next.ServeHTTP(response, request)
+				return
+			}
+
+			response.WriteHeader(http.StatusForbidden)
+		})
+	}
+}
+
+// paramDecision is the outcome of checking one request.
+type paramDecision struct {
+	allowed bool
+
+	// name is the first parameter no capability allows, when not allowed.
+	name string
+
+	// malformed are the token's malformed parameter capabilities.
+	malformed []string
+}
+
+// check decides whether the token may do what the request asks.  A token
+// with no parameter capability, and whose caller has no override, is
+// unrestricted.  A malformed capability counts as present but allows
+// nothing.
+func (c *ParamCheck) check(token bascule.Token, req ParamRequest) paramDecision {
+	var (
+		d       paramDecision
+		present bool
+		caps    []paramCapability
+	)
+
+	if token != nil {
+		if override, ok := c.overrides[token.Principal()]; ok {
+			present, caps = len(override) > 0, override
+		} else {
+			capabilities, _ := bascule.GetCapabilities(token)
+			for _, capability := range capabilities {
+				parsed := c.parse(capability)
+				if !parsed.selected {
+					continue
+				}
+
+				present = true
+				if parsed.malformed {
+					d.malformed = append(d.malformed, capability)
+					continue
+				}
+
+				caps = append(caps, parsed.paramCapability)
+			}
+		}
+	}
+
+	if !present {
+		d.allowed = true
+		return d
+	}
+
+	for _, name := range req.Names {
+		if !allowed(caps, req.Operation, name) {
+			d.name = name
+			return d
+		}
+	}
+
+	d.allowed = true
+
+	return d
+}
+
+// allowed reports whether any capability lets op be done to name.
+func allowed(caps []paramCapability, op Operation, name string) bool {
+	for _, cap := range caps {
+		if cap.allows(op, name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// parse matches a capability against the prefixes and parses it, through
+// the cache.
+func (c *ParamCheck) parse(capability string) parsedParamCapability {
+	c.cacheLock.Lock()
+	defer c.cacheLock.Unlock()
+
+	if parsed, ok := c.cache[capability]; ok {
+		return parsed
+	}
+
+	var parsed parsedParamCapability
+	for _, prefix := range c.prefixes {
+		text, ok := strings.CutPrefix(capability, prefix)
+		if !ok {
+			continue
+		}
+
+		parsed.selected = true
+		cap, err := parseParamCapability(text)
+		if err != nil {
+			parsed.malformed = true
+		} else {
+			parsed.paramCapability = cap
+		}
+
+		break
+	}
+
+	if len(c.cache) >= c.cacheSize {
+		clear(c.cache)
+	}
+
+	c.cache[capability] = parsed
+
+	return parsed
+}
+
+// record reports a decision: malformed capabilities are counted and logged,
+// a rejection is counted, logged and explained to the caller, and in a
+// permissive mode a rejection is recorded as a warning instead.  When the
+// mode tells the caller, each warning is also a response header.
+func (c *ParamCheck) record(header http.Header, request *http.Request, token bascule.Token, req ParamRequest, d paramDecision) {
+	var client, partner string
+	if token != nil {
+		client = token.Principal()
+		partner = determinePartnerID(token)
+	}
+
+	for _, capability := range d.malformed {
+		w := bascule.Warning{
+			Reason: "malformed",
+			Attrs: []bascule.WarningAttr{
+				{Key: KindLabel, Value: paramWarningKind},
+				{Key: "cap", Value: capability},
+			},
+		}
+
+		if c.mode.warnings {
+			header.Add(WarningHeader, w.String())
+		}
+
+		c.warnings.With(prometheus.Labels{
+			KindLabel:     paramWarningKind,
+			ReasonLabel:   w.Reason,
+			ClientIDLabel: client,
+		}).Add(1)
+	}
+
+	if d.allowed {
+		return
+	}
+
+	fields := []zap.Field{
+		zap.String("sat_client_id", client),
+		zap.String("sat_partner_id", partner),
+		zap.String("sat_rejection_reason", ParameterNotAllowed),
+		zap.String("operation", string(req.Operation)),
+		zap.String("parameter", d.name),
+	}
+
+	if c.mode.permissive {
+		w := bascule.Warning{
+			Reason: "would-reject",
+			Attrs: []bascule.WarningAttr{
+				{Key: KindLabel, Value: paramWarningKind},
+				{Key: ReasonLabel, Value: strings.ReplaceAll(ParameterNotAllowed, "_", "-")},
+				{Key: "op", Value: string(req.Operation)},
+				{Key: "name", Value: d.name},
+			},
+		}
+
+		if c.mode.warnings {
+			header.Add(WarningHeader, w.String())
+		}
+
+		c.warnings.With(prometheus.Labels{
+			KindLabel:     paramWarningKind,
+			ReasonLabel:   ParameterNotAllowed,
+			ClientIDLabel: client,
+		}).Add(1)
+
+		c.l.Info("parameter check: would reject", append(fields, zap.Stringer("warning", w))...)
+
+		return
+	}
+
+	// The caller is told why: the name is one they sent, and the token
+	// has been verified, so there is nothing to hide from them.
+	if c.mode.warnings {
+		header.Add(WarningHeader, bascule.Warning{
+			Reason: "rejected",
+			Attrs: []bascule.WarningAttr{
+				{Key: KindLabel, Value: paramWarningKind},
+				{Key: ReasonLabel, Value: strings.ReplaceAll(ParameterNotAllowed, "_", "-")},
+				{Key: "op", Value: string(req.Operation)},
+				{Key: "name", Value: d.name},
+			},
+		}.String())
+	}
+
+	c.counter.With(prometheus.Labels{
+		ClientIDLabel:  client,
+		PartnerIDLabel: partner,
+		EndpointLabel:  determineEndpoint(c.endpoints, request),
+		MethodLabel:    request.Method,
+		OutcomeLabel:   Rejected,
+		ReasonLabel:    ParameterNotAllowed,
+	}).Add(1)
+
+	c.l.Info("parameter check: request rejected", fields...)
+}

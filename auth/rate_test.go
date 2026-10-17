@@ -49,7 +49,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 	token := func(caps ...string) string {
 		return "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 			capabilitiesClaim: append([]string{testPrefix + "device/.*/config:get"}, caps...),
-			allowedResources:  partners("comcast"),
+			allowedResources:  partners(testPartner),
 		})
 	}
 
@@ -271,7 +271,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 				wantWarnings: []string{malformedRate},
 			}},
 		}, {
-			name:           "the default mode is permissive",
+			name:           "the default mode is permissive: over the rate is only counted",
 			rateConfigured: true,
 			cfg:            rateConfig{Prefixes: []string{testRatePrefix}},
 			defaultMode:    true,
@@ -384,7 +384,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 					OutcomeLabel:   Rejected,
 					ReasonLabel:    tc.rejectReason,
 					ClientIDLabel:  testPrincipal,
-					PartnerIDLabel: "comcast",
+					PartnerIDLabel: testPartner,
 					EndpointLabel:  NoneEndpoint,
 					MethodLabel:    http.MethodGet,
 				}
@@ -412,7 +412,7 @@ func TestNewMiddleware_Rate_IsPerCaller(t *testing.T) {
 
 	claims := map[string]any{
 		capabilitiesClaim: []string{testPrefix + "device/.*/config:get", testRatePrefix + onePerMinute},
-		allowedResources:  partners("comcast"),
+		allowedResources:  partners(testPartner),
 	}
 	first := keys.signAs(t, "caller-1", future, claims)
 	second := keys.signAs(t, "caller-2", future, claims)

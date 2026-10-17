@@ -36,6 +36,7 @@ const (
 	testCIDRPrefix = "x1:webpa:cidr:"
 	testPath       = "/api/v3/device/mac:112233445566/config"
 	testPrincipal  = "client0"
+	testPartner    = "comcast"
 
 	// capabilitiesClaim is the claim basculejwt reads capabilities from.
 	capabilitiesClaim = "capabilities"
@@ -188,7 +189,7 @@ func protectCounting(t *testing.T, cfg inboundConfig, v *viper.Viper, kp jws.Key
 	t.Helper()
 
 	checks, warnings := testCounter(), testWarningCounter()
-	chain, err := NewMiddleware(cfg, v, kp, zap.NewNop(), checks, warnings)
+	chain, _, err := NewMiddleware(cfg, v, kp, zap.NewNop(), checks, warnings)
 	require.NoError(t, err)
 
 	mw := chain.Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -206,7 +207,7 @@ func TestNewMiddleware_JWT(t *testing.T) {
 
 	granting := map[string]any{
 		capabilitiesClaim: []string{testPrefix + "device/.*/config:get"},
-		allowedResources:  partners("comcast"),
+		allowedResources:  partners(testPartner),
 	}
 
 	v := viper.New()
@@ -227,7 +228,7 @@ func TestNewMiddleware_JWT(t *testing.T) {
 			name: "all-method capability",
 			authorization: "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 				capabilitiesClaim: []string{testPrefix + "device/.*/config:all"},
-				allowedResources:  partners("comcast"),
+				allowedResources:  partners(testPartner),
 			}),
 			wantStatus: http.StatusOK,
 		}, {
@@ -257,27 +258,27 @@ func TestNewMiddleware_JWT(t *testing.T) {
 			name: "capability for another method",
 			authorization: "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 				capabilitiesClaim: []string{testPrefix + "device/.*/config:patch"},
-				allowedResources:  partners("comcast"),
+				allowedResources:  partners(testPartner),
 			}),
 			wantStatus: http.StatusForbidden,
 		}, {
 			name: "capability for another endpoint",
 			authorization: "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 				capabilitiesClaim: []string{testPrefix + "device/.*/stat:get"},
-				allowedResources:  partners("comcast"),
+				allowedResources:  partners(testPartner),
 			}),
 			wantStatus: http.StatusForbidden,
 		}, {
 			name: "capability with another prefix",
 			authorization: "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 				capabilitiesClaim: []string{"other:prefix:device/.*/config:get"},
-				allowedResources:  partners("comcast"),
+				allowedResources:  partners(testPartner),
 			}),
 			wantStatus: http.StatusForbidden,
 		}, {
 			name: "no capabilities",
 			authorization: "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
-				allowedResources: partners("comcast"),
+				allowedResources: partners(testPartner),
 			}),
 			wantStatus: http.StatusForbidden,
 		}, {
@@ -437,6 +438,47 @@ func TestNewMiddleware_Config(t *testing.T) {
 			kp:    keys.provider,
 			valid: true,
 		}, {
+			name: "jwt with param",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Param: paramConfig{
+					Prefixes:  []string{testParamPrefix},
+					Mode:      "Enforce",
+					Overrides: map[string][]string{"a": {"Device.**:read", " Device.WiFi.** "}, "b": {}},
+				},
+			}},
+			kp:    keys.provider,
+			valid: true,
+		}, {
+			name: "param without prefixes",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramConfigKey + ".Mode": ModeEnforce},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Param: paramConfig{Mode: ModeEnforce}}},
+			kp:   keys.provider,
+		}, {
+			name: "param with an empty prefix",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{""}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Param: paramConfig{Prefixes: []string{""}}}},
+			kp:   keys.provider,
+		}, {
+			name: "param with an unknown mode",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Param: paramConfig{Prefixes: []string{testParamPrefix}, Mode: unknownMode}}},
+			kp:   keys.provider,
+		}, {
+			name: "param has no required mode",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
+			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Param: paramConfig{Prefixes: []string{testParamPrefix}, Mode: ModeRequired}}},
+			kp:   keys.provider,
+		}, {
+			name: "param override is malformed",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Param:    paramConfig{Prefixes: []string{testParamPrefix}, Overrides: map[string][]string{"a": {"Device.**:wirte"}}},
+			}},
+			kp: keys.provider,
+		}, {
 			name: "rate has no required mode",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, ratePrefixesKey: []string{testRatePrefix}},
 			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Rate: rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModeRequired}}},
@@ -523,7 +565,7 @@ func TestNewMiddleware_Config(t *testing.T) {
 				v.Set(k, val)
 			}
 
-			_, err := NewMiddleware(tc.cfg, v, tc.kp, zap.NewNop(), testCounter(), testWarningCounter())
+			_, _, err := NewMiddleware(tc.cfg, v, tc.kp, zap.NewNop(), testCounter(), testWarningCounter())
 			if tc.valid {
 				assert.NoError(t, err)
 			} else {
@@ -558,7 +600,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 	token := func(caps ...string) string {
 		return "Bearer " + keys.sign(t, testKeyID, future, map[string]any{
 			capabilitiesClaim: append([]string{testPrefix + "device/.*/config:get"}, caps...),
-			allowedResources:  partners("comcast"),
+			allowedResources:  partners(testPartner),
 		})
 	}
 
@@ -661,7 +703,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 			wantStatus:     http.StatusOK,
 			wantWarnings:   []string{malformed},
 		}, {
-			name:           "the default mode is permissive",
+			name:           "the default mode is permissive: origin outside is only counted",
 			cidrConfigured: true,
 			cidr:           cidrConfig{Prefixes: []string{testCIDRPrefix}},
 			silent:         true,
@@ -840,7 +882,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 					OutcomeLabel:   Rejected,
 					ReasonLabel:    tc.wantReason,
 					ClientIDLabel:  testPrincipal,
-					PartnerIDLabel: "comcast",
+					PartnerIDLabel: testPartner,
 					EndpointLabel:  NoneEndpoint,
 					MethodLabel:    http.MethodGet,
 				})
@@ -870,7 +912,7 @@ func TestNewMiddleware_CIDR_WarningLabels(t *testing.T) {
 				testCIDRPrefix + "not a network",
 				testCIDRPrefix + "203.0.113.0/24",
 			},
-			allowedResources: partners("comcast"),
+			allowedResources: partners(testPartner),
 		}))
 	})
 	require.Equal(t, http.StatusOK, rec.Code)

@@ -146,6 +146,7 @@ type jwtConfig struct {
 	EndpointBuckets []string
 	CIDR            cidrConfig
 	Rate            rateConfig
+	Param           paramConfig
 }
 
 // cidrConfig is the auth.inbound.JWT.CIDR section: how a token's CIDR
@@ -184,9 +185,13 @@ type cidrConfig struct {
 // When the rate check is configured, its bearer is also held to the rates
 // its rate capabilities state.
 //
+// The parameter check is returned separately, because only the device
+// routes know which parameters a request names; they apply it with
+// ParamCheck.Middleware.  It is nil when not configured.
+//
 // Warnings raised while authorizing a request are returned to the caller in
 // WarningHeader and counted in warnings.
-func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap.Logger, counter, warnings *prometheus.CounterVec) (alice.Chain, error) {
+func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap.Logger, counter, warnings *prometheus.CounterVec) (alice.Chain, *ParamCheck, error) {
 	var (
 		authorizationParserOpts []basculehttp.AuthorizationParserOption
 		authorizerOpts          []bascule.AuthorizerOption[*http.Request]
@@ -194,6 +199,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		jwtParseOpts            []jwt.ParseOption
 		endpointBuckets         []*regexp.Regexp
 		limiter                 *rateLimiter
+		params                  *ParamCheck
 
 		// tellCaller is whether bascule's middleware writes the warnings
 		// its approvers raise to the caller.  The CIDR approver is the
@@ -202,11 +208,11 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 	)
 
 	if v.IsSet(basicConfigKey) && v.IsSet(jwtConfigKey) {
-		return alice.Chain{}, fmt.Errorf("`%s` and `%s` can't both be set", basicConfigKey, jwtConfigKey)
+		return alice.Chain{}, nil, fmt.Errorf("`%s` and `%s` can't both be set", basicConfigKey, jwtConfigKey)
 	} else if v.IsSet(basicConfigKey) {
 		basicAllowed, err := decodeBasicCredentials(cfg.Basic)
 		if err != nil {
-			return alice.Chain{}, err
+			return alice.Chain{}, nil, err
 		}
 
 		authorizationParserOpts = append(authorizationParserOpts, basculehttp.WithBasic())
@@ -217,13 +223,13 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		l.Info("inbound basic auth enabled", zap.Int("credentials", len(basicAllowed)))
 	} else if v.IsSet(jwtConfigKey) {
 		if kp == nil {
-			return alice.Chain{}, fmt.Errorf("`%s` must configure at least one key provider", clorthoConfigKey)
+			return alice.Chain{}, nil, fmt.Errorf("`%s` must configure at least one key provider", clorthoConfigKey)
 		}
 
 		jwtParseOpts = append(jwtParseOpts, jwt.WithKeyProvider(kp))
 		jwtp, err := basculejwt.NewTokenParser(jwtParseOpts...)
 		if err != nil {
-			return alice.Chain{}, fmt.Errorf("error setting up JWT parser: %v", err)
+			return alice.Chain{}, nil, fmt.Errorf("error setting up JWT parser: %v", err)
 		}
 
 		authorizationParserOpts = append(authorizationParserOpts, basculehttp.WithScheme(basculehttp.SchemeBearer, jwtp))
@@ -231,7 +237,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 
 		approver, err := basculecaps.NewApprover(capabilityOptions(cfg.JWT)...)
 		if err != nil {
-			return alice.Chain{}, fmt.Errorf("error setting up JWT capability checks: %v", err)
+			return alice.Chain{}, nil, fmt.Errorf("error setting up JWT capability checks: %v", err)
 		}
 
 		authorizerOpts = append(authorizerOpts,
@@ -251,7 +257,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		if v.IsSet(cidrConfigKey) {
 			cidr, err := newCIDRApprover(cfg.JWT.CIDR)
 			if err != nil {
-				return alice.Chain{}, fmt.Errorf("error setting up JWT cidr capability checks: %v", err)
+				return alice.Chain{}, nil, fmt.Errorf("error setting up JWT cidr capability checks: %v", err)
 			}
 
 			authorizerOpts = append(authorizerOpts, bascule.WithApprovers(cidr.approver))
@@ -265,7 +271,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		if v.IsSet(rateConfigKey) {
 			limiter, err = newRateLimiter(cfg.JWT.Rate, l, counter, warnings, endpointBuckets)
 			if err != nil {
-				return alice.Chain{}, fmt.Errorf("error setting up JWT rate capability checks: %v", err)
+				return alice.Chain{}, nil, fmt.Errorf("error setting up JWT rate capability checks: %v", err)
 			}
 
 			l.Info("inbound rate capability checks enabled",
@@ -273,13 +279,24 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 				zap.Strings("defaults", cfg.JWT.Rate.Defaults),
 				zap.Int("overrides", len(cfg.JWT.Rate.Overrides)))
 		}
+
+		if v.IsSet(paramConfigKey) {
+			params, err = newParamCheck(cfg.JWT.Param, l, counter, warnings, endpointBuckets)
+			if err != nil {
+				return alice.Chain{}, nil, fmt.Errorf("error setting up JWT parameter capability checks: %v", err)
+			}
+
+			l.Info("inbound parameter capability checks enabled",
+				zap.String("mode", params.mode.String()),
+				zap.Int("overrides", len(cfg.JWT.Param.Overrides)))
+		}
 	} else {
-		return alice.Chain{}, fmt.Errorf("either `%s` or `%s` must be set, but not both", basicConfigKey, jwtConfigKey)
+		return alice.Chain{}, nil, fmt.Errorf("either `%s` or `%s` must be set, but not both", basicConfigKey, jwtConfigKey)
 	}
 
 	tp, err := basculehttp.NewAuthorizationParser(authorizationParserOpts...)
 	if err != nil {
-		return alice.Chain{}, fmt.Errorf("error setting up authorization parser: %v", err)
+		return alice.Chain{}, nil, fmt.Errorf("error setting up authorization parser: %v", err)
 	}
 
 	validatorOpts = append(validatorOpts, basculehttp.AsValidator(authPrincipalValidator))
@@ -310,7 +327,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 	)
 	auth, err := basculehttp.NewMiddleware(middlewareOpts...)
 	if err != nil {
-		return alice.Chain{}, fmt.Errorf("failed to create auth middleware: %v", err)
+		return alice.Chain{}, nil, fmt.Errorf("failed to create auth middleware: %v", err)
 	}
 
 	// The limiter keeps state per principal, so it must run only once the
@@ -320,7 +337,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		constructors = append(constructors, limiter.handle)
 	}
 
-	return alice.New(constructors...), nil
+	return alice.New(constructors...), params, nil
 }
 
 // decodeBasicCredentials turns the configured list of base64 "user:password"

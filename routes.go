@@ -68,6 +68,7 @@ type primaryEndpointIn struct {
 	TranslationServices         []string                      `name:"supportedServices"`
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
 	ParamFilters                *paramfilter.Filters          `name:"paramFilters"`
+	ParamCheck                  *auth.ParamCheck
 }
 
 type handleWebhookRoutesIn struct {
@@ -287,6 +288,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		ReducedLoggingResponseCodes: in.ReducedLoggingResponseCodes,
 		BearerFingerprint:           in.BearerFingerprint,
 		ParamFilters:                in.ParamFilters,
+		ParamCheck:                  in.ParamCheck,
 		Tracing:                     in.Tracing,
 	})
 }
