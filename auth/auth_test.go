@@ -89,11 +89,12 @@ func newTestKeys(t *testing.T) testKeys {
 func (k testKeys) sign(t *testing.T, kid string, exp time.Time, claims map[string]any) string {
 	t.Helper()
 
-	return k.signAs(t, testPrincipal, exp, claims, kid)
+	return k.signAs(t, testPrincipal, time.Now().Add(-time.Minute), exp, claims, kid)
 }
 
-// signAs is sign for any principal.  kid defaults to testKeyID.
-func (k testKeys) signAs(t *testing.T, principal string, exp time.Time, claims map[string]any, kid ...string) string {
+// signAs is sign for any principal and issue time.  A zero issue time
+// leaves the iat claim out.  kid defaults to testKeyID.
+func (k testKeys) signAs(t *testing.T, principal string, iat, exp time.Time, claims map[string]any, kid ...string) string {
 	t.Helper()
 
 	keyID := testKeyID
@@ -104,8 +105,10 @@ func (k testKeys) signAs(t *testing.T, principal string, exp time.Time, claims m
 	builder := jwt.NewBuilder().
 		Subject(principal).
 		Issuer("https://issuer.example").
-		IssuedAt(time.Now().Add(-time.Minute)).
 		Expiration(exp)
+	if !iat.IsZero() {
+		builder = builder.IssuedAt(iat)
+	}
 	for name, value := range claims {
 		builder = builder.Claim(name, value)
 	}
@@ -471,11 +474,19 @@ func TestNewMiddleware_Config(t *testing.T) {
 			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, Param: paramConfig{Prefixes: []string{testParamPrefix}, Mode: ModeRequired}}},
 			kp:   keys.provider,
 		}, {
+			name: "param max age with a bad operation",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				Param:    paramConfig{Prefixes: []string{testParamPrefix}, MaxAge: map[string]time.Duration{malformedAnything: time.Minute}},
+			}},
+			kp: keys.provider,
+		}, {
 			name: "param override is malformed",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, paramPrefixesKey: []string{testParamPrefix}},
 			cfg: inboundConfig{JWT: jwtConfig{
 				Prefixes: []string{testPrefix},
-				Param:    paramConfig{Prefixes: []string{testParamPrefix}, Overrides: map[string][]string{"a": {"Device.**:wirte"}}},
+				Param:    paramConfig{Prefixes: []string{testParamPrefix}, Overrides: map[string][]string{"a": {malformedAnything}}},
 			}},
 			kp: keys.provider,
 		}, {

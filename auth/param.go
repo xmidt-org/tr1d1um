@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/xmidt-org/bascule"
@@ -70,13 +71,22 @@ type paramConfig struct {
 	Mode string
 
 	// Overrides are parameter capabilities, without the prefix, set here
-	// for particular callers by principal.  An override replaces whatever
-	// the caller's tokens say, looser or stricter.  An empty list makes the
+	// for particular callers by principal, matched without regard to case
+	// since the configuration loses it.  An override replaces whatever the
+	// caller's tokens say, looser or stricter.  An empty list makes the
 	// caller unrestricted.
 	Overrides map[string][]string
 
 	// CacheSize bounds how many parsed capabilities are retained.
 	CacheSize int
+
+	// MaxAge limits how long a token carrying a given parameter capability
+	// is honored, by the capability's pattern with an optional operation
+	// suffix, e.g. "Device.**": 30m.  A token older than the limit for any
+	// capability it carries is refused on every request, whatever it asks
+	// for, so a risky capability cannot outlive the deployment's tolerance
+	// for it.  Overrides do not exempt a token.
+	MaxAge map[string]time.Duration
 }
 
 // paramCapability is one parsed parameter capability.
@@ -210,7 +220,7 @@ func newParamCheck(cfg paramConfig, l *zap.Logger, counter, warnings *prometheus
 			caps = append(caps, cap)
 		}
 
-		overrides[principal] = caps
+		overrides[strings.ToLower(principal)] = caps
 	}
 
 	cacheSize := cfg.CacheSize
@@ -287,7 +297,7 @@ func (c *ParamCheck) check(token bascule.Token, req ParamRequest) paramDecision 
 	)
 
 	if token != nil {
-		if override, ok := c.overrides[token.Principal()]; ok {
+		if override, ok := c.overrides[strings.ToLower(token.Principal())]; ok {
 			present, caps = len(override) > 0, override
 		} else {
 			capabilities, _ := bascule.GetCapabilities(token)
@@ -418,7 +428,7 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 
 	if c.mode.permissive {
 		w := bascule.Warning{
-			Reason: "would-reject",
+			Reason: warningWouldReject,
 			Attrs: []bascule.WarningAttr{
 				{Key: KindLabel, Value: paramWarningKind},
 				{Key: ReasonLabel, Value: strings.ReplaceAll(ParameterNotAllowed, "_", "-")},
@@ -446,7 +456,7 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 	// has been verified, so there is nothing to hide from them.
 	if c.mode.warnings {
 		header.Add(WarningHeader, bascule.Warning{
-			Reason: "rejected",
+			Reason: warningRejected,
 			Attrs: []bascule.WarningAttr{
 				{Key: KindLabel, Value: paramWarningKind},
 				{Key: ReasonLabel, Value: strings.ReplaceAll(ParameterNotAllowed, "_", "-")},

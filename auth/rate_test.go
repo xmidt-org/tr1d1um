@@ -76,7 +76,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 			cfg:            rateConfig{Prefixes: []string{testRatePrefix}},
 			steps:          []rateStep{ok(), ok(), ok()},
 		}, {
-			name:           "another prefix is ignored",
+			name:           "another rate prefix is ignored",
 			rateConfigured: true,
 			cfg:            rateConfig{Prefixes: []string{testRatePrefix}},
 			steps:          []rateStep{ok("other:rate:1/1m"), ok("other:rate:1/1m")},
@@ -316,6 +316,15 @@ func TestNewMiddleware_Rate(t *testing.T) {
 			},
 			steps: []rateStep{ok(), ok(), ok(testRatePrefix + onePerMinute), ok(testRatePrefix + onePerMinute)},
 		}, {
+			name:           "an override matches the principal without regard to case",
+			rateConfigured: true,
+			cfg: rateConfig{
+				Prefixes:  []string{testRatePrefix},
+				Overrides: map[string][]string{strings.ToUpper(testPrincipal): {onePerMinute}},
+			},
+			steps:        []rateStep{ok(), tooMany()},
+			rejectReason: RateExceeded,
+		}, {
 			name:           "an override for another caller does not apply",
 			rateConfigured: true,
 			cfg: rateConfig{
@@ -414,8 +423,8 @@ func TestNewMiddleware_Rate_IsPerCaller(t *testing.T) {
 		capabilitiesClaim: []string{testPrefix + "device/.*/config:get", testRatePrefix + onePerMinute},
 		allowedResources:  partners(testPartner),
 	}
-	first := keys.signAs(t, "caller-1", future, claims)
-	second := keys.signAs(t, "caller-2", future, claims)
+	first := keys.signAs(t, "caller-1", time.Now(), future, claims)
+	second := keys.signAs(t, "caller-2", time.Now(), future, claims)
 
 	for i, tc := range []struct {
 		token      string

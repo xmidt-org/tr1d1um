@@ -452,6 +452,11 @@ auth:
     #     # trusted and used as written: minWindow and maxWindow do not
     #     # apply to them.
     #     # (Optional)
+    #     #
+    #     # NOTE: the keys are NOT case sensitive.  The configuration
+    #     # loader lowercases every map key, so "PartnerX" and "partnerx"
+    #     # are the same caller, and a principal is matched to its override
+    #     # without regard to case.
     #     overrides:
     #       "partner-x": ["50/1m", "10000/24h"]
     #       "exempt-caller": []
@@ -504,6 +509,11 @@ auth:
     #     # An override replaces whatever the caller's tokens say, looser
     #     # or stricter.  An empty list makes the caller unrestricted.
     #     # (Optional)
+    #     #
+    #     # NOTE: the keys are NOT case sensitive.  The configuration
+    #     # loader lowercases every map key, so "PartnerX" and "partnerx"
+    #     # are the same caller, and a principal is matched to its override
+    #     # without regard to case.
     #     overrides:
     #       "partner-x": ["Device.DeviceInfo.**:read", "Device.WiFi.SSID.*.SSID"]
     #       "exempt-caller": []
@@ -512,6 +522,30 @@ auth:
     #     # retained.
     #     # (Optional). Defaults to 1024.
     #     cacheSize: 1024
+    #
+    #     # maxAge limits how long a token carrying a given parameter
+    #     # capability is honored, measured from the token's iat claim,
+    #     # however long the issuer let the token live.  A token older than
+    #     # the limit for any capability it carries is refused on every
+    #     # request to every endpoint, whatever it asks for, so a risky
+    #     # capability cannot outlive the deployment's tolerance for it; a
+    #     # caller that does not need such a capability should not claim it.
+    #     # A token with no iat cannot carry a limited capability at all.
+    #     # Keys are the capability's pattern with an optional operation
+    #     # suffix; a key without one applies to the pattern with any
+    #     # suffix.  Overrides do not exempt
+    #     # a token.  The check follows mode above; a refusal is a 403 whose
+    #     # X-Webpa-Capability-Warning header names the capability, its
+    #     # limit and the token's age.
+    #     # (Optional)
+    #     #
+    #     # NOTE: the keys are NOT case sensitive.  The configuration
+    #     # loader lowercases every map key, and patterns match without
+    #     # regard to case anyway, so "Device.**" and "device.**" are the
+    #     # same limit.
+    #     maxAge:
+    #       "Device.**": 30m
+    #       "Device.WiFi.Security.**:write": 15m
     #
     #   # clortho configures where the keys that verify tokens come from.  At
     #   # least one provider, of any kind, is required.  Every field of the
