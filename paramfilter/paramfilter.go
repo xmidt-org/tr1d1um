@@ -122,7 +122,7 @@ func New(cfg FilterConfig) *Filter {
 
 	patterns := make([]*regexp.Regexp, 0, len(cfg.Except))
 	for _, p := range cfg.Except {
-		re, err := compileGlob(p)
+		re, err := CompileGlob(p)
 		if err == nil {
 			patterns = append(patterns, re)
 		}
@@ -164,13 +164,15 @@ func (f *Filter) matchesAny(name string) bool {
 	return false
 }
 
-// compileGlob converts a TR-181 glob pattern into a case-insensitive regexp.
+// CompileGlob converts a TR-181 glob pattern into a regexp over lowercased
+// names, so a name must be lowercased before matching.  Every feature that
+// selects parameters by pattern shares this grammar.
 //
 // The conversion rules are:
 //   - **  -> .* (match everything including dots)
 //   - *   -> [^.]* (match everything except dots)
 //   - all other characters are regexp-quoted then lowered.
-func compileGlob(pattern string) (*regexp.Regexp, error) {
+func CompileGlob(pattern string) (*regexp.Regexp, error) {
 	lower := strings.ToLower(pattern)
 
 	var b strings.Builder

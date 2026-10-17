@@ -79,6 +79,7 @@ const (
 	OriginNotAllowed    = "origin_not_allowed"
 	UnknownOrigin       = "unknown_origin"
 	RateExceeded        = "rate_exceeded"
+	ParameterNotAllowed = "parameter_not_allowed"
 	RateDenied          = "rate_denied"
 	// partners
 	NonePartner     = "none"
@@ -228,9 +229,9 @@ func warningKindReason(w bascule.Warning) (kind, reason string) {
 	kind, reason = UnknownReason, w.Reason
 	for _, attr := range w.Attrs {
 		switch attr.Key {
-		case "kind":
+		case KindLabel:
 			kind = attr.Value
-		case "reason":
+		case ReasonLabel:
 			reason = attr.Value
 		}
 	}

@@ -212,12 +212,16 @@ type chainOut struct {
 	fx.Out
 
 	Middleware alice.Chain `name:"auth_chain"`
+
+	// ParamCheck is applied by the device routes.  It is nil when the
+	// parameter check is not configured.
+	ParamCheck *ParamCheck
 }
 
 func provideMiddleware(in chainIn) (chainOut, error) {
-	middle, err := NewMiddleware(in.Cfg, in.V, in.KeyProvider, in.Logger, in.Counter, in.Warnings)
+	middle, params, err := NewMiddleware(in.Cfg, in.V, in.KeyProvider, in.Logger, in.Counter, in.Warnings)
 
-	return chainOut{Middleware: middle}, err
+	return chainOut{Middleware: middle, ParamCheck: params}, err
 }
 
 type decoratorIn struct {

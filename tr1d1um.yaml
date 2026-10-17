@@ -456,6 +456,63 @@ auth:
     #       "partner-x": ["50/1m", "10000/24h"]
     #       "exempt-caller": []
     #
+    #   # param holds a token's bearer to the TR-181 parameters its
+    #   # parameter capabilities name, for example
+    #   # "x1:webpa:param:Device.WiFi.**:read".  Every parameter a request
+    #   # gets or sets must match a capability whose operation allows it:
+    #   # ":read" covers getting values and attributes, ":write" covers
+    #   # setting them and adding, replacing and deleting table rows, and
+    #   # ":all" (or no suffix) covers both.  Patterns are case-insensitive:
+    #   # "*" matches within one level (no "."), "**" across levels.  A
+    #   # partial path such as "Device.WiFi." is allowed only by a pattern
+    #   # ending in "**" that matches it; table operations act on their
+    #   # table or row as a partial path.  Parameter capabilities only
+    #   # narrow what the endpoint capabilities already grant; a token with
+    #   # none is unrestricted.  A capability that cannot be parsed still
+    #   # counts as present but matches nothing, so a typo never removes a
+    #   # limit.  Every problem is logged and counted in the
+    #   # auth_capability_warning metric, and, in a mode with warnings,
+    #   # reported to the caller in an X-Webpa-Capability-Warning header,
+    #   # whether or not the request was blocked.  A refused request is a
+    #   # 403 whose X-Webpa-Capability-Warning header names the first
+    #   # parameter not covered and the operation, as does the log.
+    #   # (Optional). When absent, parameter capabilities are not checked.
+    #   param:
+    #     # prefixes select a token's parameter capabilities, matched
+    #     # literally.  A capability with any other prefix is ignored.
+    #     # Required.
+    #     prefixes: ["x1:webpa:param:"]
+    #
+    #     # mode decides what a failure does and whether the caller is
+    #     # told.  Every mode logs and counts what it finds.
+    #     #   permissive              nothing is rejected and the caller is
+    #     #                           told nothing.
+    #     #   permissiveWithWarnings  permissive, and the caller is told in
+    #     #                           the warning header what enforce would
+    #     #                           have rejected and which capabilities
+    #     #                           are malformed.
+    #     #   enforce                 a parameter no capability allows is a
+    #     #                           403, and the caller is told about
+    #     #                           malformed capabilities.
+    #     # A newly configured check starts as a trial run; switch to
+    #     # enforce once the log and metric are quiet.
+    #     # (Optional). Defaults to "permissive".
+    #     mode: "permissive"
+    #
+    #     # overrides set the parameter capabilities, without the prefix,
+    #     # for particular callers here, by the token's principal (sub).
+    #     # An override replaces whatever the caller's tokens say, looser
+    #     # or stricter.  An empty list makes the caller unrestricted.
+    #     # (Optional)
+    #     overrides:
+    #       "partner-x": ["Device.DeviceInfo.**:read", "Device.WiFi.SSID.*.SSID"]
+    #       "exempt-caller": []
+    #
+    #     # cacheSize bounds how many parsed parameter capabilities are
+    #     # retained.
+    #     # (Optional). Defaults to 1024.
+    #     cacheSize: 1024
+    #
     #   # clortho configures where the keys that verify tokens come from.  At
     #   # least one provider, of any kind, is required.  Every field of the
     #   # provider configurations is accepted here; see

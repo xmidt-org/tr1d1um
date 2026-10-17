@@ -54,6 +54,10 @@ type Options struct {
 	// log output for GET and PATCH operations.  A nil value logs none.
 	ParamFilters *paramfilter.Filters
 
+	// ParamCheck holds callers to the TR-181 parameters their parameter
+	// capabilities name.  Nil when not configured.
+	ParamCheck *auth.ParamCheck
+
 	// Tracing supplies the propagator and header prefix used to pick up
 	// trace context from incoming requests.
 	Tracing candlelight.Tracing
@@ -71,11 +75,14 @@ func ConfigHandler(c *Options) {
 	}
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
+	params := c.ParamCheck.Middleware(extractParameters)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))).
+	// the parameter check runs after authentication, so that the token it
+	// reads has been verified
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler))))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler))))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -292,14 +299,15 @@ func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, 
 }
 
 func requestGetPayload(names, attributes string) ([]byte, error) {
-	if len(names) < 1 {
+	split := splitNames(names)
+	if len(split) == 0 {
 		return nil, ErrEmptyNames
 	}
 
 	wdmp := new(getWDMP)
 
 	//default values at this point
-	wdmp.Names, wdmp.Command = strings.Split(names, ","), CommandGet
+	wdmp.Names, wdmp.Command = split, CommandGet
 
 	if attributes != "" {
 		wdmp.Command, wdmp.Attributes = CommandGetAttrs, attributes

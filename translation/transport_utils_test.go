@@ -7,14 +7,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/paramfilter"
 	transaction "github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
@@ -482,6 +487,126 @@ func TestCaptureWDMPParameters_PATCH(t *testing.T) {
 
 			// Values should only be present when the filter allows them.
 			assert.Equal(t, tt.expectValues, hasField(last.Context, "parameterValues"))
+		})
+	}
+}
+
+func TestExtractParameters(t *testing.T) {
+	const (
+		configPath   = "/api/v3/device/mac:112233445566/config"
+		parameterVar = "parameter" // the mux variable naming a table or row
+		modelName    = "Device.DeviceInfo.ModelName"
+	)
+
+	const body = `{"parameters":[{"name":"Device.WiFi.SSID.1.SSID","value":"home","dataType":0},{"name":"Device.WiFi.Radio.1.Channel","value":6,"dataType":1}]}`
+
+	cases := []struct {
+		name     string
+		method   string
+		target   string
+		vars     map[string]string
+		body     string
+		wantOK   bool
+		wantReq  auth.ParamRequest
+		wantBody string // what the handler can still read afterwards
+	}{
+		{
+			name:    "get names",
+			method:  http.MethodGet,
+			target:  configPath + "?names=" + modelName + ",Device.DeviceInfo.",
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationRead, Names: []string{modelName, "Device.DeviceInfo."}},
+		}, {
+			name:    "get names are trimmed and blanks dropped",
+			method:  http.MethodGet,
+			target:  configPath + "?names=" + url.QueryEscape(" "+modelName+" , ,Device.DeviceInfo. "),
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationRead, Names: []string{modelName, "Device.DeviceInfo."}},
+		}, {
+			name:   "get with only blank names is left to the handler",
+			method: http.MethodGet,
+			target: configPath + "?names=" + url.QueryEscape(" , "),
+		}, {
+			name:    "get attributes still reads the names",
+			method:  http.MethodGet,
+			target:  configPath + "?names=" + modelName + "&attributes=notify",
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationRead, Names: []string{modelName}},
+		}, {
+			name:   "get without names is left to the handler",
+			method: http.MethodGet,
+			target: configPath,
+		}, {
+			name:     "patch writes the parameters in its body, which the handler can still read",
+			method:   http.MethodPatch,
+			target:   configPath,
+			body:     body,
+			wantOK:   true,
+			wantReq:  auth.ParamRequest{Operation: auth.OperationWrite, Names: []string{"Device.WiFi.SSID.1.SSID", "Device.WiFi.Radio.1.Channel"}},
+			wantBody: body,
+		}, {
+			name:     "patch with an unreadable body is left to the handler, body intact",
+			method:   http.MethodPatch,
+			target:   configPath,
+			body:     "not json",
+			wantBody: "not json",
+		}, {
+			name:    "post writes the table as a partial path",
+			method:  http.MethodPost,
+			target:  configPath + "/Device.NAT.PortMapping",
+			vars:    map[string]string{parameterVar: "Device.NAT.PortMapping"},
+			body:    `{"InternalPort":"80"}`,
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationWrite, Names: []string{"Device.NAT.PortMapping."}},
+		}, {
+			name:    "put keeps a trailing dot and trims spaces",
+			method:  http.MethodPut,
+			target:  configPath + "/Device.NAT.PortMapping.",
+			vars:    map[string]string{parameterVar: " Device.NAT.PortMapping. "},
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationWrite, Names: []string{"Device.NAT.PortMapping."}},
+		}, {
+			name:    "delete writes the row as a partial path",
+			method:  http.MethodDelete,
+			target:  configPath + "/Device.NAT.PortMapping.3",
+			vars:    map[string]string{parameterVar: "Device.NAT.PortMapping.3"},
+			wantOK:  true,
+			wantReq: auth.ParamRequest{Operation: auth.OperationWrite, Names: []string{"Device.NAT.PortMapping.3."}},
+		}, {
+			name:   "a table operation without a path is left to the handler",
+			method: http.MethodDelete,
+			target: configPath + "/",
+			vars:   map[string]string{parameterVar: ""},
+		}, {
+			name:   "another method names nothing",
+			method: http.MethodHead,
+			target: configPath + "?names=" + modelName,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body io.Reader
+			if tc.body != "" {
+				body = strings.NewReader(tc.body)
+			}
+
+			r := httptest.NewRequest(tc.method, tc.target, body)
+			if tc.vars != nil {
+				r = mux.SetURLVars(r, tc.vars)
+			}
+
+			got, ok := extractParameters(r)
+			assert.Equal(t, tc.wantOK, ok)
+			if tc.wantOK {
+				assert.Equal(t, tc.wantReq, got)
+			}
+
+			if tc.wantBody != "" {
+				rest, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantBody, string(rest))
+			}
 		})
 	}
 }

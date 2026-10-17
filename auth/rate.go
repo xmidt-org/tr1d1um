@@ -318,8 +318,8 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 		w := bascule.Warning{
 			Reason: "would-reject",
 			Attrs: []bascule.WarningAttr{
-				{Key: "kind", Value: rateWarningKind},
-				{Key: "reason", Value: strings.ReplaceAll(reason, "_", "-")},
+				{Key: KindLabel, Value: rateWarningKind},
+				{Key: ReasonLabel, Value: strings.ReplaceAll(reason, "_", "-")},
 			},
 		}
 		if limit := d.Limit.String(); limit != "" {
