@@ -40,6 +40,14 @@ const (
 	KindLabel      = "kind"
 )
 
+// The reasons of the warnings the checks raise.  A would-reject records a
+// failure a permissive mode let through; a rejected explains a refusal to
+// the caller and is not counted as a warning.
+const (
+	warningWouldReject = "would-reject"
+	warningRejected    = "rejected"
+)
+
 // label values
 const (
 	Accepted = "accepted"
@@ -80,6 +88,8 @@ const (
 	UnknownOrigin       = "unknown_origin"
 	RateExceeded        = "rate_exceeded"
 	ParameterNotAllowed = "parameter_not_allowed"
+	TokenTooOld         = "token_too_old"
+	NoIssuedAt          = "no_issued_at"
 	RateDenied          = "rate_denied"
 	// partners
 	NonePartner     = "none"
@@ -206,6 +216,12 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 	client := e.Token.Principal()
 	partner := determinePartnerID(e.Token)
 	for _, w := range e.Warnings {
+		// the explanation of a refusal is not a warning; the refusal is
+		// already counted
+		if w.Reason == warningRejected {
+			continue
+		}
+
 		kind, reason := warningKindReason(w)
 		ae.warnings.With(prometheus.Labels{
 			KindLabel:     kind,
@@ -252,6 +268,10 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 		reason = OriginNotAllowed
 	} else if errors.Is(e.Err, basculehttp.ErrUnknownOrigin) {
 		reason = UnknownOrigin
+	} else if errors.Is(e.Err, errTokenTooOld) {
+		reason = TokenTooOld
+	} else if errors.Is(e.Err, errNoIssuedAt) {
+		reason = NoIssuedAt
 	} else if errors.Is(e.Err, bascule.ErrUnauthorized) {
 		reason = NoCapabilitiesMatch
 	} else if errors.Is(e.Err, errAuthMissingClaims) {

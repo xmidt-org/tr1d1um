@@ -202,8 +202,9 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		params                  *ParamCheck
 
 		// tellCaller is whether bascule's middleware writes the warnings
-		// its approvers raise to the caller.  The CIDR approver is the
-		// only source of warnings inside bascule, so its mode decides.
+		// its approvers raise to the caller.  The CIDR approver and the
+		// parameter age limit are the sources of warnings inside bascule,
+		// so a silent mode on either keeps the header off.
 		tellCaller = true
 	)
 
@@ -288,7 +289,20 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 
 			l.Info("inbound parameter capability checks enabled",
 				zap.String("mode", params.mode.String()),
-				zap.Int("overrides", len(cfg.JWT.Param.Overrides)))
+				zap.Int("overrides", len(cfg.JWT.Param.Overrides)),
+				zap.Int("maxAges", len(cfg.JWT.Param.MaxAge)))
+
+			if len(cfg.JWT.Param.MaxAge) > 0 {
+				age, err := newParamAgeApprover(cfg.JWT.Param, params.mode)
+				if err != nil {
+					return alice.Chain{}, nil, fmt.Errorf("error setting up JWT parameter capability age limits: %v", err)
+				}
+
+				// the age limit runs inside bascule, so it shares the
+				// warning header switch with the CIDR check
+				authorizerOpts = append(authorizerOpts, bascule.WithApprovers(age))
+				tellCaller = tellCaller && params.mode.warnings
+			}
 		}
 	} else {
 		return alice.Chain{}, nil, fmt.Errorf("either `%s` or `%s` must be set, but not both", basicConfigKey, jwtConfigKey)

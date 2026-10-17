@@ -37,6 +37,64 @@ Tr1d1um validates the incoming request, injects it into the payload of a SimpleR
 ### Event listener registration - `/hook(s)` endpoints
 Devices connected to the XMiDT Cluster generate events (i.e. going offline). The webhooks library used by Tr1d1um leverages AWS SNS to publish these events. These endpoints then allow API users to both setup listeners of desired events and fetch the current list of configured listeners in the system.
 
+### Capabilities
+
+A caller's JWT carries flat capability strings. Each configured prefix
+selects one kind of capability, and each kind is checked on its own; the
+`auth.inbound.jwt` section of [tr1d1um.yaml](tr1d1um.yaml) documents every
+setting.
+
+| Kind     | Example                                  | Decides                                   |
+|----------|------------------------------------------|-------------------------------------------|
+| endpoint | `x1:webpa:api:device/.*/config:get`      | which endpoints and methods may be called |
+| cidr     | `x1:webpa:cidr:96.44.169.0/24`           | which networks the caller may call from   |
+| rate     | `x1:webpa:rate:600/1m`                   | how fast the caller may call, per instance|
+| param    | `x1:webpa:param:Device.WiFi.**:read`     | which TR-181 parameters may be touched    |
+
+Endpoint capabilities grant access. The other kinds only narrow it: a token
+with none of a kind is unrestricted on that kind, and a capability that
+cannot be parsed counts as present but matches nothing, so a typo never
+widens access.
+
+#### Parameter capabilities
+
+Every TR-181 parameter a `/config` request gets or sets must match a
+parameter capability. A capability is a pattern with an optional operation
+suffix:
+
+| Suffix          | Allows                                                                   |
+|-----------------|--------------------------------------------------------------------------|
+| none, or `:all` | both reading and writing                                                 |
+| `:read`         | getting values and attributes                                            |
+| `:write`        | setting values and attributes; adding, replacing and deleting table rows |
+
+So `Device.WiFi.**` alone allows everything under `Device.WiFi.`, and
+`Device.WiFi.**:read` allows only reading it. Any other suffix, such as
+`:wirte`, makes the capability malformed: it still counts as present but
+allows nothing. Patterns are matched without regard to case; `*` matches
+within one level of the name and `**` across levels, so `Device.*` matches
+`Device.Foo` but not `Device.Foo.Bar`, while `Device.**` matches both. A
+partial path such as `Device.WiFi.` is allowed only by a pattern ending in
+`**` that matches it. Table operations act on their table or row as a
+partial path.
+
+A deployment may also cap how long a token carrying a given parameter
+capability is honoured, for example `Device.**: 30m`. A token older than the
+cap for any capability it carries is refused on every request, whatever it
+asks for, so a caller should not claim a risky capability it does not need.
+
+**Map keys in the configuration are not case sensitive.** The configuration
+loader lowercases every key, so in the `overrides` and `maxAge` maps
+`PartnerX` and `partnerx` name the same caller, and `Device.**` and
+`device.**` the same pattern. A caller's principal is matched to its
+override without regard to case.
+
+Each kind runs in a mode: `permissive` (the default) logs and counts what
+it would reject without rejecting anything, `permissiveWithWarnings` also
+tells the caller in an `X-Webpa-Capability-Warning` header, and `enforce`
+rejects. A rejected parameter request is a `403` whose warning header names
+the operation and the first parameter no capability allows.
+
 
 ## Build
 

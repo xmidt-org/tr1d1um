@@ -59,10 +59,10 @@ type rateConfig struct {
 	MinWindow time.Duration
 	MaxWindow time.Duration
 
-	// Overrides are rates set here for particular callers, by principal.
-	// An override replaces whatever the caller's tokens say, looser or
-	// stricter.  An empty list makes the caller
-	// unrestricted.
+	// Overrides are rates set here for particular callers, by principal,
+	// matched without regard to case since the configuration loses it.  An
+	// override replaces whatever the caller's tokens say, looser or
+	// stricter.  An empty list makes the caller unrestricted.
 	Overrides map[string][]string
 }
 
@@ -135,11 +135,11 @@ func newRateResolver(cfg rateConfig) (tokenrate.Resolver, error) {
 			return nil, err
 		}
 
-		overrides[principal] = rates
+		overrides[strings.ToLower(principal)] = rates
 	}
 
 	return func(_ context.Context, principal string, provided []tokenrate.Rate) ([]tokenrate.Rate, error) {
-		if rates, ok := overrides[principal]; ok {
+		if rates, ok := overrides[strings.ToLower(principal)]; ok {
 			return rates, nil
 		}
 
@@ -316,7 +316,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 
 	if rl.mode.permissive {
 		w := bascule.Warning{
-			Reason: "would-reject",
+			Reason: warningWouldReject,
 			Attrs: []bascule.WarningAttr{
 				{Key: KindLabel, Value: rateWarningKind},
 				{Key: ReasonLabel, Value: strings.ReplaceAll(reason, "_", "-")},
