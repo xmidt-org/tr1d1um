@@ -173,6 +173,27 @@ func TestSPIFFEDecorator_Concurrent(t *testing.T) {
 	assert.EqualValues(t, 1, issuer.calls.Load())
 }
 
+// TestSPIFFEDecorator_RefreshAfterAnotherCaller pins the path the concurrent
+// test reaches only when a goroutine loses the race for the lock: a caller
+// that found the cache stale, then waited while another caller refreshed it,
+// must reuse that token rather than exchange again.  It is driven directly so
+// coverage does not depend on scheduling.
+func TestSPIFFEDecorator_RefreshAfterAnotherCaller(t *testing.T) {
+	issuer := &fakeIssuer{t: t}
+	d, audiences := newTestSPIFFEDecorator(t, spiffeDecoratorConfig{}, issuer)
+
+	first, err := decorate(d)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer token-1", first)
+
+	// what a caller that saw the stale cache and then got the lock sees
+	got, err := d.refresh(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, first, got)
+	assert.EqualValues(t, 1, issuer.calls.Load(), "no second exchange")
+	assert.Len(t, *audiences, 1, "no second SVID fetch")
+}
+
 func TestSPIFFEDecorator_Errors(t *testing.T) {
 	cases := []struct {
 		name    string
