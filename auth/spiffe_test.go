@@ -101,7 +101,7 @@ func decorate(d Decorator) (string, error) {
 func TestSPIFFEDecorator_Exchange(t *testing.T) {
 	issuer := &fakeIssuer{t: t}
 	d, audiences := newTestSPIFFEDecorator(t, spiffeDecoratorConfig{
-		Scopes: []string{"webpa-prefix:api:device/.*/config:get", "webpa-prefix:rate:50/1s"},
+		Scopes: []string{"webpa-prefix-api:device/.*/config:get", "webpa-prefix-rate:50/1s"},
 	}, issuer)
 
 	got, err := decorate(d)
@@ -115,7 +115,7 @@ func TestSPIFFEDecorator_Exchange(t *testing.T) {
 		"client_id":             {testClientID},
 		"client_assertion_type": {DefaultSPIFFEAssertionType},
 		"client_assertion":      {testSVID},
-		"scope":                 {"webpa-prefix:api:device/.*/config:get webpa-prefix:rate:50/1s"},
+		"scope":                 {"webpa-prefix-api:device/.*/config:get webpa-prefix-rate:50/1s"},
 	}, issuer.form)
 }
 

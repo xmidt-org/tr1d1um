@@ -61,7 +61,7 @@ type ParamExtractor func(*http.Request) (req ParamRequest, ok bool)
 // check runs only when the section is present.
 type paramConfig struct {
 	// Prefixes select a token's parameter capabilities, e.g.
-	// webpa-prefix:param:.  A prefix is matched literally.  At least one is
+	// webpa-prefix-param:.  A prefix is matched literally.  At least one is
 	// required.
 	Prefixes []string
 

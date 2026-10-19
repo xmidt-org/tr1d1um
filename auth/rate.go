@@ -36,7 +36,7 @@ const rateWarningKind = "rate"
 // capabilities limit how fast its bearer may call this instance.  The check
 // runs only when the section is present.
 type rateConfig struct {
-	// Prefixes select a token's rate capabilities, e.g. webpa-prefix:rate:.
+	// Prefixes select a token's rate capabilities, e.g. webpa-prefix-rate:.
 	// A prefix is matched literally.  At least one is required.
 	Prefixes []string
 

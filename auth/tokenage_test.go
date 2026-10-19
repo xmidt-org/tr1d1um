@@ -66,14 +66,14 @@ func TestNewMiddleware_ParamMaxAge(t *testing.T) {
 			authorization: token(stale, testParamPrefix+anything),
 			wantStatus:    http.StatusForbidden,
 			wantReason:    TokenTooOld,
-			wantWarnings:  []string{tooOld + `"webpa-prefix:param:Device.**"; maxAge=30m0s; age=`},
+			wantWarnings:  []string{tooOld + `"webpa-prefix-param:Device.**"; maxAge=30m0s; age=`},
 		}, {
 			name:          "the whole token is refused, whatever else it could do",
 			cfg:           enforcing,
 			authorization: token(stale, testParamPrefix+deviceInfo+":read", testParamPrefix+wifiSecurity),
 			wantStatus:    http.StatusForbidden,
 			wantReason:    TokenTooOld,
-			wantWarnings:  []string{tooOld + `"webpa-prefix:param:Device.WiFi.Security.**"; maxAge=15m0s`},
+			wantWarnings:  []string{tooOld + `"webpa-prefix-param:Device.WiFi.Security.**"; maxAge=15m0s`},
 		}, {
 			name:          "an old token with only unlimited capabilities is fine",
 			cfg:           enforcing,
@@ -251,9 +251,9 @@ func TestParamMaxAgeFromYAML(t *testing.T) {
 auth:
   inbound:
     jwt:
-      prefixes: ["webpa-prefix:api:"]
+      prefixes: ["webpa-prefix-api:"]
       param:
-        prefixes: ["webpa-prefix:param:"]
+        prefixes: ["webpa-prefix-param:"]
         maxAge:
           "Device.**": 30m
           "Device.WiFi.Security.**:write": 15m

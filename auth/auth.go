@@ -153,8 +153,8 @@ type jwtConfig struct {
 // capabilities limit where its bearer may call from.  The check runs only
 // when the section is present.
 type cidrConfig struct {
-	// Prefixes select a token's CIDR capabilities, e.g. webpa-prefix:cidr:.
-	// At least one is required.
+	// Prefixes select a token's CIDR capabilities, e.g. webpa-prefix-cidr:.
+	// A prefix is matched literally.  At least one is required.
 	Prefixes []string
 
 	// Mode is one of ModePermissive (the default), ModePermissiveWithWarnings,
@@ -439,7 +439,7 @@ func newCIDRApprover(cfg cidrConfig) (cidrCheck, error) {
 	}
 
 	opts := []basculehttp.CIDRApproverOption{
-		basculehttp.WithCIDRPrefixes(cfg.Prefixes...),
+		basculehttp.WithCIDRPrefixLiterals(cfg.Prefixes...),
 		basculehttp.WithOriginResolver(resolver),
 		cidrModeOption(mode),
 	}
@@ -476,7 +476,7 @@ func cidrModeOption(mode checkMode) basculehttp.CIDRApproverOption {
 func capabilityOptions(cfg jwtConfig) []basculecaps.ApproverOption {
 	opts := []basculecaps.ApproverOption{
 		basculecaps.WithURLNormalizeFunc(stripAPIVersion),
-		basculecaps.WithPrefixes(cfg.Prefixes...),
+		basculecaps.WithPrefixLiterals(cfg.Prefixes...),
 	}
 
 	if cfg.AcceptAllMethod != "" {

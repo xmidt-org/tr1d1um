@@ -175,7 +175,7 @@ func TestProvide(t *testing.T) {
 				fanoutConfigKey + ".SPIFFE": map[string]any{ //nolint:gosec // a client ID, not a credential
 					"tokenURL": "https://issuer.example.com/token",
 					"clientID": testClientID,
-					"scopes":   []string{"webpa-prefix:api:device/.*/config:get"},
+					"scopes":   []string{"webpa-prefix-api:device/.*/config:get"},
 					"socket":   "unix:///run/spire/sockets/agent.sock",
 				},
 				webhookConfigKey + ".Basic": credential,

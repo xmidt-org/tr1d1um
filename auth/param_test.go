@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	testParamPrefix  = "webpa-prefix:param:"
+	testParamPrefix  = "webpa-prefix-param:"
 	paramPrefixesKey = paramConfigKey + ".Prefixes"
 
 	// a few parameter names the tests share
@@ -273,7 +273,7 @@ func TestNewMiddleware_Param(t *testing.T) {
 			caps:            []string{testParamPrefix + anything + ":wirte"},
 			req:             read(modelName),
 			wantStatus:      http.StatusForbidden,
-			wantWarnings:    []string{`malformed; kind=param; cap="webpa-prefix:param:Device.**:wirte"`},
+			wantWarnings:    []string{`malformed; kind=param; cap="webpa-prefix-param:Device.**:wirte"`},
 		}, {
 			name:            "an empty pattern is malformed",
 			paramConfigured: true,
@@ -528,9 +528,9 @@ func TestParamConfigFromYAML(t *testing.T) {
 auth:
   inbound:
     jwt:
-      prefixes: ["webpa-prefix:api:"]
+      prefixes: ["webpa-prefix-api:"]
       param:
-        prefixes: ["webpa-prefix:param:"]
+        prefixes: ["webpa-prefix-param:"]
         mode: enforce
         cacheSize: 256
         overrides:
@@ -546,7 +546,7 @@ auth:
 	require.NoError(t, v.UnmarshalKey(inboundConfigKey, &cfg))
 
 	assert.True(t, v.IsSet(paramConfigKey))
-	assert.Equal(t, []string{"webpa-prefix:param:"}, cfg.JWT.Param.Prefixes)
+	assert.Equal(t, []string{"webpa-prefix-param:"}, cfg.JWT.Param.Prefixes)
 	assert.Equal(t, ModeEnforce, cfg.JWT.Param.Mode)
 	assert.Equal(t, 256, cfg.JWT.Param.CacheSize)
 	assert.Equal(t, []string{"Device.DeviceInfo.**:read", "Device.WiFi.SSID.*.SSID"}, cfg.JWT.Param.Overrides["partner-x"])
