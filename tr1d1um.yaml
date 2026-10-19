@@ -293,14 +293,15 @@ auth:
     # bearer may act for at the allowedResources.allowedPartners claim.
     #
     # A capability has the form {prefix}{endpoint}:{method}, for example
-    # "x1:webpa:api:device/.*/config:get".  The endpoint is a regular
+    # "webpa-prefix-api:device/.*/config:get".  The endpoint is a regular
     # expression matched against the request path with the /api/vN prefix
     # removed, and the method is the lowercased HTTP verb or the
     # acceptAllMethod value.
     # jwt:
     #   # prefixes are the capability prefixes this service honors.  A
-    #   # capability with any other prefix is ignored.  Required.
-    #   prefixes: ["x1:webpa:api:"]
+    #   # capability with any other prefix is ignored.  A prefix is matched
+    #   # literally.  Required.
+    #   prefixes: ["webpa-prefix-api:"]
     #
     #   # acceptAllMethod is the method value that grants every HTTP method.
     #   # (Optional). Defaults to "all".
@@ -321,7 +322,7 @@ auth:
     #     - "device/.*/config\\b"
     #
     #   # cidr holds a token's bearer to the networks its CIDR capabilities
-    #   # name, for example "x1:webpa:cidr:96.44.169.0/24".  The caller
+    #   # name, for example "webpa-prefix-cidr:96.44.169.0/24".  The caller
     #   # origin (see trustedProxies below) must be inside at least one of
     #   # them.
     #   # CIDR capabilities only limit access; a token with none is
@@ -335,8 +336,9 @@ auth:
     #   # (Optional). When absent, CIDR capabilities are not checked.
     #   cidr:
     #     # prefixes select a token's CIDR capabilities.  A capability with
-    #     # any other prefix is ignored.  Required.
-    #     prefixes: ["x1:webpa:cidr:"]
+    #     # any other prefix is ignored.  A prefix is matched literally.
+    #     # Required.
+    #     prefixes: ["webpa-prefix-cidr:"]
     #
     #     # mode decides what a failure does, whether the caller is told,
     #     # and what a token with no CIDR capability means.  Every mode logs
@@ -383,7 +385,7 @@ auth:
     #       - "10.0.0.0/8"
     #
     #   # rate holds a token's bearer to the rates its rate capabilities
-    #   # name, for example "x1:webpa:rate:50/1m": at most <count> calls per
+    #   # name, for example "webpa-prefix-rate:50/1m": at most <count> calls per
     #   # <window> against this instance.  The window is a Go duration such
     #   # as 1m, 1h30m or 24h; days are not a unit.  Windows outside
     #   # minWindow and maxWindow are held at that bound at the same calls
@@ -406,7 +408,7 @@ auth:
     #   rate:
     #     # prefixes select a token's rate capabilities, matched literally.
     #     # A capability with any other prefix is ignored.  Required.
-    #     prefixes: ["x1:webpa:rate:"]
+    #     prefixes: ["webpa-prefix-rate:"]
     #
     #     # mode decides what a failure does and whether the caller is
     #     # told.  Every mode logs and counts what it finds.
@@ -463,7 +465,7 @@ auth:
     #
     #   # param holds a token's bearer to the TR-181 parameters its
     #   # parameter capabilities name, for example
-    #   # "x1:webpa:param:Device.WiFi.**:read".  Every parameter a request
+    #   # "webpa-prefix-param:Device.WiFi.**:read".  Every parameter a request
     #   # gets or sets must match a capability whose operation allows it:
     #   # ":read" covers getting values and attributes, ":write" covers
     #   # setting them and adding, replacing and deleting table rows, and
@@ -486,7 +488,7 @@ auth:
     #     # prefixes select a token's parameter capabilities, matched
     #     # literally.  A capability with any other prefix is ignored.
     #     # Required.
-    #     prefixes: ["x1:webpa:param:"]
+    #     prefixes: ["webpa-prefix-param:"]
     #
     #     # mode decides what a failure does and whether the caller is
     #     # told.  Every mode logs and counts what it finds.

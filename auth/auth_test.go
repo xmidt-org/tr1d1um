@@ -32,8 +32,8 @@ import (
 
 const (
 	testKeyID      = "test-key"
-	testPrefix     = "x1:webpa:api:"
-	testCIDRPrefix = "x1:webpa:cidr:"
+	testPrefix     = "webpa-prefix-api:"
+	testCIDRPrefix = "webpa-prefix-cidr:"
 	testPath       = "/api/v3/device/mac:112233445566/config"
 	testPrincipal  = "client0"
 	testPartner    = "comcast"
@@ -534,11 +534,6 @@ func TestNewMiddleware_Config(t *testing.T) {
 			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: unknownMode}}},
 			kp:   keys.provider,
 		}, {
-			name: "cidr with a bad prefix regex",
-			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrPrefixesKey: []string{"("}},
-			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Prefixes: []string{"("}}}},
-			kp:   keys.provider,
-		}, {
 			name: "trusted proxy is a bare address",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrPrefixesKey: []string{testCIDRPrefix}},
 			cfg: inboundConfig{JWT: jwtConfig{
@@ -736,7 +731,7 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 			authorization:  token(testCIDRPrefix + "192.0.2.0/33"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     OriginNotAllowed,
-			wantWarnings:   []string{`malformed; kind=cidr; cap="x1:webpa:cidr:192.0.2.0/33"`},
+			wantWarnings:   []string{`malformed; kind=cidr; cap="webpa-prefix-cidr:192.0.2.0/33"`},
 		}, {
 			name:           "a bare address is malformed",
 			cidrConfigured: true,
@@ -941,9 +936,9 @@ func TestInboundConfigFromYAML(t *testing.T) {
 auth:
   inbound:
     jwt:
-      prefixes: ["x1:webpa:api:"]
+      prefixes: ["webpa-prefix-api:"]
       cidr:
-        prefixes: ["x1:webpa:cidr:"]
+        prefixes: ["webpa-prefix-cidr:"]
         mode: permissiveRequiredWithWarnings
         cacheSize: 256
         trustedProxies: ["10.0.0.0/8", "2001:db8::/32"]
@@ -958,7 +953,7 @@ auth:
 
 	assert.True(t, v.IsSet(cidrConfigKey))
 	assert.Equal(t, []string{"10.0.0.0/8", "2001:db8::/32"}, cfg.JWT.CIDR.TrustedProxies)
-	assert.Equal(t, []string{"x1:webpa:cidr:"}, cfg.JWT.CIDR.Prefixes)
+	assert.Equal(t, []string{"webpa-prefix-cidr:"}, cfg.JWT.CIDR.Prefixes)
 	assert.Equal(t, ModePermissiveRequiredWithWarnings, cfg.JWT.CIDR.Mode)
 	assert.Equal(t, 256, cfg.JWT.CIDR.CacheSize)
 }

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	testRatePrefix  = "x1:webpa:rate:"
+	testRatePrefix  = "webpa-prefix-rate:"
 	ratePrefixesKey = rateConfigKey + ".Prefixes"
 	rateModeKey     = rateConfigKey + ".Mode"
 
@@ -163,7 +163,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 			steps: []rateStep{{
 				caps:         []string{testRatePrefix + "10/0s"},
 				wantStatus:   http.StatusTooManyRequests,
-				wantWarnings: []string{`malformed; kind=rate; cap="x1:webpa:rate:10/0s"`},
+				wantWarnings: []string{`malformed; kind=rate; cap="webpa-prefix-rate:10/0s"`},
 			}},
 			rejectReason: RateExceeded,
 		}, {
@@ -173,7 +173,7 @@ func TestNewMiddleware_Rate(t *testing.T) {
 			steps: []rateStep{{
 				caps:         []string{testRatePrefix + "100/1d"},
 				wantStatus:   http.StatusTooManyRequests,
-				wantWarnings: []string{`malformed; kind=rate; cap="x1:webpa:rate:100/1d"`},
+				wantWarnings: []string{`malformed; kind=rate; cap="webpa-prefix-rate:100/1d"`},
 			}},
 			rejectReason: RateExceeded,
 		}, {
@@ -584,9 +584,9 @@ func TestRateConfigFromYAML(t *testing.T) {
 auth:
   inbound:
     jwt:
-      prefixes: ["x1:webpa:api:"]
+      prefixes: ["webpa-prefix-api:"]
       rate:
-        prefixes: ["x1:webpa:rate:"]
+        prefixes: ["webpa-prefix-rate:"]
         mode: permissiveWithWarnings
         minWindow: 30s
         maxWindow: 12h
@@ -604,7 +604,7 @@ auth:
 	require.NoError(t, v.UnmarshalKey(inboundConfigKey, &cfg))
 
 	assert.True(t, v.IsSet(rateConfigKey))
-	assert.Equal(t, []string{"x1:webpa:rate:"}, cfg.JWT.Rate.Prefixes)
+	assert.Equal(t, []string{"webpa-prefix-rate:"}, cfg.JWT.Rate.Prefixes)
 	assert.Equal(t, ModePermissiveWithWarnings, cfg.JWT.Rate.Mode)
 	assert.Equal(t, 30*time.Second, cfg.JWT.Rate.MinWindow)
 	assert.Equal(t, 12*time.Hour, cfg.JWT.Rate.MaxWindow)
