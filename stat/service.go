@@ -28,16 +28,16 @@ func NewService(o *ServiceOptions) Service {
 
 // ServiceOptions defines the options needed to build a new stat service.
 type ServiceOptions struct {
-	//Base Endpoint URL for device stats from the XMiDT API.
-	//It's expected to have the "${device}" substring to perform device ID substitution.
+	// Base Endpoint URL for device stats from the XMiDT API.
+	// It's expected to have the "${device}" substring to perform device ID substitution.
 	XmidtStatURL string
 
-	//Auth decorates http requests with authorization header(s).
-	//(Optional)
+	// Auth decorates http requests with authorization header(s).
+	// (Optional)
 	Auth auth.Decorator
 
-	//HTTPTransactor is the component that's responsible to make the HTTP
-	//request to the XMiDT API and return only data we care about.
+	// HTTPTransactor is the component that's responsible to make the HTTP
+	// request to the XMiDT API and return only data we care about.
 	HTTPTransactor transaction.T
 }
 

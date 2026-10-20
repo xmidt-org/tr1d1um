@@ -16,10 +16,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/arrange/arrangehttp"
 )
 
 const testDevicePath = "/api/v3/device/mac:112233445566/config"

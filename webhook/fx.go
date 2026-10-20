@@ -4,10 +4,11 @@
 package webhook
 
 import (
+	"go.uber.org/fx"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/anclafx"
 	"github.com/xmidt-org/tr1d1um/internal/viperfx"
-	"go.uber.org/fx"
 )
 
 const module = "tr1d1um.webhook"

@@ -15,11 +15,14 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
+
 	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/tr1d1um/transaction"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/wrp-go/v5"
 
 	"github.com/xmidt-org/bascule"
@@ -45,10 +48,9 @@ func TestDecodeRequest(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 		r = mux.SetURLVars(r, map[string]string{
-			// nolint: goconst
 			"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
-		assert.Nil(e)
+		require.NoError(t, e)
 		assert.NotEmpty(wrpMsg)
 	})
 
@@ -57,7 +59,7 @@ func TestDecodeRequest(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
 		r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
 		wrpMsg, e := decodeRequest(ctxTID, r)
-		assert.Nil(e)
+		require.NoError(t, e)
 		assert.NotEmpty(wrpMsg)
 	})
 }
@@ -66,15 +68,13 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 	tests := []struct {
 		name                   string
 		tokenType              string
-		attrMap                map[string]interface{}
+		attrMap                map[string]any
 		addPartnerIDsInHeaders bool
 		expectedPartnerIDs     []string
 	}{
 		{
-			name: "Partners from JWT",
-			tokenType:
-			// nolint: goconst
-			"jwt",
+			name:               "Partners from JWT",
+			tokenType:          "jwt",
 			attrMap:            map[string]any{allowedPartners: []string{"partnerA", "partnerB"}},
 			expectedPartnerIDs: []string{"partnerA", "partnerB"},
 		},
@@ -82,7 +82,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		{
 			name:                   "Partners from headers",
 			tokenType:              "sss",
-			attrMap:                map[string]interface{}{},
+			attrMap:                map[string]any{},
 			addPartnerIDsInHeaders: true,
 			expectedPartnerIDs:     []string{"partner0", "partner1"},
 		},
@@ -90,14 +90,14 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 		{
 			name:      "No Patner IDs",
 			tokenType: "jwt",
-			attrMap:   map[string]interface{}{},
+			attrMap:   map[string]any{},
 		},
 
 		{
 			name:      "Wrong type for partners from JWT",
 			tokenType: "jwt",
-			attrMap: map[string]interface{}{
-				"allowedResources": map[string]interface{}{
+			attrMap: map[string]any{
+				"allowedResources": map[string]any{
 					"allowedPartners": map[string]string{"partner-A": "first", "partner-B": "second"},
 				}},
 			addPartnerIDsInHeaders: true,
@@ -124,7 +124,7 @@ func TestDecodeRequestPartnerIDs(t *testing.T) {
 			}
 
 			wrpMsg, e := decodeRequest(ctx, r)
-			assert.NoError(e)
+			require.NoError(t, e)
 			assert.Equal(test.expectedPartnerIDs, wrpMsg.WRPMessage.PartnerIDs)
 		})
 	}
@@ -150,9 +150,9 @@ func TestRequestPayload(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPatch, "http://localhost", bytes.NewBufferString("invalidWDMP"))
 		_, e := requestPayload(r)
 		var err transaction.CodedError
-		assert.True(errors.As(e, &err))
+		require.ErrorAs(t, e, &err)
 		assert.Contains(e.Error(), "invalid WDMP structure")
-		assert.EqualValues(http.StatusBadRequest, err.StatusCode())
+		assert.Equal(http.StatusBadRequest, err.StatusCode())
 
 	})
 
@@ -175,7 +175,6 @@ func TestRequestPayload(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "http://localhost", nil)
 
 		r = mux.SetURLVars(r, map[string]string{
-			// nolint: goconst
 			"service": "add"})
 		_, e := requestPayload(r)
 		assert.EqualValues(ErrMissingTable, e)
@@ -202,7 +201,7 @@ func TestRequestGetPayload(t *testing.T) {
 		assert := assert.New(t)
 
 		p, e := requestGetPayload("n0,n1", "")
-		assert.Nil(e)
+		require.NoError(t, e)
 
 		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGet, Names: []string{"n0", "n1"}})
 
@@ -210,21 +209,21 @@ func TestRequestGetPayload(t *testing.T) {
 			panic(err)
 		}
 
-		assert.EqualValues(expectedBytes, p)
+		assert.Equal(expectedBytes, p)
 	})
 
 	t.Run("NamesAreTrimmed", func(t *testing.T) {
 		assert := assert.New(t)
 
 		p, e := requestGetPayload(" n0 ,, n1,", "")
-		assert.Nil(e)
+		require.NoError(t, e)
 
 		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGet, Names: []string{"n0", "n1"}})
 		if err != nil {
 			panic(err)
 		}
 
-		assert.EqualValues(expectedBytes, p)
+		assert.Equal(expectedBytes, p)
 	})
 
 	t.Run("OnlyBlankNames", func(t *testing.T) {
@@ -239,7 +238,7 @@ func TestRequestGetPayload(t *testing.T) {
 		assert := assert.New(t)
 
 		p, e := requestGetPayload("n0,n1", "attr0")
-		assert.Nil(e)
+		require.NoError(t, e)
 
 		expectedBytes, err := json.Marshal(&getWDMP{Command: CommandGetAttrs, Names: []string{"n0", "n1"}, Attributes: "attr0"})
 
@@ -247,7 +246,7 @@ func TestRequestGetPayload(t *testing.T) {
 			panic(err)
 		}
 
-		assert.EqualValues(expectedBytes, p)
+		assert.Equal(expectedBytes, p)
 	})
 }
 
@@ -277,11 +276,11 @@ func TestRequestSetPayload(t *testing.T) {
 			panic(err)
 		}
 
-		assert.Nil(e)
-		assert.EqualValues(CommandTestSet, wdmp.Command)
-		assert.EqualValues("new", wdmp.NewCid)
-		assert.EqualValues("old", wdmp.OldCid)
-		assert.EqualValues("sync", wdmp.SyncCmc)
+		require.NoError(t, e)
+		assert.Equal(CommandTestSet, wdmp.Command)
+		assert.Equal("new", wdmp.NewCid)
+		assert.Equal("old", wdmp.OldCid)
+		assert.Equal("sync", wdmp.SyncCmc)
 	})
 }
 
@@ -298,7 +297,6 @@ func TestRequestAddPayload(t *testing.T) {
 		assert := assert.New(t)
 
 		p, e := requestAddPayload(map[string]string{
-			// nolint: goconst
 			"parameter": "t0"}, bytes.NewBufferString(""))
 
 		assert.Nil(p)
@@ -318,7 +316,7 @@ func TestRequestAddPayload(t *testing.T) {
 		assert := assert.New(t)
 		p, e := requestAddPayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(`{"row": "r0"}`))
 
-		assert.Nil(e)
+		require.NoError(t, e)
 
 		expected, err := json.Marshal(&addRowWDMP{
 			Command: CommandAddRow,
@@ -330,7 +328,7 @@ func TestRequestAddPayload(t *testing.T) {
 			panic(err)
 		}
 
-		assert.EqualValues(expected, p)
+		assert.Equal(expected, p)
 	})
 }
 
@@ -368,7 +366,7 @@ func TestRequestReplacePayload(t *testing.T) {
 
 		p, e := requestReplacePayload(map[string]string{"parameter": "t0"}, bytes.NewBufferString(rowsPayload))
 
-		assert.Nil(e)
+		require.NoError(t, e)
 
 		expected, err := json.Marshal(&replaceRowsWDMP{
 			Command: CommandReplaceRows,
@@ -380,7 +378,7 @@ func TestRequestReplacePayload(t *testing.T) {
 			panic(err)
 		}
 
-		assert.EqualValues(expected, p)
+		assert.Equal(expected, p)
 	})
 }
 
@@ -405,16 +403,16 @@ func TestRequestDeletePayload(t *testing.T) {
 
 		p, e := requestDeletePayload(map[string]string{"parameter": "0"})
 
-		assert.Nil(e)
-		assert.EqualValues(expected, p)
+		require.NoError(t, e)
+		assert.Equal(expected, p)
 	})
 }
 
 func TestEncodeResponse(t *testing.T) {
 	assert := assert.New(t)
 
-	//XMiDT response status code is not 200.
-	//Tr1d1um should just forward such response code and body
+	// XMiDT response status code is not 200.
+	// Tr1d1um should just forward such response code and body
 	t.Run("StatusNotOK", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		response := &transaction.XmidtResponse{
@@ -425,14 +423,14 @@ func TestEncodeResponse(t *testing.T) {
 
 		err := encodeResponse(ctxTID, recorder, response)
 
-		assert.Nil(err)
-		assert.EqualValues(http.StatusServiceUnavailable, recorder.Code)
-		assert.EqualValues("t", recorder.Body.String())
-		assert.EqualValues("test", recorder.Header().Get("X-test"))
+		require.NoError(t, err)
+		assert.Equal(http.StatusServiceUnavailable, recorder.Code)
+		assert.Equal("t", recorder.Body.String())
+		assert.Equal("test", recorder.Header().Get("X-test"))
 	})
 
-	//XMiDT response is not msgpack-encoded
-	//Since this is not expected, Tr1d1um considers it an internal error case
+	// XMiDT response is not msgpack-encoded
+	// Since this is not expected, Tr1d1um considers it an internal error case
 	t.Run("UnexpectedResponseFormat", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		response := &transaction.XmidtResponse{
@@ -440,11 +438,11 @@ func TestEncodeResponse(t *testing.T) {
 			Body: []byte("t"),
 		}
 
-		assert.NotNil(encodeResponse(ctxTID, recorder, response))
+		assert.Error(encodeResponse(ctxTID, recorder, response))
 	})
 
-	//XMiDt responds with a 200 (OK) with a well-formatted RDK device response
-	//Tr1d1um returns the status provided by the device
+	// XMiDt responds with a 200 (OK) with a well-formatted RDK device response
+	// Tr1d1um returns the status provided by the device
 	t.Run("RDKDeviceResponse", func(t *testing.T) {
 		tests := []struct {
 			resp               *transaction.XmidtResponse
@@ -500,15 +498,15 @@ func TestEncodeResponse(t *testing.T) {
 			t.Run(fmt.Sprintf("statusCode:%d", tc.expectedStatusCode), func(t *testing.T) {
 				recorder := httptest.NewRecorder()
 				err := encodeResponse(ctxTID, recorder, tc.resp)
-				assert.Nil(err)
-				assert.EqualValues(tc.expectedStatusCode, recorder.Code)
-				assert.EqualValues(fmt.Sprintf(`{"statusCode": %d}`, tc.deviceStatusCode), recorder.Body.String())
+				require.NoError(t, err)
+				assert.Equal(tc.expectedStatusCode, recorder.Code)
+				assert.Equal(fmt.Sprintf(`{"statusCode": %d}`, tc.deviceStatusCode), recorder.Body.String())
 			})
 		}
 	})
 
-	//RDK device is having an internal error and returns 500.
-	//Tr1d1um, in order to avoid ambiguity, should not return 500.
+	// RDK device is having an internal error and returns 500.
+	// Tr1d1um, in order to avoid ambiguity, should not return 500.
 	//Rationale: Tr1d1um is not the one having an internal error, it is the device.
 	t.Run("InternalRDKDeviceError", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
@@ -522,13 +520,13 @@ func TestEncodeResponse(t *testing.T) {
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
-		assert.Nil(err)
-		assert.EqualValues(http.StatusOK, recorder.Code)
-		assert.EqualValues(internalErrorResponse, recorder.Body.Bytes())
+		require.NoError(t, err)
+		assert.Equal(http.StatusOK, recorder.Code)
+		assert.Equal(internalErrorResponse, recorder.Body.Bytes())
 	})
 
-	//For whatever reason, the device may respond with incomplete or unexpected data
-	//In such case, Tr1d1um just forwards as much as it could from the device
+	// For whatever reason, the device may respond with incomplete or unexpected data
+	// In such case, Tr1d1um just forwards as much as it could from the device
 	t.Run("BadRDKDeviceResponse", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
@@ -541,9 +539,9 @@ func TestEncodeResponse(t *testing.T) {
 		}
 
 		err := encodeResponse(ctxTID, recorder, response)
-		assert.Nil(err)
-		assert.EqualValues(http.StatusOK, recorder.Code)
-		assert.EqualValues(`{"statusCode":`, recorder.Body.String())
+		require.NoError(t, err)
+		assert.Equal(http.StatusOK, recorder.Code)
+		assert.Equal(`{"statusCode":`, recorder.Body.String())
 	})
 }
 
@@ -564,12 +562,11 @@ func TestEncodeError(t *testing.T) {
 
 			expected := bytes.NewBufferString("")
 			json.NewEncoder(expected).Encode(map[string]string{
-				// nolint: goconst
 				"message": e.Error()})
 
 			encodeError(ctxTID, e, w)
-			assert.EqualValues(expected.String(), w.Body.String())
-			assert.EqualValues(http.StatusBadRequest, w.Code)
+			assert.Equal(expected.String(), w.Body.String())
+			assert.Equal(http.StatusBadRequest, w.Code)
 		}
 	})
 
@@ -587,8 +584,8 @@ func TestEncodeError(t *testing.T) {
 				"message": e.Error()})
 
 			encodeError(ctxTID, e, w)
-			assert.EqualValues(expected.String(), w.Body.String())
-			assert.EqualValues(http.StatusServiceUnavailable, w.Code)
+			assert.Equal(expected.String(), w.Body.String())
+			assert.Equal(http.StatusServiceUnavailable, w.Code)
 		}
 	})
 
@@ -602,7 +599,7 @@ func TestEncodeError(t *testing.T) {
 		json.NewEncoder(expected).Encode(map[string]string{
 			"message": transaction.ErrTr1d1umInternal.Error()})
 
-		assert.EqualValues(expected.String(), w.Body.String())
+		assert.Equal(expected.String(), w.Body.String())
 	})
 }
 

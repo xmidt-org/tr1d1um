@@ -16,9 +16,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tokenrate"
-	"go.uber.org/zap"
 )
 
 const rateConfigKey = "auth.inbound.JWT.Rate"

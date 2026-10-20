@@ -16,6 +16,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/spf13/viper"
+
 	"github.com/xmidt-org/bascule/basculehttp"
 )
 
@@ -134,7 +135,7 @@ func (bearer *bearerDecorator) Decorate(ctx context.Context, req *http.Request) 
 	bearer.lock.Lock()
 	defer bearer.lock.Unlock()
 
-	req, err := http.NewRequest("GET", bearer.url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bearer.url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create new request for Bearer: %v", err)
 	}

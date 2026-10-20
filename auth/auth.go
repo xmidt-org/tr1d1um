@@ -19,11 +19,12 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/basculehttp/basculecaps"
 	"github.com/xmidt-org/bascule/basculejwt"
-	"go.uber.org/zap"
 )
 
 const (

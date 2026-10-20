@@ -15,17 +15,17 @@ var (
 	ErrInvalidService    = transaction.NewBadRequestError(errors.New("unsupported Service"))
 	ErrUnsupportedMethod = transaction.NewBadRequestError(errors.New("unsupported method. Could not decode request payload"))
 
-	//Set command errors
+	// Set command errors
 	ErrInvalidSetWDMP = transaction.NewBadRequestError(errors.New("invalid SET message"))
 	ErrNewCIDRequired = transaction.NewBadRequestError(errors.New("newCid is required for TEST_AND_SET"))
 
-	//Add/Delete command  errors
+	// Add/Delete command  errors
 	ErrMissingTable   = transaction.NewBadRequestError(errors.New("table property is required"))
 	ErrMissingRow     = transaction.NewBadRequestError(errors.New("row property is required"))
 	ErrInvalidRow     = transaction.NewBadRequestError(errors.New("row property is invalid"))
 	ErrInvalidPayload = transaction.NewBadRequestError(errors.New("payload is invalid"))
 
-	//Replace command error
+	// Replace command error
 	ErrMissingRows = transaction.NewBadRequestError(errors.New("rows property is required"))
 	ErrInvalidRows = transaction.NewBadRequestError(errors.New("rows property is invalid"))
 )

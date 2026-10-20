@@ -7,14 +7,16 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tr1d1um/paramfilter"
-	"go.uber.org/zap"
 )
 
 const paramConfigKey = "auth.inbound.JWT.Param"
@@ -140,14 +142,14 @@ func parseParamCapability(text string) (paramCapability, error) {
 		return paramCapability{}, fmt.Errorf("empty pattern in %q", text)
 	}
 
-	cap := paramCapability{subtree: strings.HasSuffix(pattern, "**")}
+	pcap := paramCapability{subtree: strings.HasSuffix(pattern, "**")}
 	switch Operation(op) {
 	case OperationRead:
-		cap.read = true
+		pcap.read = true
 	case OperationWrite:
-		cap.write = true
+		pcap.write = true
 	case operationAll:
-		cap.read, cap.write = true, true
+		pcap.read, pcap.write = true, true
 	default:
 		return paramCapability{}, fmt.Errorf("unknown operation %q in %q", op, text)
 	}
@@ -157,9 +159,9 @@ func parseParamCapability(text string) (paramCapability, error) {
 		return paramCapability{}, fmt.Errorf("bad pattern %q: %w", pattern, err)
 	}
 
-	cap.pattern = re
+	pcap.pattern = re
 
-	return cap, nil
+	return pcap, nil
 }
 
 // parsedParamCapability is a capability string matched against the prefixes.
@@ -202,22 +204,20 @@ func newParamCheck(cfg paramConfig, l *zap.Logger, counter, warnings *prometheus
 		return nil, fmt.Errorf("`%s.Prefixes`: at least one parameter capability prefix is required", paramConfigKey)
 	}
 
-	for _, p := range cfg.Prefixes {
-		if p == "" {
-			return nil, fmt.Errorf("`%s.Prefixes`: a prefix cannot be empty", paramConfigKey)
-		}
+	if slices.Contains(cfg.Prefixes, "") {
+		return nil, fmt.Errorf("`%s.Prefixes`: a prefix cannot be empty", paramConfigKey)
 	}
 
 	overrides := make(map[string][]paramCapability, len(cfg.Overrides))
 	for principal, texts := range cfg.Overrides {
 		caps := make([]paramCapability, 0, len(texts))
 		for i, text := range texts {
-			cap, err := parseParamCapability(strings.TrimSpace(text))
+			pcap, err := parseParamCapability(strings.TrimSpace(text))
 			if err != nil {
 				return nil, fmt.Errorf("`%s.Overrides[%q][%d]`: %w", paramConfigKey, principal, i, err)
 			}
 
-			caps = append(caps, cap)
+			caps = append(caps, pcap)
 		}
 
 		overrides[strings.ToLower(principal)] = caps
@@ -337,8 +337,8 @@ func (c *ParamCheck) check(token bascule.Token, req ParamRequest) paramDecision 
 
 // allowed reports whether any capability lets op be done to name.
 func allowed(caps []paramCapability, op Operation, name string) bool {
-	for _, cap := range caps {
-		if cap.allows(op, name) {
+	for _, pcap := range caps {
+		if pcap.allows(op, name) {
 			return true
 		}
 	}
@@ -364,11 +364,11 @@ func (c *ParamCheck) parse(capability string) parsedParamCapability {
 		}
 
 		parsed.selected = true
-		cap, err := parseParamCapability(text)
+		pcap, err := parseParamCapability(text)
 		if err != nil {
 			parsed.malformed = true
 		} else {
-			parsed.paramCapability = cap
+			parsed.paramCapability = pcap
 		}
 
 		break

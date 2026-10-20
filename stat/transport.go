@@ -9,11 +9,12 @@ import (
 	"errors"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
-	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -32,7 +33,7 @@ var (
 type Options struct {
 	S Service
 
-	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
+	// APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
 	APIRouter                   *mux.Router
 	Authenticate                *alice.Chain
 	Log                         *zap.Logger
@@ -81,19 +82,18 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	w.Header().Set(candlelight.HeaderWPATIDKeyName, ctxKeyReqTID)
-	var ce transaction.CodedError
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[transaction.CodedError](err); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
-		//the real error is logged into our system before encodeError() is called
-		//the idea behind masking it is to not send the external API consumer internal error messages
+		// the real error is logged into our system before encodeError() is called
+		// the idea behind masking it is to not send the external API consumer internal error messages
 		err = transaction.ErrTr1d1umInternal
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		// nolint: goconst
+	// The status is already written; a failed body write cannot be reported.
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"message": err.Error(),
 	})
 }

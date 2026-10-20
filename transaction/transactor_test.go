@@ -18,12 +18,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/sallust"
 )
 
 func TestTransactError(t *testing.T) {
@@ -54,11 +55,11 @@ func TestTransactIdeal(t *testing.T) {
 	}
 
 	rawXmidtResponse := &http.Response{
-		StatusCode: 404,
+		StatusCode: http.StatusNotFound,
 		Body:       io.NopCloser(bytes.NewBufferString("not found")),
 		Header: http.Header{
-			"X-A": []string{"a", "b"}, //should be forwarded
-			"Y-A": []string{"c", "d"}, //should be ignored
+			"X-A": []string{"a", "b"}, // should be forwarded
+			"Y-A": []string{"c", "d"}, // should be ignored
 		},
 	}
 
@@ -70,8 +71,8 @@ func TestTransactIdeal(t *testing.T) {
 
 	r := httptest.NewRequest(http.MethodGet, "localhost:6003/test", nil)
 	actual, e := transactor.Transact(r)
-	assert.Nil(e)
-	assert.EqualValues(expected, actual)
+	require.NoError(t, e)
+	assert.Equal(expected, actual)
 }
 
 func TestForwardHeadersByPrefix(t *testing.T) {
@@ -95,7 +96,7 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		ForwardHeadersByPrefix("He", from, to)
 		assert.NotEmpty(to)
 		assert.Len(to, 1)
-		assert.EqualValues("3", to.Get("Helium"))
+		assert.Equal("3", to.Get("Helium"))
 	})
 
 	t.Run("MultipleHeadersFilteredFullArray", func(t *testing.T) {
@@ -110,12 +111,12 @@ func TestForwardHeadersByPrefix(t *testing.T) {
 		ForwardHeadersByPrefix("H", from, to)
 		assert.NotEmpty(to)
 		assert.Len(to, 2)
-		assert.EqualValues([]string{"5", "6"}, to["Hydrogen"])
+		assert.Equal([]string{"5", "6"}, to["Hydrogen"])
 	})
 
 	t.Run("NilCases", func(t *testing.T) {
 		var to, from = make(http.Header), make(http.Header)
-		//none of these should panic
+		// none of these should panic
 		ForwardHeadersByPrefix("", nil, nil)
 		ForwardHeadersByPrefix("", from, nil)
 		ForwardHeadersByPrefix("", from, to)
@@ -149,12 +150,13 @@ func TestWelcome(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
-			require := require.New(t)
 			handler := http.HandlerFunc(
 				func(_ http.ResponseWriter, r *http.Request) {
 					assert.NotNil(r.Context().Value(ContextKeyRequestArrivalTime))
 					tid := r.Context().Value(ContextKeyRequestTID)
-					require.NotNil(tid)
+					if !assert.NotNil(tid) {
+						return
+					}
 					tid = tid.(string)
 					if assert.NotZero(tid) && tc.expectedTID != "" {
 						assert.Equal(tc.expectedTID, tid)
@@ -232,7 +234,6 @@ func TestAddDeviceIdToLog(t *testing.T) {
 			ctx:  context.Background(),
 			req: func() (r *http.Request) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
-				// nolint: goconst
 				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445577"})
 				return
 			},
@@ -245,7 +246,6 @@ func TestAddDeviceIdToLog(t *testing.T) {
 				r = httptest.NewRequest(http.MethodGet, "http://localhost:6100/api/v2/device/", nil)
 				return
 			},
-			// nolint: goconst
 			deviceid: "mac:000000000000",
 		},
 	}
@@ -324,10 +324,9 @@ func TestAddBearerFingerprintToLog(t *testing.T) {
 			expected: map[string]any{"suffix": "1234567890"},
 		},
 		{
-			desc:   "sha only",
-			cfg:    FingerprintConfig{SHA256: true},
-			header: "Bearer " + token,
-			// nolint: goconst
+			desc:     "sha only",
+			cfg:      FingerprintConfig{SHA256: true},
+			header:   "Bearer " + token,
 			expected: map[string]any{"sha": sha},
 		},
 		{

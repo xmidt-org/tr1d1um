@@ -10,24 +10,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/sallust"
 )
 
 func TestNewCodedError(t *testing.T) {
 	assert := assert.New(t)
 	var ce = NewCodedError(errors.New("test"), 500)
 	assert.NotNil(ce)
-	assert.EqualValues(500, ce.StatusCode())
-	assert.EqualValues("test", ce.Error())
+	assert.Equal(500, ce.StatusCode())
+	assert.Equal("test", ce.Error())
 }
 
 func TestBadRequestError(t *testing.T) {
 	assert := assert.New(t)
 	var ce = NewBadRequestError(errors.New("test"))
 	assert.NotNil(ce)
-	assert.EqualValues(400, ce.StatusCode())
-	assert.EqualValues("test", ce.Error())
+	assert.Equal(400, ce.StatusCode())
+	assert.Equal("test", ce.Error())
 }
 
 func TestErrorLogEncoder(t *testing.T) {
@@ -55,12 +56,12 @@ func TestErrorLogEncoder(t *testing.T) {
 
 			if tc.getLogger == nil {
 				assert.Panics(func() {
-					//assumes TID is context
+					// assumes TID is context
 					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
 				})
 			} else {
 				assert.NotPanics(func() {
-					//assumes TID is context
+					// assumes TID is context
 					le(context.WithValue(context.TODO(), ContextKeyRequestTID, "tid00"), errors.New("test"), nil)
 				})
 			}

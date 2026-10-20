@@ -16,6 +16,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/arrange/arrangehttp"
@@ -32,9 +36,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
 	webhook "github.com/xmidt-org/webhook-schema"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 var (
@@ -300,10 +301,7 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 
 	hooks := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)
 	hook := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)
-	fixV2Middleware, err := fixV2Duration(in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
-	if err != nil {
-		return fmt.Errorf("failed to initialize v2 endpoint middleware: %v", err)
-	}
+	fixV2Middleware := fixV2Duration(in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
 
 	in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(hook))).Methods(http.MethodPost)
 	in.APIRouter.Handle("/hooks", in.AuthChain.Then(hooks)).Methods(http.MethodGet)
@@ -351,15 +349,14 @@ func buildAPIAltRouter(in apiAltRouterIn) {
 func provideURLPrefix(in provideURLPrefixIn) string {
 	// if we want to support the previous API version, then include it in the
 	// api base.
-	urlPrefix := fmt.Sprintf("/%s", apiBase)
+	urlPrefix := "/" + apiBase
 	if in.PrevVerSupport {
-		urlPrefix = fmt.Sprintf("/%s", apiBaseDualVersion)
+		urlPrefix = "/" + apiBaseDualVersion
 	}
 	return urlPrefix
 }
 
-//nolint:funlen
-func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) (alice.Constructor, error) {
+func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) alice.Constructor {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
@@ -390,8 +387,7 @@ func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) (alice.Cons
 			var wr webhook.RegistrationV1
 			err = json.Unmarshal(requestPayload, &wr)
 			if err != nil {
-				var e *json.UnmarshalTypeError
-				if errors.As(err, &e) {
+				if e, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 					v2ErrEncode(w, logger,
 						fmt.Errorf("%w: %v must be of type %v", errFailedWebhookUnmarshal, e.Field, e.Type),
 						http.StatusBadRequest)
@@ -439,7 +435,7 @@ func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) (alice.Cons
 			}
 			v2Handler.ServeHTTP(w, r)
 		})
-	}, nil
+	}
 }
 
 func v2ErrEncode(w http.ResponseWriter, logger *zap.Logger, err error, code int) {
@@ -451,8 +447,8 @@ func v2ErrEncode(w http.ResponseWriter, logger *zap.Logger, err error, code int)
 
 	w.WriteHeader(code)
 
-	json.NewEncoder(w).Encode(
-		map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(
+		map[string]any{
 			"message": err.Error(),
 		})
 }

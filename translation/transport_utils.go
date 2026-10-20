@@ -10,14 +10,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/paramfilter"
 	"github.com/xmidt-org/tr1d1um/transaction"
-	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
+
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/wrp-go/v5"
 )
@@ -41,12 +44,12 @@ func deduceSET(wdmp *setWDMP, newCID, oldCID, syncCMC string) (err error) {
 // isValidSetWDMP helps verify a given Set WDMP object is valid for its context
 func isValidSetWDMP(wdmp *setWDMP) (isValid bool) {
 	if len(wdmp.Parameters) == 0 {
-		return wdmp.Command == CommandTestSet //TEST_AND_SET can have empty parameters
+		return wdmp.Command == CommandTestSet // TEST_AND_SET can have empty parameters
 	}
 
 	var cmdSetAttr, cmdSet = 0, 0
 
-	//validate parameters if it exists, even for TEST_SET
+	// validate parameters if it exists, even for TEST_SET
 	for _, param := range wdmp.Parameters {
 		if param.Name == nil || *param.Name == "" {
 			return
@@ -128,7 +131,7 @@ func loadWDMP(encodedWDMP []byte, newCID, oldCID, syncCMC string) (*setWDMP, err
 
 	err := json.Unmarshal(encodedWDMP, wdmp)
 
-	if err != nil && len(encodedWDMP) > 0 { //len(encodedWDMP) == 0 is ok as it is used for TEST_SET
+	if err != nil && len(encodedWDMP) > 0 { // len(encodedWDMP) == 0 is ok as it is used for TEST_SET
 		return nil, transaction.NewBadRequestError(fmt.Errorf("invalid WDMP structure: %s", err))
 	}
 
@@ -286,10 +289,5 @@ func getParamNames(params []setParam) (paramNames []string) {
 }
 
 func contains(i string, elements []string) bool {
-	for _, e := range elements {
-		if e == i {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(elements, i)
 }

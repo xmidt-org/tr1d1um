@@ -11,10 +11,11 @@ import (
 	"net/http"
 
 	"github.com/spf13/cast"
+	"go.uber.org/multierr"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/basculejwt"
-	"go.uber.org/multierr"
 )
 
 const (

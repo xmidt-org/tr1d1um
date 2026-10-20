@@ -12,17 +12,19 @@ import (
 	"runtime"
 	"time"
 
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/internal/viperfx"
 	"github.com/xmidt-org/tr1d1um/webhook"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
-	"go.uber.org/zap"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
 	"github.com/xmidt-org/candlelight"
 )
 
@@ -61,7 +63,7 @@ var (
 	Commit  string
 )
 
-var defaults = map[string]interface{}{
+var defaults = map[string]any{
 	translationServicesKey: []string{}, // no services allowed by the default
 	targetURLKey:           "localhost:6000",
 	netDialerTimeoutKey:    "5s",

@@ -15,14 +15,15 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/ancla/auth"
 	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/clortho/clorthofx"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/tr1d1um/internal/viperfx"
-	"go.uber.org/fx"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
 )
 
 const module = "tr1d1um.auth"

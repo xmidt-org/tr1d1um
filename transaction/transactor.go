@@ -12,15 +12,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v5"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // bearerFingerprint is the nested log object emitted when credential
@@ -44,13 +46,13 @@ func (c bearerFingerprint) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 // the XMiDT API
 type XmidtResponse struct {
 
-	//Code is the HTTP Status code received from the transaction
+	// Code is the HTTP Status code received from the transaction
 	Code int
 
-	//ForwardedHeaders contains all the headers tr1d1um keeps from the transaction
+	// ForwardedHeaders contains all the headers tr1d1um keeps from the transaction
 	ForwardedHeaders http.Header
 
-	//Body represents the full data off the XMiDT http.Response body
+	// Body represents the full data off the XMiDT http.Response body
 	Body []byte
 }
 
@@ -64,10 +66,10 @@ type T interface {
 
 // Options include parameters needed to configure the transactor
 type Options struct {
-	//RequestTimeout is the deadline duration for the HTTP transaction to be completed
+	// RequestTimeout is the deadline duration for the HTTP transaction to be completed
 	RequestTimeout time.Duration
 
-	//Do is the core responsible to perform the actual HTTP request
+	// Do is the core responsible to perform the actual HTTP request
 	Do func(*http.Request) (*http.Response, error)
 }
 
@@ -84,8 +86,8 @@ type Request struct {
 }
 
 type response struct {
-	Code    int         `json:"code,omitempty"`
-	Headers interface{} `json:"headers,omitempty"`
+	Code    int `json:"code,omitempty"`
+	Headers any `json:"headers,omitempty"`
 }
 
 func (re *Request) MarshalJSON() ([]byte, error) {
@@ -123,7 +125,7 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 		return
 	}
 
-	//Timeout, network errors, etc.
+	// Timeout, network errors, etc.
 	err = NewCodedError(err, http.StatusServiceUnavailable)
 	return
 }
@@ -152,11 +154,8 @@ func Log(reducedLoggingResponseCodes []int) FinalizerFunc {
 		includeHeaders := true
 		response := response{Code: code}
 
-		for _, responseCode := range reducedLoggingResponseCodes {
-			if responseCode == code {
-				includeHeaders = false
-				break
-			}
+		if slices.Contains(reducedLoggingResponseCodes, code) {
+			includeHeaders = false
 		}
 
 		if includeHeaders {
@@ -285,7 +284,6 @@ func getDeviceId(r *http.Request) string {
 	vars := mux.Vars(r)
 	id := vars["deviceid"]
 	if id == "" {
-		// nolint: goconst
 		id = "mac:000000000000"
 	}
 

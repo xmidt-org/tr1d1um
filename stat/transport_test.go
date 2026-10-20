@@ -18,6 +18,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var ctxTID = context.WithValue(context.Background(), transaction.ContextKeyRequestTID, "testTID")
@@ -48,7 +49,7 @@ func TestDecodeRequest(t *testing.T) {
 
 		resp, err := decodeRequest(ctxTID, r)
 
-		assert.Nil(err)
+		require.NoError(t, err)
 
 		assert.Equal(&statRequest{
 			DeviceID: "mac:112233445566",
@@ -75,7 +76,6 @@ func TestEncodeError(t *testing.T) {
 
 		json.NewEncoder(expected).Encode(
 			map[string]string{
-				// nolint: goconst
 				"message": transaction.ErrTr1d1umInternal.Error(),
 			},
 		)
@@ -83,12 +83,13 @@ func TestEncodeError(t *testing.T) {
 		w := httptest.NewRecorder()
 		encodeError(ctxTID, errors.New("tremendously unexpected internal error"), w)
 
-		assert.EqualValues(http.StatusInternalServerError, w.Code)
-		assert.EqualValues(expected.String(), w.Body.String())
+		assert.Equal(http.StatusInternalServerError, w.Code)
+		assert.Equal(expected.String(), w.Body.String())
 	})
 }
 
 func testErrorEncode(t *testing.T, expectedCode int, es []error) {
+	t.Helper()
 	assert := assert.New(t)
 
 	for _, e := range es {
@@ -102,8 +103,8 @@ func testErrorEncode(t *testing.T, expectedCode int, es []error) {
 		w := httptest.NewRecorder()
 		encodeError(ctxTID, e, w)
 
-		assert.EqualValues(expectedCode, w.Code)
-		assert.EqualValues(expected.String(), w.Body.String())
+		assert.Equal(expectedCode, w.Code)
+		assert.Equal(expected.String(), w.Body.String())
 	}
 }
 
@@ -142,18 +143,18 @@ func TestEncodeResponse(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert := assert.New(t)
-			//Tr1d1um just forwards the response
+			// Tr1d1um just forwards the response
 			var e = encodeResponse(ctxTID, tc.respRecorder, tc.resp)
 			if tc.expectedErr != nil {
-				assert.True(errors.Is(e, tc.expectedErr),
+				assert.ErrorIs(e, tc.expectedErr,
 					fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain",
 						e, tc.expectedErr))
 				return
 			}
-			assert.Nil(e)
-			assert.EqualValues(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
+			require.NoError(t, e)
+			assert.Equal(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
 			assert.EqualValues(tc.resp.Body, tc.respRecorder.Body.String())
-			assert.EqualValues(tc.resp.Code, tc.respRecorder.Code)
+			assert.Equal(tc.resp.Code, tc.respRecorder.Code)
 		})
 	}
 }

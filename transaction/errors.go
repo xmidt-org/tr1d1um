@@ -54,8 +54,7 @@ func NewCodedError(e error, code int) CodedError {
 func ErrorLogEncoder(getLogger func(context.Context) *zap.Logger, ee ErrorEncoder) ErrorEncoder {
 	return func(ctx context.Context, e error, w http.ResponseWriter) {
 		code := http.StatusInternalServerError
-		var ce CodedError
-		if errors.As(e, &ce) {
+		if ce, ok := errors.AsType[CodedError](e); ok {
 			code = ce.StatusCode()
 		}
 
