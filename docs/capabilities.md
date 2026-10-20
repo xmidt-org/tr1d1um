@@ -292,7 +292,7 @@ endpoint settings at the top level of `auth.inbound.jwt`. Every kind takes
 | `trustedProxies`     | cidr  | Networks of the hops you operate, such as load balancers. List them, or every request will appear to come from the balancer. Each entry is a network; a single host is `/32` or `/128`. |
 | `defaults`           | rate  | Rates for any caller whose token carries no rate and who has no override. Each such caller gets its own allowance. Set them to hold everyone to something before issuers add rates to tokens. With none, such a caller is unlimited. |
 | `minWindow`, `maxWindow` | rate | The bounds a token's window is held within. Default `1m` and `24h`.                                                                                                                 |
-| `overrides`          | rate, param | Capabilities for one caller, keyed by principal, written without the prefix. An override replaces whatever the caller's tokens say, looser or stricter. An empty list makes the caller unrestricted on that kind. |
+| `overrides`          | cidr, rate, param | Capabilities for one caller, keyed by principal, written without the prefix (for cidr, just the networks). An override replaces whatever the caller's tokens say, looser or stricter. An empty list makes the caller unrestricted on that kind; in a cidr required mode it leaves the caller with no network, so they are refused. |
 | `maxAge`             | param | How long a token carrying a given parameter capability is honored. See below.                                                                                                           |
 
 Defaults and overrides are used as written; the window bounds do not apply

@@ -384,6 +384,22 @@ auth:
     #     trustedProxies:
     #       - "10.0.0.0/8"
     #
+    #     # overrides set the networks for particular callers here, by the
+    #     # token's principal (sub).  An override replaces whatever CIDR
+    #     # capabilities the caller's tokens carry, wider or narrower.  An
+    #     # empty list leaves the caller with no network, so they are
+    #     # unrestricted, or refused in a required mode.  Every entry must
+    #     # be a network: a single host is written /32 or /128.
+    #     # (Optional)
+    #     #
+    #     # NOTE: the keys are NOT case sensitive.  The configuration
+    #     # loader lowercases every map key, so "PartnerX" and "partnerx"
+    #     # are the same caller, and a principal is matched to its override
+    #     # without regard to case.
+    #     overrides:
+    #       "partner-x": ["203.0.113.0/24", "2001:db8::/32"]
+    #       "exempt-caller": []
+    #
     #   # rate holds a token's bearer to the rates its rate capabilities
     #   # name, for example "webpa-prefix-rate:50/1m": at most <count> calls per
     #   # <window> against this instance.  The window is a Go duration such
