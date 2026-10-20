@@ -30,7 +30,6 @@ import (
 
 // convenient global values
 const (
-	DefaultKeyID       = "current"
 	apiVersion         = "v3"
 	prevAPIVersion     = "v2"
 	applicationName    = "tr1d1um"
@@ -84,17 +83,6 @@ type TracingConfigIn struct {
 	fx.In
 	TracingConfig candlelight.Config
 	Logger        *zap.Logger
-}
-
-type ConstOut struct {
-	fx.Out
-	DefaultKeyID string `name:"default_key_id"`
-}
-
-func consts() ConstOut {
-	return ConstOut{
-		DefaultKeyID: DefaultKeyID,
-	}
 }
 
 func configureXmidtClientTimeout(in XmidtClientTimeoutConfigIn) httpClientTimeout {
@@ -159,7 +147,6 @@ func newApp(v *viper.Viper, l *zap.Logger) fx.Option {
 		touchhttp.Provide(),
 		provideMetrics(),
 		fx.Provide(
-			consts,
 			viperfx.Unmarshal(tracingConfigKey, candlelight.Config{}),
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
@@ -175,6 +162,10 @@ func newApp(v *viper.Viper, l *zap.Logger) fx.Option {
 
 func tr1d1um(arguments []string) (exitCode int) {
 	fs, err := parseFlags(arguments)
+	if errors.Is(err, pflag.ErrHelp) {
+		// pflag has printed the usage, which is what was asked for
+		return 0
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -193,16 +184,12 @@ func tr1d1um(arguments []string) (exitCode int) {
 
 	app := fx.New(newApp(v, l))
 
-	switch err := app.Err(); {
-	case errors.Is(err, pflag.ErrHelp):
-		return
-	case err == nil:
-		app.Run()
-	default:
+	if err := app.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 
+	app.Run()
 	return 0
 }
 
