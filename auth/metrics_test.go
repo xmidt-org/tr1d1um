@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -149,7 +150,7 @@ func TestAuthenticatorEvent_GetLabels(t *testing.T) {
 			})
 
 			assert.Equal(t, map[string]string{
-				ClientIDLabel:  "user",
+				ClientIDLabel:  Unauthenticated,
 				PartnerIDLabel: "",
 				EndpointLabel:  NoneEndpoint,
 				MethodLabel:    http.MethodPost,
@@ -168,6 +169,50 @@ func TestAuthenticatorEvent_GetLabels(t *testing.T) {
 		assert.Empty(t, got[ClientIDLabel])
 		assert.Empty(t, got[PartnerIDLabel])
 		assert.Equal(t, AuthMissingCreds, got[ReasonLabel])
+	})
+
+	t.Run("jwt rejected for its claims", func(t *testing.T) {
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source:       httptest.NewRequest(http.MethodGet, "/", nil),
+			InvalidToken: testClaimsToken(t, map[string]any{allowedResources: partners("partner-a")}),
+			Err:          basculejwt.ErrExpired,
+		})
+
+		assert.Equal(t, "client", got[ClientIDLabel])
+		assert.Equal(t, "partner-a", got[PartnerIDLabel])
+		assert.Equal(t, AuthUnsatifiedExp, got[ReasonLabel])
+	})
+
+	t.Run("token wins over the invalid token", func(t *testing.T) {
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source:       httptest.NewRequest(http.MethodGet, "/", nil),
+			Token:        testClaimsToken(t, nil),
+			InvalidToken: testBasicToken{user: "other"},
+			Err:          errAuthEmptyPrincipal,
+		})
+
+		assert.Equal(t, "client", got[ClientIDLabel])
+	})
+
+	t.Run("invalid basic token", func(t *testing.T) {
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source:       httptest.NewRequest(http.MethodGet, "/", nil),
+			InvalidToken: testBasicToken{user: "user"},
+			Err:          bascule.ErrBadCredentials,
+		})
+
+		assert.Equal(t, Unauthenticated, got[ClientIDLabel])
+	})
+
+	t.Run("verified jwt token", func(t *testing.T) {
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source: httptest.NewRequest(http.MethodGet, "/", nil),
+			Token:  testClaimsToken(t, map[string]any{allowedResources: partners("partner-a")}),
+			Err:    errAuthEmptyPrincipal,
+		})
+
+		assert.Equal(t, "client", got[ClientIDLabel])
+		assert.Equal(t, "partner-a", got[PartnerIDLabel])
 	})
 }
 
@@ -198,8 +243,14 @@ func TestAuthorizerEvent_GetLabels(t *testing.T) {
 				Err:      fmt.Errorf("wrapped: %w", tc.err),
 			})
 
+			// a basic user name is unverified when its credentials are bad
+			client := "user"
+			if tc.want == AuthBadCreds {
+				client = Unauthenticated
+			}
+
 			assert.Equal(t, map[string]string{
-				ClientIDLabel:  "user",
+				ClientIDLabel:  client,
 				PartnerIDLabel: "",
 				EndpointLabel:  NoneEndpoint,
 				MethodLabel:    http.MethodPatch,
@@ -404,9 +455,76 @@ func TestNewMiddleware_InvalidUTF8Principal(t *testing.T) {
 	assert.Equal(t, float64(1), testutil.ToFloat64(checks.With(prometheus.Labels{
 		OutcomeLabel:   Rejected,
 		ReasonLabel:    AuthBadCreds,
-		ClientIDLabel:  "\uFFFD",
+		ClientIDLabel:  Unauthenticated,
 		PartnerIDLabel: EmptyLabelValue,
 		EndpointLabel:  NoneEndpoint,
 		MethodLabel:    http.MethodGet,
 	})))
+}
+
+// TestNewMiddleware_RejectedJWTLabels checks, through the whole chain, that a
+// JWT turned away for its claims is counted by the client it came from, since
+// its signature verified, and that one whose signature did not verify is not.
+func TestNewMiddleware_RejectedJWTLabels(t *testing.T) {
+	keys := newTestKeys(t)
+	other := newTestKeys(t)
+	claims := map[string]any{allowedResources: partners(testPartner)}
+	past := time.Now().Add(-time.Hour)
+	v := viper.New()
+	v.Set(jwtPrefixesKey, []string{testPrefix})
+	cfg := inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}}}
+
+	tests := []struct {
+		name    string
+		bearer  string
+		reason  string
+		client  string
+		partner string
+	}{
+		{
+			name:    "expired, signature verified",
+			bearer:  keys.sign(t, testKeyID, past, claims),
+			reason:  AuthUnsatifiedExp,
+			client:  testPrincipal,
+			partner: testPartner,
+		}, {
+			name:    "expired, signed by an unknown key",
+			bearer:  other.sign(t, testKeyID, past, claims),
+			reason:  AuthCannotVerify,
+			client:  EmptyLabelValue,
+			partner: EmptyLabelValue,
+		}, {
+			name:    "expired, naming an unknown key id",
+			bearer:  keys.sign(t, "nope", past, claims),
+			reason:  AuthKeyNotFind,
+			client:  EmptyLabelValue,
+			partner: EmptyLabelValue,
+		}, {
+			name:    "malformed",
+			bearer:  "not.a.jwt",
+			reason:  AuthCannotVerify,
+			client:  EmptyLabelValue,
+			partner: EmptyLabelValue,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mw, checks, _ := protectCounting(t, cfg, v, keys.provider)
+
+			rec := serveRequest(t, mw, func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tc.bearer) })
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+			// counted first, since looking a series up creates it
+			assert.Equal(t, 1, testutil.CollectAndCount(checks), "only that series is recorded")
+			assert.Equal(t, float64(1), testutil.ToFloat64(checks.With(prometheus.Labels{
+				OutcomeLabel:   Rejected,
+				ReasonLabel:    tc.reason,
+				ClientIDLabel:  tc.client,
+				PartnerIDLabel: tc.partner,
+				EndpointLabel:  NoneEndpoint,
+				MethodLabel:    http.MethodGet,
+			})))
+		})
+	}
 }

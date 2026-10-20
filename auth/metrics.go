@@ -58,6 +58,11 @@ const (
 	// a series reads clearly.
 	EmptyLabelValue = "empty"
 
+	// Unauthenticated is recorded as the client of a rejected request whose
+	// credentials were never verified, such as an unknown basic auth user.
+	// Recording the caller's value would let any caller add series.
+	Unauthenticated = "unauthenticated"
+
 	TokenMissing = "token_not_found"
 	//nolint:gosec // a metric label, not a credential
 	TokenTypeMismatch = "token_type_mismatch"
@@ -128,9 +133,16 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		partner string
 		reason  string
 	)
-	if e.Token != nil {
-		client = e.Token.Principal()
-		partner = determinePartnerID(e.Token)
+	// A JWT rejected for its claims, e.g. an expired one, has no Token, but its
+	// signature verified, so who it came from can be recorded.
+	token := e.Token
+	if token == nil {
+		token = e.InvalidToken
+	}
+
+	if token != nil {
+		client = token.Principal()
+		partner = determinePartnerID(token)
 	}
 
 	if errors.Is(e.Err, basculejwt.ErrExpired) {
@@ -166,6 +178,14 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		ae.l.Error("authenticator event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
 		ae.l.Info("authenticator event: creds rejected", fs...)
+	}
+
+	// A JWT token only exists once its signature has been verified, so its
+	// client and partner are bounded by who holds a valid token.  A basic token
+	// carries whatever user name the caller sent; its password is not checked
+	// until authorization.
+	if _, ok := token.(basculehttp.BasicToken); ok {
+		client = Unauthenticated
 	}
 
 	return prometheus.Labels{
@@ -290,6 +310,12 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 		ae.l.Error("authorizer event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
 		ae.l.Info("authorizer event: creds rejected", fs...)
+	}
+
+	// Basic credentials are checked while authorizing, so a bad_creds
+	// rejection of one carries a user name that was never verified.
+	if _, ok := e.Token.(basculehttp.BasicToken); ok && reason == AuthBadCreds {
+		client = Unauthenticated
 	}
 
 	return prometheus.Labels{
