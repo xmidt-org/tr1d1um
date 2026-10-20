@@ -407,11 +407,11 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 			header.Add(WarningHeader, w.String())
 		}
 
-		c.warnings.With(prometheus.Labels{
+		c.warnings.With(cleanLabels(prometheus.Labels{
 			KindLabel:     paramWarningKind,
 			ReasonLabel:   w.Reason,
 			ClientIDLabel: client,
-		}).Add(1)
+		})).Add(1)
 	}
 
 	if d.allowed {
@@ -441,11 +441,11 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 			header.Add(WarningHeader, w.String())
 		}
 
-		c.warnings.With(prometheus.Labels{
+		c.warnings.With(cleanLabels(prometheus.Labels{
 			KindLabel:     paramWarningKind,
 			ReasonLabel:   ParameterNotAllowed,
 			ClientIDLabel: client,
-		}).Add(1)
+		})).Add(1)
 
 		c.l.Info("parameter check: would reject", append(fields, zap.Stringer("warning", w))...)
 
@@ -466,14 +466,14 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 		}.String())
 	}
 
-	c.counter.With(prometheus.Labels{
+	c.counter.With(cleanLabels(prometheus.Labels{
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(c.endpoints, request),
 		MethodLabel:    request.Method,
 		OutcomeLabel:   Rejected,
 		ReasonLabel:    ParameterNotAllowed,
-	}).Add(1)
+	})).Add(1)
 
 	c.l.Info("parameter check: request rejected", fields...)
 }

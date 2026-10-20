@@ -13,9 +13,14 @@ import (
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
@@ -282,4 +287,126 @@ func TestAuthenticatorEvent_ValidatorRejectionReason(t *testing.T) {
 			assert.Equal(t, tc.want, got[ReasonLabel])
 		})
 	}
+}
+
+// TestEventListeners_MissingFields checks that an event missing a field bascule
+// documents as always set is still counted, with blank labels, rather than
+// panicking on the request goroutine.
+func TestEventListeners_MissingFields(t *testing.T) {
+	// a missing value is recorded as EmptyLabelValue
+	labels := func(outcome, reason, client, endpoint, method string) prometheus.Labels {
+		orEmpty := func(v string) string {
+			if v == "" {
+				return EmptyLabelValue
+			}
+			return v
+		}
+
+		return prometheus.Labels{
+			OutcomeLabel:   outcome,
+			ReasonLabel:    orEmpty(reason),
+			ClientIDLabel:  orEmpty(client),
+			PartnerIDLabel: EmptyLabelValue,
+			EndpointLabel:  endpoint,
+			MethodLabel:    orEmpty(method),
+		}
+	}
+
+	t.Run("authenticator without a source", func(t *testing.T) {
+		counter := testCounter()
+		ae := authenticatorEvent{l: zap.NewNop(), counter: counter}
+
+		require.NotPanics(t, func() {
+			ae.OnEvent(bascule.AuthenticateEvent[*http.Request]{Err: bascule.ErrMissingCredentials})
+		})
+		assert.Equal(t, float64(1), testutil.ToFloat64(counter.With(labels(Rejected, AuthMissingCreds, "", NoneEndpoint, ""))))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	token := testBasicToken{user: "user"}
+	warning := bascule.Warning{Reason: warningWouldReject, Attrs: []bascule.WarningAttr{{Key: KindLabel, Value: "cidr"}}}
+
+	tests := []struct {
+		name  string
+		event bascule.AuthorizeEvent[*http.Request]
+		want  prometheus.Labels
+	}{
+		{
+			name:  "authorizer rejection without a token",
+			event: bascule.AuthorizeEvent[*http.Request]{Resource: req, Err: bascule.ErrUnauthorized},
+			want:  labels(Rejected, NoCapabilitiesMatch, "", NoneEndpoint, http.MethodGet),
+		}, {
+			name:  "authorizer rejection without a resource",
+			event: bascule.AuthorizeEvent[*http.Request]{Token: token, Err: bascule.ErrUnauthorized},
+			want:  labels(Rejected, NoCapabilitiesMatch, "user", NoneEndpoint, ""),
+		}, {
+			name:  "authorizer acceptance without a token",
+			event: bascule.AuthorizeEvent[*http.Request]{Resource: req},
+			want:  labels(Accepted, "", "", NoneEndpoint, http.MethodGet),
+		}, {
+			name:  "authorizer acceptance without a resource",
+			event: bascule.AuthorizeEvent[*http.Request]{Token: token},
+			want:  labels(Accepted, "", "user", NoneEndpoint, ""),
+		}, {
+			name:  "authorizer warning without a token",
+			event: bascule.AuthorizeEvent[*http.Request]{Resource: req, Warnings: []bascule.Warning{warning}},
+			want:  labels(Accepted, "", "", NoneEndpoint, http.MethodGet),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			counter, warnings := testCounter(), testWarningCounter()
+			ae := authorizerEvent{l: zap.NewNop(), counter: counter, warnings: warnings}
+
+			require.NotPanics(t, func() { ae.OnEvent(tc.event) })
+			assert.Equal(t, float64(1), testutil.ToFloat64(counter.With(tc.want)))
+			assert.Equal(t, len(tc.event.Warnings), testutil.CollectAndCount(warnings), "warnings counted")
+		})
+	}
+}
+
+// TestAuthorizerEvent_AcceptedIsNotARejection checks that an accepted request
+// is counted as accepted and logged as nothing worse than debug.
+func TestAuthorizerEvent_AcceptedIsNotARejection(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	counter := testCounter()
+	ae := authorizerEvent{l: zap.New(core), counter: counter, warnings: testWarningCounter()}
+
+	ae.OnEvent(bascule.AuthorizeEvent[*http.Request]{
+		Resource: httptest.NewRequest(http.MethodGet, "/", nil),
+		Token:    testBasicToken{user: "user"},
+	})
+
+	assert.Equal(t, 1, testutil.CollectAndCount(counter))
+	assert.Equal(t, float64(1), testutil.ToFloat64(counter.With(prometheus.Labels{
+		OutcomeLabel: Accepted, ReasonLabel: EmptyLabelValue, ClientIDLabel: "user", PartnerIDLabel: EmptyLabelValue, EndpointLabel: NoneEndpoint, MethodLabel: http.MethodGet,
+	})))
+	assert.Zero(t, logs.Len(), "an accepted request is not logged as a rejection")
+}
+
+// TestNewMiddleware_InvalidUTF8Principal checks that a caller cannot make the
+// metrics panic: prometheus refuses a label value that is not valid UTF-8,
+// and a basic auth user name is whatever the caller sends.
+func TestNewMiddleware_InvalidUTF8Principal(t *testing.T) {
+	v := viper.New()
+	v.Set(basicKey, []string{encodedCredential("user", "pass")})
+	mw, checks, _ := protectCounting(t, inboundConfig{Basic: []string{encodedCredential("user", "pass")}}, v, nil)
+
+	var rec *httptest.ResponseRecorder
+	require.NotPanics(t, func() {
+		rec = serveRequest(t, mw, func(r *http.Request) {
+			r.Header.Set("Authorization", "Basic "+encodedCredential("\xff", "pass"))
+		})
+	})
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	assert.Equal(t, float64(1), testutil.ToFloat64(checks.With(prometheus.Labels{
+		OutcomeLabel:   Rejected,
+		ReasonLabel:    AuthBadCreds,
+		ClientIDLabel:  "\uFFFD",
+		PartnerIDLabel: EmptyLabelValue,
+		EndpointLabel:  NoneEndpoint,
+		MethodLabel:    http.MethodGet,
+	})))
 }

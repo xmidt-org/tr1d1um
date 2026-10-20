@@ -289,11 +289,11 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 			header.Add(WarningHeader, w.String())
 		}
 
-		rl.warnings.With(prometheus.Labels{
+		rl.warnings.With(cleanLabels(prometheus.Labels{
 			KindLabel:     rateWarningKind,
 			ReasonLabel:   strings.ReplaceAll(w.Reason, "-", "_"),
 			ClientIDLabel: client,
-		}).Add(1)
+		})).Add(1)
 	}
 
 	if d.Allowed {
@@ -331,25 +331,25 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 			header.Add(WarningHeader, w.String())
 		}
 
-		rl.warnings.With(prometheus.Labels{
+		rl.warnings.With(cleanLabels(prometheus.Labels{
 			KindLabel:     rateWarningKind,
 			ReasonLabel:   reason,
 			ClientIDLabel: client,
-		}).Add(1)
+		})).Add(1)
 
 		rl.l.Info("rate limiter: would reject", append(fields, zap.Stringer("warning", w))...)
 
 		return
 	}
 
-	rl.counter.With(prometheus.Labels{
+	rl.counter.With(cleanLabels(prometheus.Labels{
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(rl.endpoints, request),
 		MethodLabel:    request.Method,
 		OutcomeLabel:   Rejected,
 		ReasonLabel:    reason,
-	}).Add(1)
+	})).Add(1)
 
 	rl.l.Info("rate limiter: request rejected", fields...)
 }
