@@ -309,6 +309,13 @@ func TestTr1d1um_ExitCodes(t *testing.T) {
 		// the configuration reads, but the application cannot be built
 		assert.Equal(t, 2, tr1d1um([]string{applicationName, "-f", path}))
 	})
+
+	t.Run("logger cannot be built", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "missing", "tr1d1um.log")
+		path := writeConfig(t, t.TempDir(), "c.yaml", "logging:\n  outputPaths:\n    - "+missing+"\n")
+
+		assert.Equal(t, 1, tr1d1um([]string{applicationName, "-f", path}))
+	})
 }
 
 // TestTr1d1um_Run starts tr1d1um as main does and stops it with SIGTERM, as a
