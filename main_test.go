@@ -10,7 +10,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -227,4 +232,118 @@ func TestConfigureXmidtClientTimeout(t *testing.T) {
 		got := configureXmidtClientTimeout(XmidtClientTimeoutConfigIn{XmidtClientTimeout: want})
 		assert.Equal(t, want, got)
 	})
+}
+
+// writeAppConfig writes the sample configuration, with every server on a free
+// port, the webhook store at storeURL and the log written to logFile, merged
+// with overrides, to a file and returns its path.
+func writeAppConfig(t *testing.T, storeURL, logFile string, overrides map[string]any) string {
+	t.Helper()
+
+	v := viper.New()
+	v.SetConfigFile("tr1d1um.yaml")
+	require.NoError(t, v.ReadInConfig())
+
+	anyPort := map[string]any{"address": "127.0.0.1:0"}
+	require.NoError(t, v.MergeConfigMap(map[string]any{
+		"servers": map[string]any{
+			"primary":   anyPort,
+			"alternate": anyPort,
+			"health":    anyPort,
+			"metrics":   anyPort,
+			"pprof":     anyPort,
+		},
+		"webhook": map[string]any{
+			"client": map[string]any{"storeBaseURL": storeURL},
+		},
+		"logging": map[string]any{
+			"outputPaths":   []string{logFile},
+			"encoderConfig": map[string]any{"messageKey": "msg"},
+		},
+	}))
+	require.NoError(t, v.MergeConfigMap(overrides))
+
+	path := filepath.Join(t.TempDir(), "tr1d1um.yaml")
+	require.NoError(t, v.WriteConfigAs(path))
+
+	return path
+}
+
+// newStore stands in for Argus, so the webhook listener has something to poll.
+func newStore(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	store := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("[]"))
+	}))
+	t.Cleanup(store.Close)
+
+	return store
+}
+
+func TestTr1d1um_ExitCodes(t *testing.T) {
+	t.Run("no configuration", func(t *testing.T) {
+		if _, err := os.Stat("/etc/" + applicationName); err == nil {
+			t.Skip("/etc/" + applicationName + " exists on this machine")
+		}
+		isolateSearchPath(t)
+
+		assert.Equal(t, 1, tr1d1um([]string{applicationName}))
+	})
+
+	// pflag prints the usage; asking for it is not an error
+	for _, flag := range []string{"-h", "--help"} {
+		t.Run(flag, func(t *testing.T) {
+			assert.Equal(t, 0, tr1d1um([]string{applicationName, flag}))
+		})
+	}
+
+	t.Run("unknown flag", func(t *testing.T) {
+		assert.Equal(t, 1, tr1d1um([]string{applicationName, "--nope"}))
+	})
+
+	t.Run("invalid configuration", func(t *testing.T) {
+		logFile := filepath.Join(t.TempDir(), "tr1d1um.log")
+		path := writeAppConfig(t, newStore(t).URL, logFile, map[string]any{
+			wrpSourceKey: "not a locator",
+		})
+
+		// the configuration reads, but the application cannot be built
+		assert.Equal(t, 2, tr1d1um([]string{applicationName, "-f", path}))
+	})
+}
+
+// TestTr1d1um_Run starts tr1d1um as main does and stops it with SIGTERM, as a
+// deployment would.
+func TestTr1d1um_Run(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stopping the application needs SIGTERM")
+	}
+
+	logFile := filepath.Join(t.TempDir(), "tr1d1um.log")
+	path := writeAppConfig(t, newStore(t).URL, logFile, nil)
+
+	exitCode := make(chan int, 1)
+	go func() {
+		exitCode <- tr1d1um([]string{applicationName, "-f", path})
+	}()
+
+	// fx logs "started" once every server is listening and its signal
+	// handling is in place.  Signaling before then would kill the test.
+	require.Eventually(t, func() bool {
+		written, err := os.ReadFile(filepath.Clean(logFile))
+		return err == nil && strings.Contains(string(written), `"msg":"started"`)
+	}, 10*time.Second, 10*time.Millisecond, "tr1d1um did not start")
+
+	self, err := os.FindProcess(os.Getpid())
+	require.NoError(t, err)
+	require.NoError(t, self.Signal(syscall.SIGTERM))
+
+	select {
+	case code := <-exitCode:
+		assert.Equal(t, 0, code)
+	case <-time.After(10 * time.Second):
+		t.Fatal("tr1d1um did not stop")
+	}
 }
