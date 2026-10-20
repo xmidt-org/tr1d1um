@@ -133,9 +133,9 @@ func isPartialPath(name string) bool {
 // parseParamCapability parses the remainder of a parameter capability after
 // its prefix: <pattern>[:read|:write|:all].
 func parseParamCapability(text string) (paramCapability, error) {
-	pattern, op := text, operationAll
-	if i := strings.LastIndexByte(text, ':'); i >= 0 {
-		pattern, op = text[:i], text[i+1:]
+	pattern, op, found := strings.CutLast(text, ":")
+	if !found {
+		op = operationAll
 	}
 
 	if pattern == "" {

@@ -87,11 +87,8 @@ func parseParamAgeLimits(maxAge map[string]time.Duration) ([]paramAgeLimit, erro
 // its prefix into its pattern and operation suffix.  The operation is "" when
 // there is no suffix.
 func splitParamCapability(text string) (pattern, op string) {
-	if i := strings.LastIndexByte(text, ':'); i >= 0 {
-		return text[:i], text[i+1:]
-	}
-
-	return text, ""
+	pattern, op, _ = strings.CutLast(text, ":")
+	return pattern, op
 }
 
 // paramAgeApprover refuses a token that carries a parameter capability with
