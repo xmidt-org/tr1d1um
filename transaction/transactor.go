@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"net/http"
 	"slices"
@@ -88,14 +87,6 @@ type Request struct {
 type response struct {
 	Code    int `json:"code,omitempty"`
 	Headers any `json:"headers,omitempty"`
-}
-
-func (re *Request) MarshalJSON() ([]byte, error) {
-	return json.Marshal(re)
-}
-
-func (rs *response) MarshalJSON() ([]byte, error) {
-	return json.Marshal(rs)
 }
 
 func New(o *Options) T {
