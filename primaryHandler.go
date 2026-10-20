@@ -172,7 +172,7 @@ func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
 
 func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHandlersOut, err error) {
 	// Webhooks (if not configured, handlers are not set up)
-	if !in.V.IsSet(webhookConfigKey) {
+	if !in.V.IsSet("webhook") {
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
@@ -221,7 +221,7 @@ func provideHandlers() fx.Option {
 // all of them, so a bad value would fail every request rather than one.
 func validateWRPSource(source string) error {
 	if _, err := wrp.ParseLocator(source); err != nil {
-		return fmt.Errorf("%s %q is not a valid WRP locator: %w", wrpSourceKey, source, err)
+		return fmt.Errorf("WRPSource %q is not a valid WRP locator: %w", source, err)
 	}
 
 	return nil

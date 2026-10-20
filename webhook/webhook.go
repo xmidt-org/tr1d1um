@@ -16,12 +16,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/auth"
 )
 
-const (
-	webhookConfigKey  = "webhook"
-	clientConfigKey   = "webhook.client"
-	listenerConfigKey = "webhook.listener"
-)
-
 type clientConfig struct {
 	// StoreBaseURL is the Argus URL (i.e. https://example-argus.io:8090)
 	StoreBaseURL string

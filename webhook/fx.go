@@ -18,9 +18,9 @@ func Provide() fx.Option {
 		module,
 		anclafx.Provide(),
 		fx.Provide(
-			viperfx.Unmarshal(webhookConfigKey, ancla.Config{}),
-			viperfx.Unmarshal(clientConfigKey, clientConfig{}),
-			viperfx.Unmarshal(listenerConfigKey, listnerConfig{}),
+			viperfx.Unmarshal("webhook", ancla.Config{}),
+			viperfx.Unmarshal("webhook.client", clientConfig{}),
+			viperfx.Unmarshal("webhook.listener", listnerConfig{}),
 			fx.Annotate(NewClientOpts, fx.ResultTags(`group:"client_options,flatten"`)),
 			fx.Annotate(NewListenerOpts, fx.ResultTags(`group:"listener_options,flatten"`, ``)),
 		),

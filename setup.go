@@ -36,10 +36,6 @@ func setup(fs *pflag.FlagSet) (*viper.Viper, *zap.Logger, error) {
 	var err error
 
 	v := viper.New()
-	for k, va := range defaults {
-		v.SetDefault(k, va)
-	}
-
 	if file, _ := fs.GetString("file"); len(file) > 0 {
 		v.SetConfigFile(file)
 		err = v.ReadInConfig()
