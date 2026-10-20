@@ -40,7 +40,7 @@ func basicSchemeValidator(ctx context.Context, req *http.Request, token bascule.
 	switch t := token.(type) {
 	case basculehttp.BasicToken:
 	default:
-		return fmt.Errorf("%w: %v: `%T`", bascule.ErrBadCredentials, errAuthUnknownScheme, t)
+		return fmt.Errorf("%w: %w: `%T`", bascule.ErrBadCredentials, errAuthUnknownScheme, t)
 	}
 
 	return nil
@@ -54,7 +54,7 @@ func bearerSchemeValidator(ctx context.Context, req *http.Request, token bascule
 	switch t := token.(type) {
 	case basculejwt.Claims:
 	default:
-		return fmt.Errorf("%w: %v: `%T`", bascule.ErrBadCredentials, errAuthUnknownScheme, t)
+		return fmt.Errorf("%w: %w: `%T`", bascule.ErrBadCredentials, errAuthUnknownScheme, t)
 	}
 
 	return nil
@@ -117,7 +117,7 @@ func authPrincipalValidator(ctx context.Context, token bascule.Token) error {
 	}
 
 	if token.Principal() == "" {
-		return fmt.Errorf("%w: %v", bascule.ErrBadCredentials, errAuthEmptyPrincipal)
+		return fmt.Errorf("%w: %w", bascule.ErrBadCredentials, errAuthEmptyPrincipal)
 	}
 
 	return nil

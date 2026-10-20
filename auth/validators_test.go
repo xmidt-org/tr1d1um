@@ -180,7 +180,7 @@ func TestSchemeValidators(t *testing.T) {
 			}
 
 			require.ErrorIs(t, err, bascule.ErrBadCredentials)
-			require.ErrorContains(t, err, errAuthUnknownScheme.Error())
+			require.ErrorIs(t, err, errAuthUnknownScheme)
 		})
 	}
 
@@ -198,7 +198,7 @@ func TestAuthPrincipalValidator(t *testing.T) {
 
 	err := authPrincipalValidator(context.Background(), testPlainToken(""))
 	require.ErrorIs(t, err, bascule.ErrBadCredentials)
-	require.ErrorContains(t, err, errAuthEmptyPrincipal.Error())
+	require.ErrorIs(t, err, errAuthEmptyPrincipal)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
