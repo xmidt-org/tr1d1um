@@ -135,16 +135,16 @@ func (bearer *bearerDecorator) Decorate(ctx context.Context, req *http.Request) 
 	bearer.lock.Lock()
 	defer bearer.lock.Unlock()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bearer.url, nil)
+	tokenReq, err := http.NewRequestWithContext(ctx, http.MethodGet, bearer.url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create new request for Bearer: %v", err)
 	}
 
 	for key, value := range bearer.headers {
-		req.Header.Set(key, value)
+		tokenReq.Header.Set(key, value)
 	}
 
-	resp, err := bearer.httpClient.Do(req)
+	resp, err := bearer.httpClient.Do(tokenReq)
 	if err != nil {
 		return fmt.Errorf("error making request to '%v' to acquire bearer token: %v",
 			bearer.url, err)
@@ -157,7 +157,7 @@ func (bearer *bearerDecorator) Decorate(ctx context.Context, req *http.Request) 
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading HTTP response body: %v", body)
+		return fmt.Errorf("error reading HTTP response body: %v", err)
 	}
 
 	var payload map[string]any
@@ -182,7 +182,7 @@ func (bearer *bearerDecorator) Decorate(ctx context.Context, req *http.Request) 
 
 	exp, ok := token.Expiration()
 	if !ok {
-		return errors.New("bearer token must contain an expieration")
+		return errors.New("bearer token must contain an expiration")
 	}
 
 	bearer.exp = exp
