@@ -427,6 +427,7 @@ func fixV2Duration(config schema.TTLVConfig, v2Handler http.Handler) alice.Const
 			body, err := json.Marshal(wr)
 			if err != nil {
 				v2ErrEncode(w, logger, fmt.Errorf("failed to recreate request body: %v", err), 0)
+				return
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
