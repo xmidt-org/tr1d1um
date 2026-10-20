@@ -207,23 +207,31 @@ func providePprofServer(name, key string) fx.Option {
 	)
 }
 
+// provideConfig provides the configured values the servers use, each with
+// the default it takes when the configuration leaves it out.
+func provideConfig() fx.Option {
+	return fx.Options(
+		viperfx.Provide("requestMaxRetries", 2),
+		viperfx.Provide("requestRetryInterval", 2*time.Second),
+		viperfx.Provide("previousVersionSupport", true),
+		viperfx.Provide("targetURL", "localhost:6000"),
+		viperfx.Provide("WRPSource", "dns:localhost"),
+		viperfx.Provide("supportedServices", []string{}), // no services allowed by default
+	)
+}
+
 func provideServers() fx.Option {
 	return fx.Options(
-		viperfx.Provide(reqMaxRetriesKey, 0),
-		viperfx.Provide(reqRetryIntervalKey, time.Duration(0)),
-		viperfx.Provide("previousVersionSupport", true),
-		viperfx.Provide("targetURL", ""),
-		viperfx.Provide("WRPSource", ""),
-		viperfx.Provide(translationServicesKey, []string{}),
+		provideConfig(),
 		fx.Provide(metricMiddleware),
 		fx.Provide(
 			fx.Annotated{
 				Name:   "reducedLoggingResponseCodes",
-				Target: viperfx.Unmarshal(reducedTransactionLoggingCodesKey, []int{}),
+				Target: viperfx.Unmarshal("logging.reducedLoggingResponseCodes", []int{}),
 			},
 			fx.Annotated{
 				Name:   "bearerFingerprint",
-				Target: viperfx.Unmarshal(fingerprintCredsKey, transaction.FingerprintConfig{}),
+				Target: viperfx.Unmarshal("fingerprintCreds", transaction.FingerprintConfig{}),
 			},
 			fx.Annotated{
 				Name:   "paramFilters",
@@ -467,7 +475,7 @@ func buildMetricsRoutes(in metricsRoutesIn) {
 }
 
 func provideParamFilters(v *viper.Viper) (*paramfilter.Filters, error) {
-	cfg, err := viperfx.Unmarshal(parameterLoggingKey, paramfilter.Config{})(v)
+	cfg, err := viperfx.Unmarshal("parameterLogging", paramfilter.Config{})(v)
 	if err != nil {
 		return nil, err
 	}

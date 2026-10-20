@@ -429,6 +429,6 @@ func TestProvideParamFilters_BadConfig(t *testing.T) {
 	f, err := provideParamFilters(viperFromYAML(t, "parameterLogging: not-a-section"))
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), parameterLoggingKey)
+	assert.Contains(t, err.Error(), "parameterLogging")
 	assert.Nil(t, f)
 }

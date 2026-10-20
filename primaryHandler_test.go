@@ -170,7 +170,7 @@ func TestProvideWebhookHandlers(t *testing.T) {
 
 	enabled := func() *viper.Viper {
 		v := viper.New()
-		v.Set(webhookConfigKey, map[string]any{})
+		v.Set("webhook", map[string]any{})
 		return v
 	}
 
@@ -200,6 +200,6 @@ func TestValidateWRPSource(t *testing.T) {
 	for _, source := range []string{"", "tr1d1um", "not a locator"} {
 		err := validateWRPSource(source)
 		require.Error(t, err, source)
-		assert.Contains(t, err.Error(), wrpSourceKey, source)
+		assert.Contains(t, err.Error(), "WRPSource", source)
 	}
 }

@@ -34,25 +34,7 @@ const (
 	prevAPIVersion     = "v2"
 	applicationName    = "tr1d1um"
 	apiBase            = "api/" + apiVersion
-	prevAPIBase        = "api/" + prevAPIVersion
 	apiBaseDualVersion = "api/{version:" + apiVersion + "|" + prevAPIVersion + "}"
-)
-
-const (
-	translationServicesKey            = "supportedServices"
-	targetURLKey                      = "targetURL"
-	netDialerTimeoutKey               = "netDialerTimeout"
-	clientTimeoutKey                  = "clientTimeout"
-	reqTimeoutKey                     = "respWaitTimeout"
-	reqRetryIntervalKey               = "requestRetryInterval"
-	reqMaxRetriesKey                  = "requestMaxRetries"
-	wrpSourceKey                      = "WRPSource"
-	hooksSchemeKey                    = "hooksScheme"
-	reducedTransactionLoggingCodesKey = "logging.reducedLoggingResponseCodes"
-	webhookConfigKey                  = "webhook"
-	tracingConfigKey                  = "tracing"
-	fingerprintCredsKey               = "fingerprintCreds"
-	parameterLoggingKey               = "parameterLogging"
 )
 
 var (
@@ -61,18 +43,6 @@ var (
 	Date    string
 	Commit  string
 )
-
-var defaults = map[string]any{
-	translationServicesKey: []string{}, // no services allowed by the default
-	targetURLKey:           "localhost:6000",
-	netDialerTimeoutKey:    "5s",
-	clientTimeoutKey:       "50s",
-	reqTimeoutKey:          "40s",
-	reqRetryIntervalKey:    "2s",
-	reqMaxRetriesKey:       2,
-	wrpSourceKey:           "dns:localhost",
-	hooksSchemeKey:         "https",
-}
 
 type XmidtClientTimeoutConfigIn struct {
 	fx.In
@@ -147,7 +117,7 @@ func newApp(v *viper.Viper, l *zap.Logger) fx.Option {
 		touchhttp.Provide(),
 		provideMetrics(),
 		fx.Provide(
-			viperfx.Unmarshal(tracingConfigKey, candlelight.Config{}),
+			viperfx.Unmarshal("tracing", candlelight.Config{}),
 			fx.Annotated{
 				Name:   "xmidt_client_timeout",
 				Target: configureXmidtClientTimeout,

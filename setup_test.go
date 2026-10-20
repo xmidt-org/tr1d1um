@@ -98,8 +98,7 @@ func TestSetup(t *testing.T) {
 		require.NotNil(t, v)
 		assert.NotNil(t, l)
 
-		assert.Equal(t, "http://xmidt.example.com", v.GetString(targetURLKey), "the file is read")
-		assert.Equal(t, defaults[wrpSourceKey], v.Get(wrpSourceKey), "defaults fill the gaps")
+		assert.Equal(t, "http://xmidt.example.com", v.GetString("targetURL"), "the file is read")
 	})
 
 	t.Run("search path", func(t *testing.T) {
@@ -109,7 +108,7 @@ func TestSetup(t *testing.T) {
 		v, l, err := setup(flags(t))
 		require.NoError(t, err)
 		assert.NotNil(t, l)
-		assert.Equal(t, "http://xmidt.example.com", v.GetString(targetURLKey))
+		assert.Equal(t, "http://xmidt.example.com", v.GetString("targetURL"))
 	})
 
 	t.Run("search path from home", func(t *testing.T) {
@@ -120,7 +119,7 @@ func TestSetup(t *testing.T) {
 
 		v, _, err := setup(flags(t))
 		require.NoError(t, err)
-		assert.Equal(t, "http://xmidt.example.com", v.GetString(targetURLKey))
+		assert.Equal(t, "http://xmidt.example.com", v.GetString("targetURL"))
 	})
 
 	t.Run("missing config file", func(t *testing.T) {

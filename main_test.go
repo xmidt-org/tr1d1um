@@ -112,9 +112,6 @@ func TestApp(t *testing.T) {
 	defer argus.Close()
 
 	v := viper.New()
-	for key, value := range defaults {
-		v.SetDefault(key, value)
-	}
 	v.SetConfigFile("tr1d1um.yaml")
 	require.NoError(t, v.ReadInConfig())
 
@@ -306,7 +303,7 @@ func TestTr1d1um_ExitCodes(t *testing.T) {
 	t.Run("invalid configuration", func(t *testing.T) {
 		logFile := filepath.Join(t.TempDir(), "tr1d1um.log")
 		path := writeAppConfig(t, newStore(t).URL, logFile, map[string]any{
-			wrpSourceKey: "not a locator",
+			"WRPSource": "not a locator",
 		})
 
 		// the configuration reads, but the application cannot be built
@@ -346,4 +343,36 @@ func TestTr1d1um_Run(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("tr1d1um did not stop")
 	}
+}
+
+// configValues are the configured values the application is given.
+type configValues struct {
+	fx.In
+	RequestMaxRetries    int           `name:"requestMaxRetries"`
+	RequestRetryInterval time.Duration `name:"requestRetryInterval"`
+	TargetURL            string        `name:"targetURL"`
+	WRPSource            string        `name:"WRPSource"`
+	SupportedServices    []string      `name:"supportedServices"`
+}
+
+// TestDefaults checks the values the application is given when the
+// configuration leaves them out.
+func TestDefaults(t *testing.T) {
+	path := writeConfig(t, t.TempDir(), "c.yaml", "logging:\n  level: info\n")
+	v, _, err := setup(flags(t, "-f", path))
+	require.NoError(t, err)
+
+	var got configValues
+	app := fxtest.New(t,
+		fx.Supply(v),
+		provideConfig(),
+		fx.Invoke(func(c configValues) { got = c }),
+	)
+	app.RequireStart().RequireStop()
+
+	assert.Equal(t, 2, got.RequestMaxRetries)
+	assert.Equal(t, 2*time.Second, got.RequestRetryInterval)
+	assert.Equal(t, "localhost:6000", got.TargetURL)
+	assert.Equal(t, "dns:localhost", got.WRPSource)
+	assert.Empty(t, got.SupportedServices)
 }
