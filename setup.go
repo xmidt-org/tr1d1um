@@ -19,13 +19,21 @@ func setupFlagSet(fs *pflag.FlagSet) {
 	fs.BoolP("version", "v", false, "print version and exit")
 }
 
-func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
+// parseFlags parses tr1d1um's command line flags from args.
+func parseFlags(args []string) (*pflag.FlagSet, error) {
 	fs := pflag.NewFlagSet(applicationName, pflag.ContinueOnError)
 	setupFlagSet(fs)
-	err := fs.Parse(args)
-	if err != nil {
-		return nil, nil, fs, fmt.Errorf("failed to create parse args: %w", err)
+	if err := fs.Parse(args); err != nil {
+		return nil, fmt.Errorf("failed to parse args: %w", err)
 	}
+
+	return fs, nil
+}
+
+// setup reads the configuration and builds the logger, as the parsed flags
+// direct.
+func setup(fs *pflag.FlagSet) (*viper.Viper, *zap.Logger, error) {
+	var err error
 
 	v := viper.New()
 	for k, va := range defaults {
@@ -43,7 +51,7 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 		err = v.ReadInConfig()
 	}
 	if err != nil {
-		return v, nil, fs, fmt.Errorf("failed to read config file: %w", err)
+		return v, nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	if debug, _ := fs.GetBool("debug"); debug {
@@ -52,8 +60,8 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 
 	var c sallust.Config
 	if err := v.UnmarshalKey("logging", &c); err != nil {
-		return v, nil, fs, fmt.Errorf("failed to read logging config: %w", err)
+		return v, nil, fmt.Errorf("failed to read logging config: %w", err)
 	}
 	l := zap.Must(c.Build())
-	return v, l, fs, err
+	return v, l, err
 }
