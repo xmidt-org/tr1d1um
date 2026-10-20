@@ -279,3 +279,13 @@ func TestNewFilters_ZeroConfig(t *testing.T) {
 	assert.False(t, f.Get.ShouldLog(wifiRadioEnable))
 	assert.False(t, f.Patch.ShouldLog(wifiRadioEnable))
 }
+
+func TestFilters_Accessors(t *testing.T) {
+	var nilFilters *Filters
+	assert.Nil(t, nilFilters.GetFilter())
+	assert.Nil(t, nilFilters.PatchFilter())
+
+	f := NewFilters(Config{})
+	assert.Same(t, f.Get, f.GetFilter())
+	assert.Same(t, f.Patch, f.PatchFilter())
+}

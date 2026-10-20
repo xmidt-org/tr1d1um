@@ -260,8 +260,14 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	client := e.Token.Principal()
 	partner := determinePartnerID(e.Token)
 	fs := []zap.Field{zap.String("sat_client_id", client), zap.String("sat_partner_id", partner)}
+	// The claim errors wrap bascule.ErrBadCredentials, so they are checked
+	// before it.
 	var reason string
-	if errors.Is(e.Err, bascule.ErrBadCredentials) {
+	if errors.Is(e.Err, errAuthMissingClaims) {
+		reason = AuthMissingClaims
+	} else if errors.Is(e.Err, errAuthInvalidClaims) {
+		reason = AuthInvalidClaims
+	} else if errors.Is(e.Err, bascule.ErrBadCredentials) {
 		reason = AuthBadCreds
 	} else if errors.Is(e.Err, basculehttp.ErrNoCIDRCapability) {
 		reason = NoCIDRCapability
@@ -275,10 +281,6 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 		reason = NoIssuedAt
 	} else if errors.Is(e.Err, bascule.ErrUnauthorized) {
 		reason = NoCapabilitiesMatch
-	} else if errors.Is(e.Err, errAuthMissingClaims) {
-		reason = AuthMissingClaims
-	} else if errors.Is(e.Err, errAuthInvalidClaims) {
-		reason = AuthInvalidClaims
 	} else {
 		reason = UnknownReason
 	}

@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -133,4 +134,73 @@ func TestRequirePartnerIDs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequirePartnerIDs_NotAJWT(t *testing.T) {
+	t.Run("token without attributes", func(t *testing.T) {
+		err := jwtClaimPartnerIDsValidator(context.Background(), nil, testPlainToken("client"))
+		require.ErrorIs(t, err, errAuthMissingClaims)
+		require.ErrorIs(t, err, bascule.ErrBadCredentials)
+	})
+
+	t.Run("canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		token := testClaimsToken(t, map[string]any{allowedResources: map[string]any{allowedPartners: []string{"p"}}})
+		require.ErrorIs(t, jwtClaimPartnerIDsValidator(ctx, nil, token), context.Canceled)
+	})
+}
+
+func TestSchemeValidators(t *testing.T) {
+	jwtToken := testClaimsToken(t, nil)
+	basicToken := testBasicToken{user: "user", password: "pass"}
+
+	tests := []struct {
+		name      string
+		validator func(context.Context, *http.Request, bascule.Token) error
+		token     bascule.Token
+		wantErr   bool
+	}{
+		{name: "basic accepts basic", validator: basicSchemeValidator, token: basicToken},
+		{name: "basic refuses jwt", validator: basicSchemeValidator, token: jwtToken, wantErr: true},
+		{name: "basic refuses unknown", validator: basicSchemeValidator, token: testPlainToken("x"), wantErr: true},
+		{name: "bearer accepts jwt", validator: bearerSchemeValidator, token: jwtToken},
+		{name: "bearer refuses basic", validator: bearerSchemeValidator, token: basicToken, wantErr: true},
+		{name: "bearer refuses unknown", validator: bearerSchemeValidator, token: testPlainToken("x"), wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.validator(context.Background(), nil, tc.token)
+			if !tc.wantErr {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, bascule.ErrBadCredentials)
+			require.ErrorContains(t, err, errAuthUnknownScheme.Error())
+		})
+	}
+
+	t.Run("canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		require.ErrorIs(t, basicSchemeValidator(ctx, nil, basicToken), context.Canceled)
+		require.ErrorIs(t, bearerSchemeValidator(ctx, nil, jwtToken), context.Canceled)
+	})
+}
+
+func TestAuthPrincipalValidator(t *testing.T) {
+	require.NoError(t, authPrincipalValidator(context.Background(), testPlainToken("client")))
+
+	err := authPrincipalValidator(context.Background(), testPlainToken(""))
+	require.ErrorIs(t, err, bascule.ErrBadCredentials)
+	require.ErrorContains(t, err, errAuthEmptyPrincipal.Error())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, authPrincipalValidator(ctx, testPlainToken("client")), context.Canceled)
 }

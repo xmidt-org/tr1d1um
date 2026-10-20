@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
 
@@ -155,6 +157,66 @@ func TestEncodeResponse(t *testing.T) {
 			assert.Equal(tc.expectedContentTypeHeader, tc.respRecorder.Header().Get("Content-Type"))
 			assert.EqualValues(tc.resp.Body, tc.respRecorder.Body.String())
 			assert.Equal(tc.resp.Code, tc.respRecorder.Code)
+		})
+	}
+}
+
+// TestEncodeResponse_ContentType runs encodeResponse behind a real server, so
+// the response is what a caller sees.  Only a 200 from XMiDT is labeled
+// JSON: any other response's body is passed through as is, so a JSON label
+// set earlier is removed and the body's type is sniffed instead.
+func TestEncodeResponse_ContentType(t *testing.T) {
+	tests := []struct {
+		name            string
+		code            int
+		body            string
+		wantContentType string
+	}{
+		{
+			name:            "200 is JSON",
+			code:            http.StatusOK,
+			body:            `{"dBytesSent": "1024"}`,
+			wantContentType: "application/json",
+		}, {
+			name:            "404 is not labeled JSON",
+			code:            http.StatusNotFound,
+			body:            "device not found",
+			wantContentType: "text/plain; charset=utf-8",
+		}, {
+			name:            "503 with a JSON looking body is not labeled JSON",
+			code:            http.StatusServiceUnavailable,
+			body:            `{"message": "unavailable"}`,
+			wantContentType: "text/plain; charset=utf-8",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				// as if something earlier had labeled the response
+				w.Header().Set("Content-Type", "application/json")
+
+				err := encodeResponse(ctxTID, w, &transaction.XmidtResponse{
+					Code:             tc.code,
+					ForwardedHeaders: http.Header{"X-Xmidt-Message": {"forwarded"}},
+					Body:             []byte(tc.body),
+				})
+				assert.NoError(t, err)
+			}))
+			defer srv.Close()
+
+			resp, err := srv.Client().Get(srv.URL)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.code, resp.StatusCode)
+			assert.Equal(t, tc.body, string(body))
+			assert.Equal(t, []string{tc.wantContentType}, resp.Header.Values("Content-Type"))
+			assert.Equal(t, "forwarded", resp.Header.Get("X-Xmidt-Message"))
+			assert.Equal(t, "testTID", resp.Header.Get(candlelight.HeaderWPATIDKeyName))
 		})
 	}
 }

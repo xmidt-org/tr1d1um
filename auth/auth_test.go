@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strconv"
 	"strings"
 	"testing"
@@ -1059,6 +1060,70 @@ func TestParseMode(t *testing.T) {
 				for _, a := range tc.accepted {
 					assert.Contains(t, err.Error(), strconv.Quote(a), "the error lists the accepted modes")
 				}
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestParseCIDROverrides(t *testing.T) {
+	cases := []struct {
+		name      string
+		overrides map[string][]string
+		want      map[string][]netip.Prefix
+		wantErr   string
+	}{
+		{
+			name: "nil",
+			want: map[string][]netip.Prefix{},
+		}, {
+			name: "networks",
+			overrides: map[string][]string{
+				"a": {"10.0.0.0/8", "2001:db8::/32"},
+				"b": {"192.0.2.1/32"},
+			},
+			want: map[string][]netip.Prefix{
+				"a": {netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("2001:db8::/32")},
+				"b": {netip.MustParsePrefix("192.0.2.1/32")},
+			},
+		}, {
+			name:      "principal is lower-cased",
+			overrides: map[string][]string{"Client-A": {"10.0.0.0/8"}},
+			want:      map[string][]netip.Prefix{"client-a": {netip.MustParsePrefix("10.0.0.0/8")}},
+		}, {
+			name:      "whitespace is trimmed and blank entries are skipped",
+			overrides: map[string][]string{"a": {"", " 10.0.0.0/8 ", "   ", "\t192.0.2.0/24\n"}},
+			want: map[string][]netip.Prefix{
+				"a": {netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.0.2.0/24")},
+			},
+		}, {
+			// an override of no networks still applies, refusing every origin
+			name:      "no networks",
+			overrides: map[string][]string{"a": {}, "b": {" "}},
+			want:      map[string][]netip.Prefix{"a": {}, "b": {}},
+		}, {
+			name:      "address without a prefix length",
+			overrides: map[string][]string{"a": {"10.0.0.0/8", "10.0.0.1"}},
+			wantErr:   "`" + cidrConfigKey + `.Overrides["a"][1]` + "`",
+		}, {
+			name:      "not a network",
+			overrides: map[string][]string{"a": {"", "nope"}},
+			wantErr:   "`" + cidrConfigKey + `.Overrides["a"][1]` + "`",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseCIDROverrides(tc.overrides)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.Contains(t, err.Error(), "expected a network such as 10.0.0.0/8")
+				assert.Nil(t, got)
 
 				return
 			}
