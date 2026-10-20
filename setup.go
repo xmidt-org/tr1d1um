@@ -60,6 +60,11 @@ func setup(fs *pflag.FlagSet) (*viper.Viper, *zap.Logger, error) {
 	if debug, _ := fs.GetBool("debug"); debug {
 		c.Level = "debug"
 	}
-	l := zap.Must(c.Build())
-	return v, l, err
+
+	l, err := c.Build()
+	if err != nil {
+		return v, nil, fmt.Errorf("failed to build logger: %w", err)
+	}
+
+	return v, l, nil
 }

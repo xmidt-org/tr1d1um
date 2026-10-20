@@ -148,6 +148,22 @@ func TestSetup(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to read logging config")
 		assert.Nil(t, l)
 	})
+
+	t.Run("logger cannot be built", func(t *testing.T) {
+		// an output path in a directory that does not exist cannot be opened
+		missing := filepath.Join(t.TempDir(), "missing", "tr1d1um.log")
+		path := writeConfig(t, t.TempDir(), "c.yaml", "logging:\n  outputPaths:\n    - "+missing+"\n")
+
+		var (
+			l   *zap.Logger
+			err error
+		)
+		require.NotPanics(t, func() { _, l, err = setup(flags(t, "-f", path)) })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to build logger")
+		assert.Contains(t, err.Error(), missing)
+		assert.Nil(t, l)
+	})
 }
 
 // TestSetup_Debug checks that --debug enables debug logging, overriding the
