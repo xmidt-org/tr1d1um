@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const testSetupConfig = `
@@ -148,6 +149,57 @@ func TestSetup(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to read logging config")
 		assert.Nil(t, l)
 	})
+}
+
+// TestSetup_Debug checks that --debug enables debug logging, overriding the
+// configured level, and keeps the rest of the logging configuration.
+func TestSetup_Debug(t *testing.T) {
+	tests := []struct {
+		name      string
+		level     string
+		debug     bool
+		wantDebug bool
+	}{
+		{name: "configured level", level: "info"},
+		{name: "debug flag overrides the configured level", level: "info", debug: true, wantDebug: true},
+		{name: "debug flag with no configured level", debug: true, wantDebug: true},
+		{name: "configured debug level", level: "debug", wantDebug: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			logFile := filepath.Join(dir, "tr1d1um.log")
+
+			config := "logging:\n  outputPaths:\n    - " + logFile + "\n"
+			if tc.level != "" {
+				config += "  level: " + tc.level + "\n"
+			}
+
+			args := []string{"-f", writeConfig(t, dir, "c.yaml", config)}
+			if tc.debug {
+				args = append(args, "-d")
+			}
+
+			_, l, err := setup(flags(t, args...))
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDebug, l.Core().Enabled(zap.DebugLevel))
+
+			// the configured output path is still used
+			l.Debug("debug message")
+			l.Info("info message")
+			require.NoError(t, l.Sync())
+
+			written, err := os.ReadFile(filepath.Clean(logFile))
+			require.NoError(t, err)
+			assert.Contains(t, string(written), "info message")
+			if tc.wantDebug {
+				assert.Contains(t, string(written), "debug message")
+			} else {
+				assert.NotContains(t, string(written), "debug message")
+			}
+		})
+	}
 }
 
 // TestVersionWithoutConfig checks that the version can be printed before

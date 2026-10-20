@@ -54,13 +54,15 @@ func setup(fs *pflag.FlagSet) (*viper.Viper, *zap.Logger, error) {
 		return v, nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if debug, _ := fs.GetBool("debug"); debug {
-		v.Set("log.level", "DEBUG")
-	}
-
 	var c sallust.Config
 	if err := v.UnmarshalKey("logging", &c); err != nil {
 		return v, nil, fmt.Errorf("failed to read logging config: %w", err)
+	}
+
+	// The level is set on the parsed configuration rather than in viper,
+	// where setting logging.level would hide the rest of the logging section.
+	if debug, _ := fs.GetBool("debug"); debug {
+		c.Level = "debug"
 	}
 	l := zap.Must(c.Build())
 	return v, l, err
