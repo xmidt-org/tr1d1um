@@ -4,6 +4,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -237,6 +238,47 @@ func TestAuthorizerEvent_PartnerIDRejectionReason(t *testing.T) {
 			require.Error(t, err)
 
 			got := ae.getLabels(bascule.AuthorizeEvent[*http.Request]{Resource: req, Token: token, Err: err})
+			assert.Equal(t, tc.want, got[ReasonLabel])
+		})
+	}
+}
+
+// TestAuthenticatorEvent_ValidatorRejectionReason feeds the errors the
+// validators actually return through the labels.  Their errors wrap
+// bascule.ErrBadCredentials, and were once all counted as bad_creds.
+func TestAuthenticatorEvent_ValidatorRejectionReason(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "basic scheme given a jwt",
+			err:  basicSchemeValidator(ctx, nil, testClaimsToken(t, nil)),
+			want: AuthUnknownScheme,
+		}, {
+			name: "bearer scheme given a basic token",
+			err:  bearerSchemeValidator(ctx, nil, testBasicToken{user: "user"}),
+			want: AuthUnknownScheme,
+		}, {
+			name: "empty principal",
+			err:  authPrincipalValidator(ctx, testPlainToken("")),
+			want: AuthEmptyPrincipal,
+		},
+	}
+
+	ae := authenticatorEvent{l: zap.NewNop()}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Error(t, tc.err)
+			require.ErrorIs(t, tc.err, bascule.ErrBadCredentials, "still bad credentials to bascule")
+
+			got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+				Source: httptest.NewRequest(http.MethodGet, "/", nil),
+				Err:    tc.err,
+			})
 			assert.Equal(t, tc.want, got[ReasonLabel])
 		})
 	}

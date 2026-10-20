@@ -145,14 +145,16 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		reason = AuthMissingCreds
 	} else if errors.Is(e.Err, bascule.ErrInvalidCredentials) {
 		reason = AuthInvalidCreds
+	} else if errors.Is(e.Err, errAuthEmptyPrincipal) {
+		// the validator errors wrap bascule.ErrBadCredentials, so they are
+		// checked before it
+		reason = AuthEmptyPrincipal
+	} else if errors.Is(e.Err, errAuthUnknownScheme) {
+		reason = AuthUnknownScheme
 	} else if errors.Is(e.Err, bascule.ErrBadCredentials) {
 		reason = AuthBadCreds
 	} else if _, ok := errors.AsType[*basculehttp.UnsupportedSchemeError](e.Err); ok {
 		reason = AuthInvalidScheme
-	} else if errors.Is(e.Err, errAuthEmptyPrincipal) {
-		reason = AuthEmptyPrincipal
-	} else if errors.Is(e.Err, errAuthUnknownScheme) {
-		reason = AuthUnknownScheme
 	} else {
 		reason = UnknownReason
 	}
