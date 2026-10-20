@@ -54,6 +54,10 @@ const (
 	Accepted = "accepted"
 	Rejected = "rejected"
 
+	// EmptyLabelValue is recorded in place of an empty label value, so that
+	// a series reads clearly.
+	EmptyLabelValue = "empty"
+
 	TokenMissing = "token_not_found"
 	//nolint:gosec // a metric label, not a credential
 	TokenTypeMismatch = "token_type_mismatch"
@@ -113,11 +117,9 @@ func (ae authenticatorEvent) OnEvent(e bascule.AuthenticateEvent[*http.Request])
 		ae.l.Debug("authenticator event: creds authenticated")
 
 		return
-	} else if e.Source == nil {
-		panic(fmt.Errorf("authenticator event handling failure: expected event source to be a non-nil: %v", e.Err))
 	}
 
-	ae.counter.With(ae.getLabels(e)).Add(1)
+	ae.counter.With(cleanLabels(ae.getLabels(e))).Add(1)
 }
 
 func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request]) prometheus.Labels {
@@ -170,7 +172,7 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(ae.endpoints, e.Source),
-		MethodLabel:    e.Source.Method,
+		MethodLabel:    methodOf(e.Source),
 		OutcomeLabel:   Rejected,
 		ReasonLabel:    reason,
 	}
@@ -187,22 +189,18 @@ func (ae authorizerEvent) OnEvent(e bascule.AuthorizeEvent[*http.Request]) {
 	var ls prometheus.Labels
 	if e.Err == nil {
 		ls = prometheus.Labels{
-			ClientIDLabel:  e.Token.Principal(),
+			ClientIDLabel:  principalOf(e.Token),
 			PartnerIDLabel: determinePartnerID(e.Token),
 			EndpointLabel:  determineEndpoint(ae.endpoints, e.Resource),
-			MethodLabel:    e.Resource.Method,
+			MethodLabel:    methodOf(e.Resource),
 			OutcomeLabel:   Accepted,
 			ReasonLabel:    "",
 		}
-	} else if e.Token == nil {
-		panic(fmt.Errorf("authorizer event handling failure: expected event token to be a non-nil since it passed the `authenticator` middleware without issue: %v", e.Err))
-	} else if e.Resource == nil {
-		panic(fmt.Errorf("authorizer event handling failure: expected event resource to be a non-nil: %v", e.Err))
 	} else {
 		ls = ae.getLabels(e)
 	}
 
-	ae.counter.With(ls).Add(1)
+	ae.counter.With(cleanLabels(ls)).Add(1)
 	ae.recordWarnings(e)
 }
 
@@ -216,7 +214,7 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 		return
 	}
 
-	client := e.Token.Principal()
+	client := principalOf(e.Token)
 	partner := determinePartnerID(e.Token)
 	for _, w := range e.Warnings {
 		// the explanation of a refusal is not a warning; the refusal is
@@ -226,11 +224,11 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 		}
 
 		kind, reason := warningKindReason(w)
-		ae.warnings.With(prometheus.Labels{
+		ae.warnings.With(cleanLabels(prometheus.Labels{
 			KindLabel:     kind,
 			ReasonLabel:   reason,
 			ClientIDLabel: client,
-		}).Add(1)
+		})).Add(1)
 
 		ae.l.Info("authorizer event: capability warning",
 			zap.String("sat_client_id", client),
@@ -259,7 +257,7 @@ func warningKindReason(w bascule.Warning) (kind, reason string) {
 }
 
 func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) prometheus.Labels {
-	client := e.Token.Principal()
+	client := principalOf(e.Token)
 	partner := determinePartnerID(e.Token)
 	fs := []zap.Field{zap.String("sat_client_id", client), zap.String("sat_partner_id", partner)}
 	// The claim errors wrap bascule.ErrBadCredentials, so they are checked
@@ -298,10 +296,46 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(ae.endpoints, e.Resource),
-		MethodLabel:    e.Resource.Method,
+		MethodLabel:    methodOf(e.Resource),
 		OutcomeLabel:   Rejected,
 		ReasonLabel:    reason,
 	}
+}
+
+// cleanLabels makes ls safe and clear to record.  Prometheus panics on a label
+// value that is not valid UTF-8, and some values, such as a basic auth user
+// name, are whatever the caller sends, so invalid bytes are replaced.  An
+// empty value becomes EmptyLabelValue.
+func cleanLabels(ls prometheus.Labels) prometheus.Labels {
+	for k, v := range ls {
+		v = strings.ToValidUTF8(v, "\uFFFD")
+		if v == "" {
+			v = EmptyLabelValue
+		}
+		ls[k] = v
+	}
+
+	return ls
+}
+
+// principalOf returns the token's principal, or "" without a token.  bascule
+// always sets an event's token and request, but a listener must not panic on
+// the request goroutine if one is missing; the event is still counted.
+func principalOf(token bascule.Token) string {
+	if token == nil {
+		return ""
+	}
+
+	return token.Principal()
+}
+
+// methodOf returns the request's method, or "" without a request.
+func methodOf(req *http.Request) string {
+	if req == nil {
+		return ""
+	}
+
+	return req.Method
 }
 
 func determineEndpoint(endpoints []*regexp.Regexp, req *http.Request) string {

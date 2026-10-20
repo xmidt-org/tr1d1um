@@ -627,7 +627,7 @@ func TestRateLimiter_Denied(t *testing.T) {
 
 			rejected := checks.With(prometheus.Labels{
 				ClientIDLabel:  testPrincipal,
-				PartnerIDLabel: "",
+				PartnerIDLabel: EmptyLabelValue,
 				EndpointLabel:  NoneEndpoint,
 				MethodLabel:    http.MethodGet,
 				OutcomeLabel:   Rejected,
