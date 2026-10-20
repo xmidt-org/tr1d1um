@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -411,6 +412,50 @@ func TestGetDeviceId(t *testing.T) {
 			id := getDeviceId(tc.req())
 			assert.NotNil(id)
 			assert.Equal(tc.expected, id)
+		})
+	}
+}
+
+// TestMarshalJSON marshals pointers to Request and response, alone and inside
+// another value.  Their MarshalJSON methods once called json.Marshal on
+// themselves, which recursed until the stack overflowed and the process died.
+func TestMarshalJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		v    any
+		want string
+	}{
+		{
+			name: "request",
+			v:    &Request{Address: "198.51.100.7", Path: "/api/v3/device", Query: "names=x", Method: http.MethodGet},
+			want: `{"address":"198.51.100.7","path":"/api/v3/device","query":"names=x","method":"GET"}`,
+		}, {
+			name: "empty request omits every field",
+			v:    &Request{},
+			want: `{}`,
+		}, {
+			name: "response",
+			v:    &response{Code: http.StatusOK, Headers: map[string][]string{"X-Test": {"a"}}},
+			want: `{"code":200,"headers":{"X-Test":["a"]}}`,
+		}, {
+			name: "empty response omits every field",
+			v:    &response{},
+			want: `{}`,
+		}, {
+			name: "nested",
+			v: struct {
+				Request  *Request  `json:"request"`
+				Response *response `json:"response"`
+			}{&Request{Method: http.MethodPost}, &response{Code: http.StatusNotFound}},
+			want: `{"request":{"method":"POST"},"response":{"code":404}}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := json.Marshal(tc.v)
+			require.NoError(t, err)
+			assert.JSONEq(t, tc.want, string(got))
 		})
 	}
 }
