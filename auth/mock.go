@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/stretchr/testify/mock"
+
 	"github.com/xmidt-org/bascule/basculehttp"
 )
 

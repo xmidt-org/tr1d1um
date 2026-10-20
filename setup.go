@@ -8,8 +8,9 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/xmidt-org/sallust"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/sallust"
 )
 
 func setupFlagSet(fs *pflag.FlagSet) {
@@ -36,8 +37,8 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 		err = v.ReadInConfig()
 	} else {
 		v.SetConfigName(applicationName)
-		v.AddConfigPath(fmt.Sprintf("/etc/%s", applicationName))
-		v.AddConfigPath(fmt.Sprintf("$HOME/.%s", applicationName))
+		v.AddConfigPath("/etc/" + applicationName)
+		v.AddConfigPath("$HOME/." + applicationName)
 		v.AddConfigPath(".")
 		err = v.ReadInConfig()
 	}
@@ -50,7 +51,9 @@ func setup(args []string) (*viper.Viper, *zap.Logger, *pflag.FlagSet, error) {
 	}
 
 	var c sallust.Config
-	v.UnmarshalKey("logging", &c)
+	if err := v.UnmarshalKey("logging", &c); err != nil {
+		return v, nil, fs, fmt.Errorf("failed to read logging config: %w", err)
+	}
 	l := zap.Must(c.Build())
 	return v, l, fs, err
 }

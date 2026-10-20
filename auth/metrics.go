@@ -14,11 +14,12 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/clortho"
-	"go.uber.org/zap"
 )
 
 const Wildcard = "*"
@@ -54,7 +55,7 @@ const (
 	Rejected = "rejected"
 
 	TokenMissing = "token_not_found"
-	// nolint: gosec
+	//nolint:gosec // a metric label, not a credential
 	TokenTypeMismatch = "token_type_mismatch"
 
 	WRPPIDMissing  = "wrp_pid_missing"
@@ -259,7 +260,7 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	client := e.Token.Principal()
 	partner := determinePartnerID(e.Token)
 	fs := []zap.Field{zap.String("sat_client_id", client), zap.String("sat_partner_id", partner)}
-	reason := ""
+	var reason string
 	if errors.Is(e.Err, bascule.ErrBadCredentials) {
 		reason = AuthBadCreds
 	} else if errors.Is(e.Err, basculehttp.ErrNoCIDRCapability) {

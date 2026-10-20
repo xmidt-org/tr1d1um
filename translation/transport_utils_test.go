@@ -18,14 +18,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/tr1d1um/paramfilter"
 	transaction "github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/wrp-go/v5"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 const (
@@ -48,8 +49,8 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 		assert := assert.New(t)
 		wdmp := new(setWDMP)
 		err := deduceSET(wdmp, "", "", "")
-		assert.Nil(err)
-		assert.EqualValues(CommandSet, wdmp.Command)
+		require.NoError(t, err)
+		assert.Equal(CommandSet, wdmp.Command)
 
 	})
 
@@ -58,8 +59,8 @@ func TestValidateAndDeduceSETCommand(t *testing.T) {
 		wdmp := new(setWDMP)
 
 		err := deduceSET(wdmp, "newVal", "oldVal", "")
-		assert.Nil(err)
-		assert.EqualValues(CommandTestSet, wdmp.Command)
+		require.NoError(t, err)
+		assert.Equal(CommandTestSet, wdmp.Command)
 	})
 }
 
@@ -67,10 +68,10 @@ func TestIsValidSetWDMP(t *testing.T) {
 	t.Run("TestAndSetZeroParams", func(t *testing.T) {
 		assert := assert.New(t)
 
-		wdmp := &setWDMP{Command: CommandTestSet} //nil parameters
+		wdmp := &setWDMP{Command: CommandTestSet} // nil parameters
 		assert.True(isValidSetWDMP(wdmp))
 
-		wdmp = &setWDMP{Command: CommandTestSet, Parameters: []setParam{}} //empty parameters
+		wdmp = &setWDMP{Command: CommandTestSet, Parameters: []setParam{}} // empty parameters
 		assert.True(isValidSetWDMP(wdmp))
 	})
 
@@ -95,7 +96,7 @@ func TestIsValidSetWDMP(t *testing.T) {
 		param := setParam{
 			Name:  &name,
 			Value: 3,
-			//DataType is left undefined
+			// DataType is left undefined
 		}
 		params := []setParam{param}
 		wdmp := &setWDMP{Command: CommandSet, Parameters: params}
@@ -120,12 +121,12 @@ func TestIsValidSetWDMP(t *testing.T) {
 		name, dataType := "victorious", int8(1)
 		setAttrParam := setParam{
 			Name:       &name,
-			Attributes: map[string]interface{}{"three": 3},
+			Attributes: map[string]any{"three": 3},
 		}
 
 		sp := setParam{
 			Name:       &name,
-			Attributes: map[string]interface{}{"two": 2},
+			Attributes: map[string]any{"two": 2},
 			Value:      3,
 			DataType:   &dataType,
 		}
@@ -140,7 +141,7 @@ func TestIsValidSetWDMP(t *testing.T) {
 		name := "victorious"
 		setAttrParam := setParam{
 			Name:       &name,
-			Attributes: map[string]interface{}{"three": 3},
+			Attributes: map[string]any{"three": 3},
 		}
 		params := []setParam{setAttrParam}
 		wdmp := &setWDMP{Command: CommandSetAttrs, Parameters: params}
@@ -151,27 +152,27 @@ func TestIsValidSetWDMP(t *testing.T) {
 func TestGetCommandForParam(t *testing.T) {
 	t.Run("EmptyParams", func(t *testing.T) {
 		assert := assert.New(t)
-		assert.EqualValues(CommandSet, getCommandForParams(nil))
-		assert.EqualValues(CommandSet, getCommandForParams([]setParam{}))
+		assert.Equal(CommandSet, getCommandForParams(nil))
+		assert.Equal(CommandSet, getCommandForParams([]setParam{}))
 	})
 
-	//Attributes and Name are required properties for SET_ATTRS
+	// Attributes and Name are required properties for SET_ATTRS
 	t.Run("SetCommandUndefinedAttributes", func(t *testing.T) {
 		assert := assert.New(t)
 		name := "setParam"
 		setCommandParam := setParam{Name: &name}
-		assert.EqualValues(CommandSet, getCommandForParams([]setParam{setCommandParam}))
+		assert.Equal(CommandSet, getCommandForParams([]setParam{setCommandParam}))
 	})
 
-	//DataType and Value must be null for SET_ATTRS
+	// DataType and Value must be null for SET_ATTRS
 	t.Run("SetAttrsCommand", func(t *testing.T) {
 		assert := assert.New(t)
 		name := "setAttrsParam"
 		setCommandParam := setParam{
 			Name:       &name,
-			Attributes: map[string]interface{}{"zero": 0},
+			Attributes: map[string]any{"zero": 0},
 		}
-		assert.EqualValues(CommandSetAttrs, getCommandForParams([]setParam{setCommandParam}))
+		assert.Equal(CommandSetAttrs, getCommandForParams([]setParam{setCommandParam}))
 	})
 }
 func TestWrapInWRP(t *testing.T) {
@@ -181,24 +182,23 @@ func TestWrapInWRP(t *testing.T) {
 		w, e := wrap([]byte(""), "", nil, nil, nil)
 
 		assert.Nil(w)
-		assert.ErrorIs(e, wrp.ErrorInvalidDeviceName)
+		require.ErrorIs(t, e, wrp.ErrorInvalidDeviceName)
 
 		var coded transaction.CodedError
-		assert.ErrorAs(e, &coded)
+		require.ErrorAs(t, e, &coded)
 		assert.Equal(http.StatusBadRequest, coded.StatusCode())
 	})
 
 	t.Run("GivenParameters", func(t *testing.T) {
 		assert := assert.New(t)
 
-		// nolint: goconst
 		w, e := wrap([]byte{'t'}, "t0", map[string]string{"deviceid": "mac:112233445566", "service": "s0"}, nil, nil)
 
-		assert.Nil(e)
-		assert.EqualValues(wrp.SimpleRequestResponseMessageType, w.Type)
-		assert.EqualValues([]byte{'t'}, w.Payload)
-		assert.EqualValues("mac:112233445566/s0", w.Destination)
-		assert.EqualValues("t0", w.TransactionUUID)
+		require.NoError(t, e)
+		assert.Equal(wrp.SimpleRequestResponseMessageType, w.Type)
+		assert.Equal([]byte{'t'}, w.Payload)
+		assert.Equal("mac:112233445566/s0", w.Destination)
+		assert.Equal("t0", w.TransactionUUID)
 	})
 }
 
@@ -218,12 +218,11 @@ func TestDecodeValidServiceRequest(t *testing.T) {
 	t.Run("ValidService", func(t *testing.T) {
 		assert := assert.New(t)
 		r := httptest.NewRequest(http.MethodGet, "localhost:8090/api", nil)
-		// nolint: goconst
 		r = mux.SetURLVars(r, map[string]string{"service": "s0"})
 
 		i, err := f(context.TODO(), r)
 		assert.Nil(i)
-		assert.Nil(err)
+		assert.NoError(err)
 	})
 }
 
@@ -258,7 +257,7 @@ func TestGetParamNames(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert := assert.New(t)
 			r := getParamNames(tc.params)
-			assert.Equal(r, tc.expectedParamnames)
+			assert.Equal(tc.expectedParamnames, r)
 		})
 	}
 }

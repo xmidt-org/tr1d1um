@@ -2,52 +2,182 @@
 ## SPDX-License-Identifier: Apache-2.0
 ---
 version: "2"
+
 linters:
+  default: none
   enable:
-    - bodyclose
-    - dupl
-    - errorlint
-    - goconst
-    - gosec
-    - misspell
-    - prealloc
-    - unconvert
-  disable:
+    # Correctness: the standard set, which must never be disabled.
     - errcheck
+    - govet
     - ineffassign
+    - staticcheck
+    - unused
+
+    # Correctness: errors and nil handling.
+    - errname
+    - errorlint
+    - nilerr
+    - nilnil
+    - wastedassign
+
+    # Correctness: HTTP, contexts and concurrency.
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - fatcontext
+    - noctx
+    - usestdlibvars
+
+    # Correctness: misuse that compiles.
+    - asasalint
+    - bidichk
+    - exhaustive
+    - gocheckcompilerdirectives
+    - gocritic
+    - gosec
+    - makezero
+    - predeclared
+    - reassign
+    - recvcheck
+    - unparam
+
+    # Tests: a test that cannot fail, or fails for the wrong reason, is worse
+    # than no test.
+    - testableexamples
+    - testifylint
+    - thelper
+    - tparallel
+    - usetesting
+
+    # Hygiene: keeps lint suppressions honest and the code idiomatic.
+    - dupl
+    - goconst
+    - intrange
+    - misspell
+    - modernize
+    - nolintlint
+    - perfsprint
+    - prealloc
+    - revive
+    - unconvert
+
   settings:
+    errcheck:
+      exclude-functions:
+        # A failed write to a response cannot be reported to the client.
+        - (net/http.ResponseWriter).Write
+        # Closing a response body that has already been read is best effort.
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        # Printing to the console or a caller supplied writer.
+        - fmt.Fprintf
+
     errorlint:
+      # Report non-wrapping error creation using fmt.Errorf
       errorf: false
+
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    gosec:
+      excludes:
+        # G104 duplicates errcheck.
+        - G104
+
+    gocritic:
+      disabled-checks:
+        # Purely stylistic; the existing if/else chains read fine.
+        - ifElseChain
+        - captLocal
+
+    govet:
+      enable:
+        - nilness
+        - reflectvaluecompare
+        - unusedwrite
+
     misspell:
       locale: US
+
+    testifylint:
+      disable:
+        # Metric counters are compared exactly.
+        - float-compare
+
+    nolintlint:
+      # Every suppression names its linter and says why.
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+    revive:
+      rules:
+        - name: atomic
+        - name: blank-imports
+        - name: confusing-results
+        - name: constant-logical-expr
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: datarace
+        - name: defer
+        - name: dot-imports
+        - name: early-return
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: identical-branches
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: modifies-value-receiver
+        - name: range
+        - name: range-val-address
+        - name: range-val-in-closure
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: string-of-int
+        - name: superfluous-else
+        - name: time-equal
+        - name: time-naming
+        - name: unconditional-recursion
+        - name: unexported-return
+        - name: unreachable-code
+        - name: useless-break
+        - name: var-declaration
+        - name: waitgroup-by-value
+
   exclusions:
     generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
     rules:
-      - linters:
+      # Tests repeat literals and grow long for readability, and build
+      # requests without a context on purpose.
+      - path: _test\.go
+        linters:
           - dupl
-          - funlen
-        path: _test.go
-      - path: main\.go            # Accept TLSClientConfig with InsecureSkipVerify
-        text: 'G402:'
+          - errcheck
+          - goconst
+          - nilnil
+          - noctx
+      - path: _test\.go
+        text: 'confusing-results'
+      - path: mocks_test\.go
+        linters:
+          - gocritic
       - path: main\.go            # Accept pprof is automatically exposed
         text: 'G108:'
-      - path: outboundSender\.go  # Accept sha1 for signature
-        text: 'G505:'
-      - path: .go                 # Accept deprecated packages for now.
+      - path: \.go$               # Accept deprecated packages for now.
         text: 'SA1019:'
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+
 formatters:
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/xmidt-org
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

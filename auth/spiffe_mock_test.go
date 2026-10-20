@@ -52,7 +52,7 @@ func newMockWorkloadAPI(t *testing.T) *mockWorkloadAPI {
 
 	// A unix socket path is limited to about 100 bytes, which t.TempDir can
 	// exceed for long test names.
-	dir, err := os.MkdirTemp("", "spiffe")
+	dir, err := os.MkdirTemp("", "spiffe") //nolint:usetesting // t.TempDir paths can exceed the socket path limit
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dir) })
 

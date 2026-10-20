@@ -15,12 +15,13 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	anclaauth "github.com/xmidt-org/ancla/auth"
 	"github.com/xmidt-org/clortho"
 	"github.com/xmidt-org/clortho/clorthofx"
 	"github.com/xmidt-org/touchstone"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // clortho's configuration types carry no struct tags, so this checks that the
@@ -92,7 +93,7 @@ auth:
 	assert.Same(t, https, out.PerKeys[0].Client)
 
 	_, err := clortho.NewKeySetProvider(out.KeySets[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = clortho.NewPerKeyProvider(out.PerKeys[0])
 	assert.NoError(t, err)
 }
@@ -229,9 +230,9 @@ func TestProvide(t *testing.T) {
 
 			switch {
 			case tc.failure:
-				assert.Error(t, app.Err())
+				require.Error(t, app.Err())
 			case tc.wantErr != nil:
-				assert.ErrorIs(t, app.Err(), tc.wantErr)
+				require.ErrorIs(t, app.Err(), tc.wantErr)
 			default:
 				assert.NoError(t, app.Err())
 			}

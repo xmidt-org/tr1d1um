@@ -9,16 +9,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCodedErrorUnwrap(t *testing.T) {
 	cause := errors.New("the cause")
 	err := NewBadRequestError(cause)
 
-	assert.ErrorIs(t, err, cause)
+	require.ErrorIs(t, err, cause)
 
 	var coded CodedError
-	assert.ErrorAs(t, err, &coded)
+	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, http.StatusBadRequest, coded.StatusCode())
 	assert.Equal(t, cause.Error(), err.Error())
 }

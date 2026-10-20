@@ -11,6 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/bascule/basculejwt"
 )
@@ -87,7 +88,6 @@ func TestRequirePartnerIDs(t *testing.T) {
 		{
 			name: "partnerIDs",
 			attrMap: map[string]any{
-				// nolint: goconst
 				allowedPartners: []string{"partner0", "partner1"},
 			},
 			shouldPass: true,

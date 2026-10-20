@@ -17,6 +17,7 @@ import (
 
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
+
 	"github.com/xmidt-org/bascule/basculehttp"
 )
 

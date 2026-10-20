@@ -24,17 +24,17 @@ type Service interface {
 
 // ServiceOptions defines the options needed to build a new translation WRP service.
 type ServiceOptions struct {
-	//XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages.
+	// XmidtWrpURL is the URL of the XMiDT API which takes in WRP messages.
 	XmidtWrpURL string
 
-	//WRPSource is the value set on the WRPSource field of all WRP messages created by Tr1d1um.
+	// WRPSource is the value set on the WRPSource field of all WRP messages created by Tr1d1um.
 	WRPSource string
 
-	//Acquirer provides a mechanism to build auth headers for outbound requests.
+	// Acquirer provides a mechanism to build auth headers for outbound requests.
 	Auth auth.Decorator
 
-	//T is the component that's responsible to make the HTTP
-	//request to the XMiDT API and return only data we care about.
+	// T is the component that's responsible to make the HTTP
+	// request to the XMiDT API and return only data we care about.
 	transaction.T
 }
 

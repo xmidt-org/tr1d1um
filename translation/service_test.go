@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/tr1d1um/auth"
 	"github.com/xmidt-org/wrp-go/v5"
@@ -74,18 +75,18 @@ func TestSendWRP(t *testing.T) {
 			}, wrp.Msgpack)
 
 			var requestMatcher = func(r *http.Request) bool {
-				assert.EqualValues("http://localhost/wrp", r.URL.String())
-				assert.EqualValues(testCase.ExpectedRequestAuth, r.Header.Get(basculehttp.DefaultAuthorizationHeader))
-				assert.EqualValues(wrphttp.MEDIA_TYPE_MSGPACK, r.Header.Get("Content-Type"))
+				assert.Equal("http://localhost/wrp", r.URL.String())
+				assert.Equal(testCase.ExpectedRequestAuth, r.Header.Get(basculehttp.DefaultAuthorizationHeader))
+				assert.Equal(wrphttp.MEDIA_TYPE_MSGPACK, r.Header.Get("Content-Type"))
 
 				data, err := io.ReadAll(r.Body)
-				require.Nil(err)
+				require.NoError(err)
 				r.Body = io.NopCloser(bytes.NewBuffer(data))
 
-				assert.EqualValues(string(expected), string(data))
+				assert.Equal(string(expected), string(data))
 
-				//MatchedBy is not friendly in explicitly showing what's not matching
-				//so we use assertions instead in this function
+				// MatchedBy is not friendly in explicitly showing what's not matching
+				// so we use assertions instead in this function
 				return true
 			}
 
@@ -107,7 +108,7 @@ func TestSendWRP(t *testing.T) {
 				authDecorator.AssertExpectations(t)
 				assert.Equal(testCase.MockError, e)
 			} else {
-				assert.Nil(e)
+				assert.NoError(e)
 			}
 		})
 	}

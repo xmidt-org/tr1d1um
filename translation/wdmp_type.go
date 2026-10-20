@@ -33,10 +33,10 @@ type setWDMP struct {
 }
 
 type setParam struct {
-	Name       *string                `json:"name"`
-	DataType   *int8                  `json:"dataType,omitempty"`
-	Value      interface{}            `json:"value,omitempty"`
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
+	Name       *string        `json:"name"`
+	DataType   *int8          `json:"dataType,omitempty"`
+	Value      any            `json:"value,omitempty"`
+	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
 type addRowWDMP struct {

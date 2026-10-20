@@ -69,7 +69,8 @@ func TestHandler(t *testing.T) {
 				encodedErr  error
 				finalCode   int
 				finalHeader http.Header
-				finalCtx    context.Context
+				finalBefore any
+				finalRan    bool
 			)
 
 			h := Handler[string, string]{
@@ -100,7 +101,8 @@ func TestHandler(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 				},
 				Finalize: func(ctx context.Context, code int, _ *http.Request) {
-					finalCtx = ctx
+					finalRan = true
+					finalBefore = ctx.Value(ctxKeyBefore{})
 					finalCode = code
 					finalHeader, _ = ctx.Value(ContextKeyResponseHeaders).(http.Header)
 				},
@@ -116,8 +118,8 @@ func TestHandler(t *testing.T) {
 
 			// the finalizer always runs, sees the before-enriched context,
 			// and gets the headers actually written
-			require.NotNil(finalCtx)
-			assert.Equal("set", finalCtx.Value(ctxKeyBefore{}))
+			require.True(finalRan)
+			assert.Equal("set", finalBefore)
 			assert.Equal(tc.expectedCode, finalCode)
 			assert.Equal(rec.Header(), finalHeader)
 		})

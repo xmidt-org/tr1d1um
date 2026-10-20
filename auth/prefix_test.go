@@ -221,9 +221,9 @@ func TestPrefixShapes_ParamMaxAge(t *testing.T) {
 			}}
 			mw, _, _ := protectCounting(t, cfg, v, keys.provider)
 
-			cap := shape.prefix + anything
+			capStr := shape.prefix + anything
 			authorization := "Bearer " + keys.signAs(t, testPrincipal, stale, now.Add(24*time.Hour), map[string]any{
-				capabilitiesClaim: []string{testPrefix + "device/.*/config:all", cap},
+				capabilitiesClaim: []string{testPrefix + "device/.*/config:all", capStr},
 				allowedResources:  partners(testPartner),
 			})
 			rec := serveRequest(t, mw, func(req *http.Request) {
@@ -237,7 +237,7 @@ func TestPrefixShapes_ParamMaxAge(t *testing.T) {
 			// quoted when it is not a plain header token
 			got := rec.Header().Values(WarningHeader)
 			require.Len(t, got, 1, "warnings: %v", got)
-			assert.Regexp(t, `cap="?`+regexp.QuoteMeta(cap)+`"?;`, got[0])
+			assert.Regexp(t, `cap="?`+regexp.QuoteMeta(capStr)+`"?;`, got[0])
 		})
 	}
 }

@@ -41,7 +41,7 @@ const (
 type Options struct {
 	S Service
 
-	//APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
+	// APIRouter is assumed to be a subrouter with the API prefix path (i.e. 'api/v2')
 	APIRouter *mux.Router
 
 	Authenticate                *alice.Chain
@@ -98,7 +98,7 @@ func getPartnerIDs(h http.Header) []string {
 
 	for _, value := range headers {
 		fields := strings.Split(value, ",")
-		for i := 0; i < len(fields); i++ {
+		for i := range fields {
 			fields[i] = strings.TrimSpace(fields[i])
 		}
 		partners = append(partners, fields...)
@@ -109,12 +109,12 @@ func getPartnerIDs(h http.Header) []string {
 // getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
 func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	token, ok := bascule.Get(ctx)
-	//if not jwt type
+	// if not jwt type
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
 
-	//if not jwt type
+	// if not jwt type
 	switch token.(type) {
 	case basculejwt.Claims:
 	default:
@@ -127,7 +127,7 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	}
 
 	partnerVal, ok := bascule.GetAttribute[any](accessor, auth.PartnerKeys...)
-	//if no partner ids
+	// if no partner ids
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
@@ -204,7 +204,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 	case http.MethodPost:
 		payload, err = requestAddPayload(mux.Vars(r), r.Body)
 	default:
-		//Unwanted methods should be filtered at the mux level. Thus, we "should" never get here
+		// Unwanted methods should be filtered at the mux level. Thus, we "should" never get here
 		err = ErrUnsupportedMethod
 	}
 
@@ -213,7 +213,7 @@ func requestPayload(r *http.Request) (payload []byte, err error) {
 
 /* Response Encoding */
 func encodeResponse(ctx context.Context, w http.ResponseWriter, resp *transaction.XmidtResponse) (err error) {
-	//equivalent to forwarding all headers
+	// equivalent to forwarding all headers
 	transaction.ForwardHeadersByPrefix("", resp.ForwardedHeaders, w.Header())
 
 	// Write TransactionID for all requests
@@ -264,18 +264,17 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	tid := getTID(ctx)
 	w.Header().Set(contentTypeHeaderKey, "application/json")
 	w.Header().Set(candlelight.HeaderWPATIDKeyName, tid)
-	var ce transaction.CodedError
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[transaction.CodedError](err); ok {
 		w.WriteHeader(ce.StatusCode())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 
-		//the real error is logged into our system before encodeError() is called
-		//the idea behind masking it is to not send the external API consumer internal error messages
+		// the real error is logged into our system before encodeError() is called
+		// the idea behind masking it is to not send the external API consumer internal error messages
 		err = transaction.ErrTr1d1umInternal
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message": err.Error(),
 	})
 
@@ -285,7 +284,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 
 func requestSetPayload(in io.Reader, newCID, oldCID, syncCMC string) (p []byte, err error) {
 	var (
-		wdmp = new(setWDMP)
+		wdmp *setWDMP
 		data []byte
 	)
 
@@ -306,7 +305,7 @@ func requestGetPayload(names, attributes string) ([]byte, error) {
 
 	wdmp := new(getWDMP)
 
-	//default values at this point
+	// default values at this point
 	wdmp.Names, wdmp.Command = split, CommandGet
 
 	if attributes != "" {

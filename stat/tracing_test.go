@@ -13,10 +13,11 @@ import (
 	"github.com/justinas/alice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/candlelight"
-	"github.com/xmidt-org/tr1d1um/transaction"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/candlelight"
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // contextCapturingService records the context the endpoint was called with.

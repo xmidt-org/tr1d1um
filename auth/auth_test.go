@@ -26,8 +26,9 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/clortho"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/clortho"
 )
 
 const (
@@ -1075,5 +1076,5 @@ func TestCheckModeString(t *testing.T) {
 		assert.Equal(t, mode, parsed.String())
 	}
 
-	assert.Equal(t, "", checkMode{required: true}.String(), "a combination that is not a mode")
+	assert.Empty(t, checkMode{required: true}.String(), "a combination that is not a mode")
 }

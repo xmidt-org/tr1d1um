@@ -44,7 +44,7 @@ type fakeIssuer struct {
 
 func (f *fakeIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	n := f.calls.Add(1)
-	require.NoError(f.t, r.ParseForm())
+	assert.NoError(f.t, r.ParseForm())
 
 	f.lock.Lock()
 	f.lastReq = r
@@ -66,6 +66,7 @@ func (f *fakeIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func newTestSPIFFEDecorator(t *testing.T, cfg spiffeDecoratorConfig, issuer *fakeIssuer) (*spiffeDecorator, *[]string) {
+	t.Helper()
 	srv := httptest.NewServer(issuer)
 	t.Cleanup(srv.Close)
 
@@ -164,7 +165,7 @@ func TestSPIFFEDecorator_Concurrent(t *testing.T) {
 	for range 20 {
 		wg.Go(func() {
 			got, err := decorate(d)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, "Bearer token-1", got)
 		})
 	}
@@ -216,7 +217,7 @@ func TestSPIFFEDecorator_Errors(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, got)
 			if tc.wantErr != nil {
-				assert.ErrorIs(t, err, tc.wantErr)
+				require.ErrorIs(t, err, tc.wantErr)
 			}
 			if tc.wantMsg != "" {
 				assert.ErrorContains(t, err, tc.wantMsg)
@@ -236,7 +237,7 @@ func TestSPIFFEDecorator_FetchError(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = decorate(d)
-	assert.ErrorIs(t, err, errNoAgent)
+	require.ErrorIs(t, err, errNoAgent)
 	assert.Zero(t, issuer.calls.Load())
 }
 
@@ -252,10 +253,10 @@ func TestSPIFFEDecorator_CanceledContext(t *testing.T) {
 
 func TestNewSPIFFEDecorator_Validation(t *testing.T) {
 	_, err := newSPIFFEDecorator(spiffeDecoratorConfig{ClientID: "c"}, "k", nil)
-	assert.ErrorIs(t, err, ErrEmptyTokenURL)
+	require.ErrorIs(t, err, ErrEmptyTokenURL)
 
 	_, err = newSPIFFEDecorator(spiffeDecoratorConfig{TokenURL: testIssuerURL}, "k", nil)
-	assert.ErrorIs(t, err, ErrEmptyClientID)
+	require.ErrorIs(t, err, ErrEmptyClientID)
 
 	d, err := newSPIFFEDecorator(spiffeDecoratorConfig{
 		TokenURL: testIssuerURL,
@@ -283,11 +284,11 @@ func TestWorkloadAPIAddress(t *testing.T) {
 		{name: "unix URI", socket: agentURI, want: agentURI},
 		{name: "bare path", socket: "/run/spire/agent.sock", want: agentURI},
 		{name: "tcp", socket: "tcp://127.0.0.1:8081", want: "tcp://127.0.0.1:8081"},
-		{name: "from env", env: ptr("unix:///env/agent.sock"), want: "unix:///env/agent.sock"},
-		{name: "bare path from env", env: ptr("/env/agent.sock"), want: "unix:///env/agent.sock"},
-		{name: "config wins over env", socket: "/cfg.sock", env: ptr("/env.sock"), want: "unix:///cfg.sock"},
+		{name: "from env", env: new("unix:///env/agent.sock"), want: "unix:///env/agent.sock"},
+		{name: "bare path from env", env: new("/env/agent.sock"), want: "unix:///env/agent.sock"},
+		{name: "config wins over env", socket: "/cfg.sock", env: new("/env.sock"), want: "unix:///cfg.sock"},
 		{name: "nothing set", wantErr: ErrNoWorkloadAPI},
-		{name: "empty env", env: ptr(""), wantErr: ErrNoWorkloadAPI},
+		{name: "empty env", env: new(""), wantErr: ErrNoWorkloadAPI},
 		{name: "relative path", socket: "run/spire/agent.sock", failure: true},
 		{name: "unknown scheme", socket: "http://agent", failure: true},
 	}
@@ -305,9 +306,9 @@ func TestWorkloadAPIAddress(t *testing.T) {
 			got, err := workloadAPIAddress(tc.socket)
 			switch {
 			case tc.wantErr != nil:
-				assert.ErrorIs(t, err, tc.wantErr)
+				require.ErrorIs(t, err, tc.wantErr)
 			case tc.failure:
-				assert.Error(t, err)
+				require.Error(t, err)
 			default:
 				require.NoError(t, err)
 				assert.Equal(t, tc.want, got)
@@ -374,7 +375,7 @@ func TestSPIFFEDecorator_WorkloadAPIUnavailable(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = decorate(d)
-	assert.ErrorContains(t, err, "error fetching JWT-SVID")
+	require.ErrorContains(t, err, "error fetching JWT-SVID")
 	assert.Zero(t, issuer.calls.Load())
 }
 
@@ -473,5 +474,3 @@ func jwtClaims(t *testing.T, token string) map[string]any {
 
 	return claims
 }
-
-func ptr[T any](v T) *T { return &v }

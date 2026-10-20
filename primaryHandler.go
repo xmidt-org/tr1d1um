@@ -12,6 +12,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/candlelight"
@@ -26,9 +30,6 @@ import (
 	"github.com/xmidt-org/tr1d1um/translation"
 	"github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/wrp-go/v5"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // httpClientTimeout contains timeouts for an HTTP client and its requests.
@@ -108,7 +109,7 @@ const defaultRetryInterval = time.Second
 // CleanupResponse closes the body of every response but the last, which goes
 // to the caller to close.
 //
-//nolint:bodyclose
+//nolint:bodyclose // the final response is returned to the caller to close
 func newRetryingClient(logger *zap.Logger, retries int, interval time.Duration, counter prometheus.Counter, client *http.Client) (retryhttp.HTTPClient, error) {
 	if retries < 1 {
 		return client, nil
@@ -243,7 +244,7 @@ func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
 				Do:             statClient.Do,
 				RequestTimeout: in.XmidtClientTimeout.RequestTimeout,
 			}),
-		XmidtStatURL: fmt.Sprintf("%s/device/${device}/stat", in.TargetURL),
+		XmidtStatURL: in.TargetURL + "/device/${device}/stat",
 	}
 
 	device_retries_counter, err := in.ServiceConfigsRetries.GetMetricWith(prometheus.Labels{apiLabel: device_api})
@@ -252,7 +253,7 @@ func provideServiceOptions(in ServiceOptionsIn) (ServiceOptionsOut, error) {
 	errs = errors.Join(errs, err)
 	// WRP Service configs
 	translationOptions := &translation.ServiceOptions{
-		XmidtWrpURL: fmt.Sprintf("%s/device", in.TargetURL),
+		XmidtWrpURL: in.TargetURL + "/device",
 		WRPSource:   in.WRPSource,
 		T: transaction.New(
 			&transaction.Options{
