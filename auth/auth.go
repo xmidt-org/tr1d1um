@@ -4,6 +4,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -173,6 +174,14 @@ type cidrConfig struct {
 	// is not one of them.  This is deployment configuration; it is never
 	// read from a token.
 	TrustedProxies []string
+
+	// Overrides are networks set here for particular callers, by principal
+	// (the token's sub), matched without regard to case since the
+	// configuration loses it.  An override replaces the networks the
+	// caller's tokens carry, wider or narrower.  An empty list leaves the
+	// caller with no network, so they are unrestricted, or, in a required
+	// mode, refused.
+	Overrides map[string][]string
 }
 
 // NewMiddleware builds the inbound authentication and authorization chain.
@@ -411,6 +420,48 @@ func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
 	return networks, nil
 }
 
+// parseCIDROverrides parses the networks configured per principal, keyed by
+// the lower-cased principal.  Each must be a network with a prefix length;
+// blank entries are skipped.
+func parseCIDROverrides(overrides map[string][]string) (map[string][]netip.Prefix, error) {
+	parsed := make(map[string][]netip.Prefix, len(overrides))
+
+	for principal, cidrs := range overrides {
+		networks := make([]netip.Prefix, 0, len(cidrs))
+
+		for i, c := range cidrs {
+			c = strings.TrimSpace(c)
+			if c == "" {
+				continue
+			}
+
+			network, err := netip.ParsePrefix(c)
+			if err != nil {
+				return nil, fmt.Errorf("`%s.Overrides[%q][%d]`: expected a network such as 10.0.0.0/8: %w", cidrConfigKey, principal, i, err)
+			}
+
+			networks = append(networks, network)
+		}
+
+		parsed[strings.ToLower(principal)] = networks
+	}
+
+	return parsed, nil
+}
+
+// overrideNetworks returns a resolver that gives a caller with an override
+// exactly the override's networks, whatever their token carries, and leaves
+// every other caller with their token's.
+func overrideNetworks(overrides map[string][]netip.Prefix) basculehttp.CIDRResolver {
+	return func(_ context.Context, principal string, provided []netip.Prefix) ([]netip.Prefix, error) {
+		if networks, ok := overrides[strings.ToLower(principal)]; ok {
+			return networks, nil
+		}
+
+		return provided, nil
+	}
+}
+
 // cidrCheck is the configured CIDR approver and the mode it runs in.
 type cidrCheck struct {
 	approver *basculehttp.CIDRApprover
@@ -438,10 +489,19 @@ func newCIDRApprover(cfg cidrConfig) (cidrCheck, error) {
 		return cidrCheck{}, err
 	}
 
+	overrides, err := parseCIDROverrides(cfg.Overrides)
+	if err != nil {
+		return cidrCheck{}, err
+	}
+
 	opts := []basculehttp.CIDRApproverOption{
 		basculehttp.WithCIDRPrefixLiterals(cfg.Prefixes...),
 		basculehttp.WithOriginResolver(resolver),
 		cidrModeOption(mode),
+	}
+
+	if len(overrides) > 0 {
+		opts = append(opts, basculehttp.WithCIDRResolver(overrideNetworks(overrides)))
 	}
 
 	if cfg.CacheSize > 0 {

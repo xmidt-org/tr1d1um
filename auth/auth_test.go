@@ -534,6 +534,14 @@ func TestNewMiddleware_Config(t *testing.T) {
 			cfg:  inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}, CIDR: cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: unknownMode}}},
 			kp:   keys.provider,
 		}, {
+			name: "cidr override is a bare address",
+			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrPrefixesKey: []string{testCIDRPrefix}},
+			cfg: inboundConfig{JWT: jwtConfig{
+				Prefixes: []string{testPrefix},
+				CIDR:     cidrConfig{Prefixes: []string{testCIDRPrefix}, Overrides: map[string][]string{"a": {"10.0.0.1"}}},
+			}},
+			kp: keys.provider,
+		}, {
 			name: "trusted proxy is a bare address",
 			set:  map[string]any{jwtPrefixesKey: []string{testPrefix}, cidrPrefixesKey: []string{testCIDRPrefix}},
 			cfg: inboundConfig{JWT: jwtConfig{
@@ -614,6 +622,10 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 		return cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: mode}
 	}
 
+	withOverrides := func(mode string, overrides map[string][]string) cidrConfig {
+		return cidrConfig{Prefixes: []string{testCIDRPrefix}, Mode: mode, Overrides: overrides}
+	}
+
 	// malformed is how every malformed cidr warning starts
 	const malformed = "malformed; kind=cidr"
 
@@ -664,6 +676,52 @@ func TestNewMiddleware_CIDR(t *testing.T) {
 			cidrConfigured: true,
 			cidr:           withMode(ModeRequired),
 			authorization:  token(),
+			wantStatus:     http.StatusForbidden,
+			wantReason:     NoCIDRCapability,
+		}, {
+			name:           "override replaces a token's network that excludes the origin",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{testPrincipal: {"192.0.2.0/24"}}),
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusOK,
+		}, {
+			name:           "override narrows a token's network that includes the origin",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{testPrincipal: {"203.0.113.0/24"}}),
+			authorization:  token(testCIDRPrefix + "192.0.2.0/24"),
+			wantStatus:     http.StatusForbidden,
+			wantReason:     OriginNotAllowed,
+		}, {
+			name:           "override gives a token with no cidr capability a network",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{testPrincipal: {"203.0.113.0/24"}}),
+			authorization:  token(),
+			wantStatus:     http.StatusForbidden,
+			wantReason:     OriginNotAllowed,
+		}, {
+			name:           "override principal is matched without regard to case",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{strings.ToUpper(testPrincipal): {"192.0.2.0/24"}}),
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusOK,
+		}, {
+			name:           "override for another principal leaves the token's networks",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{"someone-else": {"192.0.2.0/24"}}),
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusForbidden,
+			wantReason:     OriginNotAllowed,
+		}, {
+			name:           "empty override makes the caller unrestricted",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeEnforce, map[string][]string{testPrincipal: {}}),
+			authorization:  token(testCIDRPrefix + "203.0.113.0/24"),
+			wantStatus:     http.StatusOK,
+		}, {
+			name:           "empty override in required mode leaves the caller with no network",
+			cidrConfigured: true,
+			cidr:           withOverrides(ModeRequired, map[string][]string{testPrincipal: {}}),
+			authorization:  token(testCIDRPrefix + "192.0.2.0/24"),
 			wantStatus:     http.StatusForbidden,
 			wantReason:     NoCIDRCapability,
 		}, {
