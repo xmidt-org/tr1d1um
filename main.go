@@ -123,16 +123,16 @@ func loadTracing(in TracingConfigIn) (candlelight.Tracing, error) {
 	return tracing, nil
 }
 
-func printVersion(f *pflag.FlagSet, arguments []string) (bool, error) {
-	if err := f.Parse(arguments); err != nil {
-		return true, err
+// printVersion writes the version to w and reports true when the flags ask
+// for it.  It runs before the configuration is read, so the version can be
+// printed without one.
+func printVersion(fs *pflag.FlagSet, w io.Writer) bool {
+	if pVersion, _ := fs.GetBool("version"); pVersion {
+		printVersionInfo(w)
+		return true
 	}
 
-	if pVersion, _ := f.GetBool("version"); pVersion {
-		printVersionInfo(os.Stdout)
-		return true, nil
-	}
-	return false, nil
+	return false
 }
 
 func printVersionInfo(writer io.Writer) {
@@ -142,16 +142,6 @@ func printVersionInfo(writer io.Writer) {
 	fmt.Fprintf(writer, "  built time: \t%s\n", Date)
 	fmt.Fprintf(writer, "  git commit: \t%s\n", Commit)
 	fmt.Fprintf(writer, "  os/arch: \t%s/%s\n", runtime.GOOS, runtime.GOARCH)
-}
-
-func exitIfError(logger *zap.Logger, err error) {
-	if err != nil {
-		if logger != nil {
-			logger.Error("failed to parse arguments", zap.Error(err))
-		}
-		fmt.Fprintf(os.Stderr, "Error: %#v\n", err.Error())
-		os.Exit(1)
-	}
 }
 
 // newApp assembles the tr1d1um application from its configuration.
@@ -184,19 +174,21 @@ func newApp(v *viper.Viper, l *zap.Logger) fx.Option {
 }
 
 func tr1d1um(arguments []string) (exitCode int) {
-	v, l, f, err := setup(arguments)
+	fs, err := parseFlags(arguments)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 
 	// This allows us to communicate the version of the binary upon request.
-	if done, parseErr := printVersion(f, arguments); done {
-		// if we're done, we're exiting no matter what
-		if parseErr != nil {
-			exitIfError(l, fmt.Errorf("failed to parse arguments: %w", parseErr))
-		}
-		os.Exit(0)
+	if printVersion(fs, os.Stdout) {
+		return 0
+	}
+
+	v, l, err := setup(fs)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
 	}
 
 	app := fx.New(newApp(v, l))
