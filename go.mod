@@ -1,6 +1,6 @@
 module github.com/xmidt-org/tr1d1um
 
-go 1.27.1
+go 1.27.3
 
 // Authentication bypass: these releases accept any HTTP Basic credential and
 // perform no authorization.  Use v0.13.0 or later.
