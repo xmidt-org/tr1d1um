@@ -4,8 +4,11 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +19,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/xmidt-org/bascule"
 	"github.com/xmidt-org/tokenrate"
 )
 
@@ -565,6 +572,140 @@ func TestRateWindowBounds(t *testing.T) {
 			assert.Equal(t, tc.wantMax, gotMax)
 		})
 	}
+}
+
+// TestRateLimiter_Denied covers a decision tokenrate denies outright, rather
+// than for exceeding a rate.  The configured resolver never errs, so this only
+// happens if tokenrate rejects what it returns; a failing resolver stands in.
+func TestRateLimiter_Denied(t *testing.T) {
+	errResolver := errors.New("resolver failed")
+
+	tests := []struct {
+		name        string
+		mode        string
+		wantStatus  int
+		wantWarning bool
+	}{
+		{name: "enforce refuses", mode: ModeEnforce, wantStatus: http.StatusForbidden},
+		{name: "permissive lets it through", mode: ModePermissive, wantStatus: http.StatusOK},
+		{name: "permissive with warnings tells the caller", mode: ModePermissiveWithWarnings, wantStatus: http.StatusOK, wantWarning: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mode, err := parseMode(tc.mode, rateConfigKey, ModePermissive, ModePermissiveWithWarnings, ModeEnforce)
+			require.NoError(t, err)
+
+			limiter, err := tokenrate.New(
+				tokenrate.WithPrefixes(testRatePrefix),
+				tokenrate.WithResolver(func(context.Context, string, []tokenrate.Rate) ([]tokenrate.Rate, error) {
+					return nil, errResolver
+				}),
+			)
+			require.NoError(t, err)
+
+			core, logs := observer.New(zapcore.InfoLevel)
+			checks, warnings := testCounter(), testWarningCounter()
+			rl := &rateLimiter{limiter: limiter, mode: mode, l: zap.New(core), counter: checks, warnings: warnings}
+
+			var served bool
+			h := rl.handle(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { served = true }))
+
+			req := httptest.NewRequest(http.MethodGet, testPath, nil)
+			req = req.WithContext(bascule.WithToken(req.Context(), testBasicToken{user: testPrincipal}))
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			assert.Equal(t, tc.wantStatus, rec.Code)
+			assert.Equal(t, tc.wantStatus == http.StatusOK, served)
+			assert.Empty(t, rec.Header().Get("Retry-After"))
+
+			failures := logs.FilterMessage("rate limiter failure").All()
+			require.Len(t, failures, 1, "a denial is logged as a failure in every mode")
+			assert.Equal(t, zapcore.ErrorLevel, failures[0].Level)
+			assert.Equal(t, errResolver.Error(), failures[0].ContextMap()["error"])
+
+			rejected := checks.With(prometheus.Labels{
+				ClientIDLabel:  testPrincipal,
+				PartnerIDLabel: "",
+				EndpointLabel:  NoneEndpoint,
+				MethodLabel:    http.MethodGet,
+				OutcomeLabel:   Rejected,
+				ReasonLabel:    RateDenied,
+			})
+			wouldReject := warnings.With(prometheus.Labels{KindLabel: rateWarningKind, ReasonLabel: RateDenied, ClientIDLabel: testPrincipal})
+			if mode.permissive {
+				assert.Zero(t, testutil.ToFloat64(rejected))
+				assert.Equal(t, float64(1), testutil.ToFloat64(wouldReject))
+			} else {
+				assert.Equal(t, float64(1), testutil.ToFloat64(rejected))
+				assert.Zero(t, testutil.ToFloat64(wouldReject))
+			}
+
+			got := rec.Header().Values(WarningHeader)
+			if !tc.wantWarning {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Contains(t, got[0], warningWouldReject)
+			assert.Contains(t, got[0], "rate-denied")
+		})
+	}
+}
+
+// TestRateLimiter_ExceededIsNotAFailure checks that only a denial is logged as
+// a failure: a caller exceeding their rate is an ordinary rejection.
+func TestRateLimiter_ExceededIsNotAFailure(t *testing.T) {
+	for _, modeName := range []string{ModeEnforce, ModePermissive} {
+		t.Run(modeName, func(t *testing.T) {
+			mode, err := parseMode(modeName, rateConfigKey, ModePermissive, ModePermissiveWithWarnings, ModeEnforce)
+			require.NoError(t, err)
+
+			limiter, err := tokenrate.New(tokenrate.WithPrefixes(testRatePrefix))
+			require.NoError(t, err)
+
+			core, logs := observer.New(zapcore.InfoLevel)
+			rl := &rateLimiter{limiter: limiter, mode: mode, l: zap.New(core), counter: testCounter(), warnings: testWarningCounter()}
+			h := rl.handle(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+
+			token := &testRateToken{principal: testPrincipal, caps: []string{testRatePrefix + onePerMinute}}
+			codes := make([]int, 0, 2)
+			for range 2 {
+				req := httptest.NewRequest(http.MethodGet, testPath, nil)
+				req = req.WithContext(bascule.WithToken(req.Context(), token))
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				codes = append(codes, rec.Code)
+			}
+
+			if mode.permissive {
+				assert.Equal(t, []int{http.StatusOK, http.StatusOK}, codes)
+				assert.Len(t, logs.FilterMessage("rate limiter: would reject").All(), 1)
+			} else {
+				assert.Equal(t, []int{http.StatusOK, http.StatusTooManyRequests}, codes)
+				assert.Len(t, logs.FilterMessage("rate limiter: request rejected").All(), 1)
+			}
+
+			assert.Empty(t, logs.FilterMessage("rate limiter failure").All())
+			assert.Empty(t, logs.FilterLevelExact(zapcore.ErrorLevel).All())
+		})
+	}
+}
+
+// testRateToken is a token carrying capabilities.
+type testRateToken struct {
+	principal string
+	caps      []string
+}
+
+func (t *testRateToken) Principal() string      { return t.principal }
+func (t *testRateToken) Capabilities() []string { return t.caps }
+
+func TestRateRejectionReason(t *testing.T) {
+	assert.Equal(t, RateExceeded, rateRejectionReason(tokenrate.Decision{Reason: tokenrate.RateExceeded}))
+	assert.Equal(t, RateDenied, rateRejectionReason(tokenrate.Decision{Reason: tokenrate.Denied}))
 }
 
 func TestRetryAfterSeconds(t *testing.T) {

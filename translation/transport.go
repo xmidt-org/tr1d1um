@@ -107,9 +107,16 @@ func getPartnerIDs(h http.Header) []string {
 }
 
 // getPartnerIDsDecodeRequest returns array of partnerIDs needed for decodeRequest
+//
+// The partner IDs of a JWT come from its claims.  Every other case falls back
+// to the partner ID headers, which the caller controls.  That suits Basic
+// auth, but would let the caller of a JWT without usable partner claims pick
+// its own; auth's partner ID approver (jwtClaimPartnerIDsValidator) refuses
+// such a JWT before the request gets here, and must stay in place for this
+// fallback to be safe.
 func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 	token, ok := bascule.Get(ctx)
-	// if not jwt type
+	// if there is no token
 	if !ok {
 		return getPartnerIDs(r.Header)
 	}
@@ -121,6 +128,7 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 		return getPartnerIDs(r.Header)
 	}
 
+	// if the jwt has no attributes
 	accessor, ok := token.(bascule.AttributesAccessor)
 	if !ok {
 		return getPartnerIDs(r.Header)
@@ -132,6 +140,7 @@ func getPartnerIDsDecodeRequest(ctx context.Context, r *http.Request) []string {
 		return getPartnerIDs(r.Header)
 	}
 
+	// if the partner ids are not a list of strings
 	partnerIDs, err := cast.ToStringSliceE(partnerVal)
 	if err != nil {
 		return getPartnerIDs(r.Header)

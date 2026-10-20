@@ -118,6 +118,12 @@ func TestIsHTTPSource(t *testing.T) {
 	assert.False(t, isHTTPSource("file:///etc/keys.json"))
 	assert.False(t, isHTTPSource("/etc/keys.json"))
 	assert.False(t, isHTTPSource("keys.example/jwks"))
+
+	// the scheme is case-insensitive
+	assert.True(t, isHTTPSource("HTTPS://keys.example/jwks"))
+
+	// a uri that does not parse is not an http source
+	assert.False(t, isHTTPSource("http://[::1/jwks"))
 }
 
 func TestProvideDecoratorsParseOpts(t *testing.T) {

@@ -62,6 +62,56 @@ func TestDecodeRequest(t *testing.T) {
 		require.NoError(t, e)
 		assert.NotEmpty(wrpMsg)
 	})
+
+	t.Run("TraceHeaders", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			traceparent string
+			tracestate  string
+			want        []string
+		}{
+			{
+				name: "none",
+			}, {
+				name:        "traceparent only",
+				traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+				want: []string{
+					"traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+					"tracestate: ",
+				},
+			}, {
+				name:        "traceparent and tracestate",
+				traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+				tracestate:  "congo=t61rcWkgMzE",
+				want: []string{
+					"traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+					"tracestate: congo=t61rcWkgMzE",
+				},
+			}, {
+				name:       "tracestate without traceparent is dropped",
+				tracestate: "congo=t61rcWkgMzE",
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				r := httptest.NewRequest(http.MethodGet, "http://localhost?names='deviceField'", nil)
+				r = mux.SetURLVars(r, map[string]string{"deviceid": "mac:112233445566"})
+				r.Header.Set(authHeaderKey, "Basic dXNlcjpwYXNz")
+				if tc.traceparent != "" {
+					r.Header.Set("traceparent", tc.traceparent)
+				}
+				if tc.tracestate != "" {
+					r.Header.Set("tracestate", tc.tracestate)
+				}
+
+				decoded, err := decodeRequest(ctxTID, r)
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, decoded.WRPMessage.Headers)
+				assert.Equal(t, "Basic dXNlcjpwYXNz", decoded.AuthHeaderValue)
+			})
+		}
+	})
 }
 
 func TestDecodeRequestPartnerIDs(t *testing.T) {
@@ -681,4 +731,83 @@ func enrichWithBasculeToken(ctx context.Context, isBearer bool, attrMap map[stri
 	}
 
 	return bascule.WithToken(ctx, bascule.StubToken("client0"))
+}
+
+// testClaimsOnly is a JWT that exposes its claims but no attributes.
+type testClaimsOnly struct {
+	basculejwt.Claims
+}
+
+func (t testClaimsOnly) Principal() string { return t.Subject() }
+
+func TestGetPartnerIDsDecodeRequest(t *testing.T) {
+	jwtWith := func(attrs map[string]any) testJWT {
+		token, err := jwt.NewBuilder().Claim(allowedResources, attrs).Subject("client0").Build()
+		require.NoError(t, err)
+		return testJWT{token}
+	}
+
+	headerIDs := []string{"partner0", "partner1", "partner2"}
+
+	tests := []struct {
+		name    string
+		token   bascule.Token
+		headers bool
+		want    []string
+	}{
+		{
+			name:    "no token uses the headers",
+			headers: true,
+			want:    headerIDs,
+		}, {
+			name: "no token and no headers",
+		}, {
+			name:    "a token that is not a jwt uses the headers",
+			token:   bascule.StubToken("client0"),
+			headers: true,
+			want:    headerIDs,
+		}, {
+			name:    "a jwt without attributes uses the headers",
+			token:   testClaimsOnly{jwtWith(map[string]any{allowedPartners: []string{"partnerA"}})},
+			headers: true,
+			want:    headerIDs,
+		}, {
+			name:    "a jwt without partner ids uses the headers",
+			token:   jwtWith(map[string]any{}),
+			headers: true,
+			want:    headerIDs,
+		}, {
+			name:    "a jwt whose partner ids are not a list uses the headers",
+			token:   jwtWith(map[string]any{allowedPartners: map[string]any{"partnerA": true}}),
+			headers: true,
+			want:    headerIDs,
+		}, {
+			name:    "a jwt's partner ids win over the headers",
+			token:   jwtWith(map[string]any{allowedPartners: []string{"partnerA", "partnerB"}}),
+			headers: true,
+			want:    []string{"partnerA", "partnerB"},
+		}, {
+			name:  "a jwt's partner ids need no headers",
+			token: jwtWith(map[string]any{allowedPartners: []string{"partnerA"}}),
+			want:  []string{"partnerA"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
+			if tc.headers {
+				// repeated headers and comma separated lists are both read
+				r.Header.Add(partnerIDHeader, "partner0")
+				r.Header.Add(partnerIDHeader, "partner1, partner2")
+			}
+
+			ctx := context.Background()
+			if tc.token != nil {
+				ctx = bascule.WithToken(ctx, tc.token)
+			}
+
+			assert.Equal(t, tc.want, getPartnerIDsDecodeRequest(ctx, r))
+		})
+	}
 }

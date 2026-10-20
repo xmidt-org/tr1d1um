@@ -13,9 +13,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/ancla"
 )
 
 // temporaryError is an error that reports itself as temporary, as a network
@@ -121,6 +124,72 @@ func TestNewRetryingClient(t *testing.T) {
 			assert.Equal(t, tc.wantRetried, testutil.ToFloat64(counter))
 		})
 	}
+}
+
+// TestNewRetryingClient_DefaultInterval checks that an unset interval falls
+// back to defaultRetryInterval.  To the retry package a nonpositive interval
+// means never retry, so without the default a configured retry count would
+// silently do nothing.
+func TestNewRetryingClient_DefaultInterval(t *testing.T) {
+	t.Parallel()
+
+	for _, interval := range []time.Duration{0, -time.Second} {
+		t.Run(interval.String(), func(t *testing.T) {
+			t.Parallel()
+
+			transport := &scriptedTransport{errs: []error{temporaryError{}}}
+			counter := prometheus.NewCounter(prometheus.CounterOpts{Name: "test_retries"})
+
+			client, err := newRetryingClient(zap.NewNop(), 1, interval, counter, &http.Client{Transport: transport})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodGet, "http://example.com/device", nil)
+			require.NoError(t, err)
+
+			start := time.Now()
+			resp, err := client.Do(req)
+			elapsed := time.Since(start)
+			require.NoError(t, err, "the temporary error is retried")
+			resp.Body.Close()
+
+			assert.Len(t, transport.bodies, 2)
+			assert.Equal(t, float64(1), testutil.ToFloat64(counter))
+			assert.GreaterOrEqual(t, elapsed, defaultRetryInterval, "the retry waits the default interval")
+		})
+	}
+}
+
+func TestProvideWebhookHandlers(t *testing.T) {
+	t.Run("disabled when not configured", func(t *testing.T) {
+		out, err := provideWebhookHandlers(provideWebhookHandlersIn{V: viper.New(), Logger: zap.NewNop()})
+		require.NoError(t, err)
+		assert.Nil(t, out.AddWebhookHandler)
+		assert.Nil(t, out.V2AddWebhookHandler)
+		assert.Nil(t, out.GetAllWebhooksHandler)
+	})
+
+	enabled := func() *viper.Viper {
+		v := viper.New()
+		v.Set(webhookConfigKey, map[string]any{})
+		return v
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		out, err := provideWebhookHandlers(provideWebhookHandlersIn{V: enabled(), Logger: zap.NewNop()})
+		require.NoError(t, err)
+		assert.NotNil(t, out.AddWebhookHandler)
+		assert.NotNil(t, out.V2AddWebhookHandler)
+		assert.NotNil(t, out.GetAllWebhooksHandler)
+	})
+
+	t.Run("invalid validation config", func(t *testing.T) {
+		var cfg ancla.Config
+		cfg.Validation.IP.ForbiddenSubnets = []string{"not a subnet"}
+
+		_, err := provideWebhookHandlers(provideWebhookHandlersIn{V: enabled(), WebhookConfig: cfg, Logger: zap.NewNop()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to initialize webhook validators")
+	})
 }
 
 func TestValidateWRPSource(t *testing.T) {

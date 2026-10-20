@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -204,5 +205,26 @@ func TestApp(t *testing.T) {
 
 		// the application's own metrics are registered
 		assert.Contains(t, got.body, "auth_capability_check")
+	})
+}
+
+func TestConfigureXmidtClientTimeout(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		got := configureXmidtClientTimeout(XmidtClientTimeoutConfigIn{})
+		assert.Equal(t, httpClientTimeout{
+			ClientTimeout:    135 * time.Second,
+			NetDialerTimeout: 5 * time.Second,
+			RequestTimeout:   129 * time.Second,
+		}, got)
+	})
+
+	t.Run("configured values are kept", func(t *testing.T) {
+		want := httpClientTimeout{
+			ClientTimeout:    time.Second,
+			NetDialerTimeout: 2 * time.Second,
+			RequestTimeout:   3 * time.Second,
+		}
+		got := configureXmidtClientTimeout(XmidtClientTimeoutConfigIn{XmidtClientTimeout: want})
+		assert.Equal(t, want, got)
 	})
 }

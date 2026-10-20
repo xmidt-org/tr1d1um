@@ -9,6 +9,7 @@ coverage:
 ignore:
   - "*_test.go"
   - "vendor"
+  - "auth/mock.go"
 
 fixes:
   - "github.com/xmidt-org/tr1d1um/::"

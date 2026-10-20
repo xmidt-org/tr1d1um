@@ -14,6 +14,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -182,4 +183,98 @@ func TestBearerDecorator_FetchDecoratesCallerRequest(t *testing.T) {
 	for i, got := range received {
 		assert.Equal(t, "Bearer "+signed, got, "downstream request %d was unauthenticated", i+1)
 	}
+}
+
+func TestNewDecorator(t *testing.T) {
+	const key = "auth.outbound.fanout"
+
+	tests := []struct {
+		name    string
+		set     []string
+		cfg     decoratorConfig
+		wantErr error
+		want    Decorator
+	}{
+		{
+			name: "none set",
+		}, {
+			name: "more than one set",
+			set:  []string{key + ".JWT", key + ".Basic"},
+			cfg:  decoratorConfig{Basic: "dXNlcjpwYXNz"},
+		}, {
+			name:    "jwt without credentials",
+			set:     []string{key + ".JWT"},
+			cfg:     decoratorConfig{JWT: bearerDecoratorConfig{AuthURL: "https://issuer.example.com"}},
+			wantErr: ErrEmptyAuthCredentials,
+		}, {
+			name: "jwt without url",
+			set:  []string{key + ".JWT"},
+			cfg: decoratorConfig{JWT: bearerDecoratorConfig{
+				RequestHeaders: map[string]string{"X-Client-Secret": "secret"},
+			}},
+			wantErr: ErrEmptyAuthURL,
+		}, {
+			name:    "basic without credentials",
+			set:     []string{key + ".Basic"},
+			wantErr: ErrEmptyAuthCredentials,
+		}, {
+			name: "basic",
+			set:  []string{key + ".Basic"},
+			cfg:  decoratorConfig{Basic: "dXNlcjpwYXNz"},
+			want: &basicDecorator{value: "dXNlcjpwYXNz"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			v := viper.New()
+			for _, k := range tc.set {
+				v.Set(k, "x")
+			}
+
+			d, err := NewDecorator(tc.cfg, v, key)
+			if tc.want == nil {
+				require.Error(t, err)
+				if tc.wantErr != nil {
+					require.ErrorIs(t, err, tc.wantErr)
+				}
+				assert.Nil(t, d)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, d)
+		})
+	}
+
+	t.Run("jwt", func(t *testing.T) {
+		v := viper.New()
+		v.Set(key+".JWT", "x")
+
+		d, err := NewDecorator(decoratorConfig{JWT: bearerDecoratorConfig{
+			AuthURL:        "https://issuer.example.com",
+			PayloadField:   "token",
+			Timeout:        5 * time.Second,
+			Buffer:         time.Minute,
+			RequestHeaders: map[string]string{"X-Client-Secret": "secret"},
+		}}, v, key)
+		require.NoError(t, err)
+
+		bearer, ok := d.(*bearerDecorator)
+		require.True(t, ok, "got %T", d)
+		assert.Equal(t, "https://issuer.example.com", bearer.url)
+		assert.Equal(t, "token", bearer.payloadField)
+		assert.Equal(t, time.Minute, bearer.buffer)
+		assert.Equal(t, map[string]string{"X-Client-Secret": "secret"}, bearer.headers)
+		assert.Equal(t, 5*time.Second, bearer.httpClient.Timeout)
+	})
+}
+
+func TestBasicDecorator_Decorate(t *testing.T) {
+	d := &basicDecorator{value: "dXNlcjpwYXNz"}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	require.NoError(t, d.Decorate(context.Background(), req))
+	assert.Equal(t, "Basic dXNlcjpwYXNz", req.Header.Get("Authorization"))
 }
