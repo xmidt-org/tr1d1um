@@ -107,9 +107,11 @@ logging:
     levelKey: key
     levelEncoder: lowercase
   # reducedLoggingResponseCodes allows disabling verbose transaction logs for
-  # benign responses from the target server given HTTP status codes.
+  # benign responses from the target server given HTTP status codes.  499 is
+  # recorded when the caller closed its connection before the request
+  # finished; no caller ever receives it.
   # (Optional)
-  # reducedLoggingResponseCodes: [200, 504]
+  # reducedLoggingResponseCodes: [200, 499, 504]
 
   # Encoding sets the logger's encoding. Valid values are "json" and
   # "console", as well as any third-party encodings registered via

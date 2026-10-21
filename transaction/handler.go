@@ -5,6 +5,8 @@ package transaction
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 )
 
@@ -61,19 +63,32 @@ func (h Handler[Req, Resp]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	req, err := h.Decode(ctx, r)
 	if err != nil {
-		h.EncodeError(ctx, err, w)
+		h.encodeError(ctx, err, w)
 		return
 	}
 
 	resp, err := h.Serve(ctx, req)
 	if err != nil {
-		h.EncodeError(ctx, err, w)
+		h.encodeError(ctx, err, w)
 		return
 	}
 
 	if err := h.Encode(ctx, w, resp); err != nil {
-		h.EncodeError(ctx, err, w)
+		h.encodeError(ctx, err, w)
 	}
+}
+
+// encodeError hands err to EncodeError.  The server cancels the request
+// context when the caller closes its connection, so a stage that failed
+// after that most likely failed because of it, whatever error it returned.
+// Such an error is reported as StatusClientClosedRequest rather than as
+// the 5xx it would otherwise map to.
+func (h Handler[Req, Resp]) encodeError(ctx context.Context, err error, w http.ResponseWriter) {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		err = NewCodedError(fmt.Errorf("%w: %w", ErrClientClosedRequest, err), StatusClientClosedRequest)
+	}
+
+	h.EncodeError(ctx, err, w)
 }
 
 // statusRecorder remembers the status code written so the finalizer can

@@ -72,6 +72,14 @@ func TestEncodeError(t *testing.T) {
 		})
 	})
 
+	t.Run("ClientClosedRequest", func(t *testing.T) {
+		testErrorEncode(t, transaction.StatusClientClosedRequest, []error{
+			transaction.NewCodedError(
+				fmt.Errorf("%w: %w", transaction.ErrClientClosedRequest, context.Canceled),
+				transaction.StatusClientClosedRequest),
+		})
+	})
+
 	t.Run("Internal", func(t *testing.T) {
 		assert := assert.New(t)
 		expected := bytes.NewBufferString("")
