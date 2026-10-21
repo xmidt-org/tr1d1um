@@ -139,6 +139,16 @@ var stripAPIVersionRegex = regexp.MustCompile(`^/api/v[0-9]+`)
 type inboundConfig struct {
 	JWT   jwtConfig
 	Basic []string
+
+	// MaxValueLen is the most bytes of a principal, a partner or a parameter
+	// name that are recorded in a metric label or a log line.  A longer value
+	// is cut, since it came from a token or a request.  Zero is the default,
+	// 256.
+	MaxValueLen int
+
+	// MaxWarningLen is the most bytes of a warning that are logged.  Zero is
+	// the default, 1024.
+	MaxWarningLen int
 }
 
 type jwtConfig struct {
@@ -218,6 +228,11 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		tellCaller = true
 	)
 
+	lim, err := newLimits(cfg.MaxValueLen, cfg.MaxWarningLen)
+	if err != nil {
+		return alice.Chain{}, nil, err
+	}
+
 	if v.IsSet(basicConfigKey) && v.IsSet(jwtConfigKey) {
 		return alice.Chain{}, nil, fmt.Errorf("`%s` and `%s` can't both be set", basicConfigKey, jwtConfigKey)
 	} else if v.IsSet(basicConfigKey) {
@@ -285,6 +300,8 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 				return alice.Chain{}, nil, fmt.Errorf("error setting up JWT rate capability checks: %v", err)
 			}
 
+			limiter.limits = lim
+
 			l.Info("inbound rate capability checks enabled",
 				zap.String("mode", limiter.mode.String()),
 				zap.Strings("defaults", cfg.JWT.Rate.Defaults),
@@ -296,6 +313,8 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 			if err != nil {
 				return alice.Chain{}, nil, fmt.Errorf("error setting up JWT parameter capability checks: %v", err)
 			}
+
+			params.limits = lim
 
 			l.Info("inbound parameter capability checks enabled",
 				zap.String("mode", params.mode.String()),
@@ -327,6 +346,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 	authorizerOpts = append(authorizerOpts,
 		bascule.WithAuthorizeListeners(
 			authorizerEvent{
+				limits:    lim,
 				l:         l,
 				counter:   counter,
 				warnings:  warnings,
@@ -342,6 +362,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 			bascule.WithValidators(validatorOpts...),
 			bascule.WithAuthenticateListeners(
 				authenticatorEvent{
+					limits:     lim,
 					l:          l,
 					counter:    counter,
 					parserOpts: jwtParseOpts,

@@ -275,6 +275,19 @@ auth:
   # basic or jwt must be configured: the server refuses to start with both or
   # with neither.
   inbound:
+    # maxValueLen is the most bytes of a caller's principal, a partner ID or a
+    # parameter name that are recorded in a metric label or a log line.  These
+    # come from a token or a request, so a longer value is cut and ends with
+    # "...", which stops a caller from filling the logs or the metrics with
+    # very long values.  Invalid UTF-8 is replaced whatever the length.
+    # Optional: the default is 256.
+    # maxValueLen: 256
+
+    # maxWarningLen is the most bytes of a capability warning that are logged,
+    # a warning holding several values such as a capability.  Optional: the
+    # default is 1024.
+    # maxWarningLen: 1024
+
     # basic is a list of base64-encoded "user:password" credentials.  An
     # inbound "Authorization: Basic" header is accepted only when it matches
     # one of them.

@@ -75,6 +75,7 @@ type rateConfig struct {
 // tokenrate's own middleware is not used because it has no permissive mode
 // and no hook for counting rejections the way the other checks are counted.
 type rateLimiter struct {
+	limits
 	limiter   *tokenrate.Limiter
 	mode      checkMode
 	l         *zap.Logger
@@ -289,7 +290,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 			header.Add(WarningHeader, w.String())
 		}
 
-		rl.warnings.With(cleanLabels(prometheus.Labels{
+		rl.warnings.With(rl.cleanLabels(prometheus.Labels{
 			KindLabel:     rateWarningKind,
 			ReasonLabel:   strings.ReplaceAll(w.Reason, "-", "_"),
 			ClientIDLabel: client,
@@ -302,9 +303,9 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 
 	reason := rateRejectionReason(d)
 	fields := []zap.Field{
-		zap.String("sat_client_id", client),
-		zap.String("sat_partner_id", partner),
-		zap.String("sat_rejection_reason", reason),
+		zap.String("jwt_principal", rl.value(client)),
+		zap.String("jwt_partner", rl.value(partner)),
+		zap.String("jwt_rejection_reason", reason),
 		zap.Stringer("limit", d.Limit),
 		zap.Duration("retry_after", d.RetryAfter),
 	}
@@ -331,7 +332,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 			header.Add(WarningHeader, w.String())
 		}
 
-		rl.warnings.With(cleanLabels(prometheus.Labels{
+		rl.warnings.With(rl.cleanLabels(prometheus.Labels{
 			KindLabel:     rateWarningKind,
 			ReasonLabel:   reason,
 			ClientIDLabel: client,
@@ -342,7 +343,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 		return
 	}
 
-	rl.counter.With(cleanLabels(prometheus.Labels{
+	rl.counter.With(rl.cleanLabels(prometheus.Labels{
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(rl.endpoints, request),

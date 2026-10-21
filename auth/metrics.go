@@ -6,10 +6,12 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -48,6 +50,61 @@ const (
 	warningWouldReject = "would-reject"
 	warningRejected    = "rejected"
 )
+
+// The defaults for the most bytes of a value that came from a token or a
+// request that are recorded.  A basic auth user name is whatever the caller
+// sends, and a token's principal, partner and capabilities are whatever its
+// issuer put there, each up to the size of the request headers, so a value is
+// cut before it becomes a label or part of a log line.  inboundConfig sets
+// them.
+const (
+	// defaultMaxValueLen applies to a single value: a principal, a partner or
+	// a parameter name.
+	defaultMaxValueLen = 256
+
+	// defaultMaxWarningLen applies to a whole warning, which holds several
+	// values.
+	defaultMaxWarningLen = 1024
+)
+
+// limits is how long a value from a token or a request may be when it is
+// recorded.  A field of zero means its default, so the zero value is usable.
+type limits struct {
+	maxValue   int
+	maxWarning int
+}
+
+// newLimits builds limits from the configured lengths, where zero is the
+// default.
+func newLimits(maxValue, maxWarning int) (limits, error) {
+	if maxValue < 0 {
+		return limits{}, fmt.Errorf("`%s.maxValueLen` must not be negative: %d", inboundConfigKey, maxValue)
+	}
+
+	if maxWarning < 0 {
+		return limits{}, fmt.Errorf("`%s.maxWarningLen` must not be negative: %d", inboundConfigKey, maxWarning)
+	}
+
+	return limits{maxValue: maxValue, maxWarning: maxWarning}, nil
+}
+
+// value makes a principal, a partner or a parameter name safe to record.
+func (l limits) value(s string) string {
+	if l.maxValue == 0 {
+		return sanitize(s, defaultMaxValueLen)
+	}
+
+	return sanitize(s, l.maxValue)
+}
+
+// warning makes a warning's text safe to record.
+func (l limits) warning(s string) string {
+	if l.maxWarning == 0 {
+		return sanitize(s, defaultMaxWarningLen)
+	}
+
+	return sanitize(s, l.maxWarning)
+}
 
 // label values
 const (
@@ -111,6 +168,7 @@ const (
 )
 
 type authenticatorEvent struct {
+	limits
 	l          *zap.Logger
 	counter    *prometheus.CounterVec
 	endpoints  []*regexp.Regexp
@@ -124,7 +182,7 @@ func (ae authenticatorEvent) OnEvent(e bascule.AuthenticateEvent[*http.Request])
 		return
 	}
 
-	ae.counter.With(cleanLabels(ae.getLabels(e))).Add(1)
+	ae.counter.With(ae.cleanLabels(ae.getLabels(e))).Add(1)
 }
 
 func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request]) prometheus.Labels {
@@ -173,7 +231,7 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		reason = UnknownReason
 	}
 
-	fs := []zap.Field{zap.String("sat_client_id", client), zap.String("sat_partner_id", partner), zap.String("sat_rejection_reason", reason)}
+	fs := []zap.Field{zap.String("jwt_principal", ae.value(client)), zap.String("jwt_partner", ae.value(partner)), zap.String("jwt_rejection_reason", reason)}
 	if reason == UnknownReason {
 		ae.l.Error("authenticator event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
@@ -199,6 +257,7 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 }
 
 type authorizerEvent struct {
+	limits
 	l         *zap.Logger
 	counter   *prometheus.CounterVec
 	warnings  *prometheus.CounterVec
@@ -220,7 +279,7 @@ func (ae authorizerEvent) OnEvent(e bascule.AuthorizeEvent[*http.Request]) {
 		ls = ae.getLabels(e)
 	}
 
-	ae.counter.With(cleanLabels(ls)).Add(1)
+	ae.counter.With(ae.cleanLabels(ls)).Add(1)
 	ae.recordWarnings(e)
 }
 
@@ -244,16 +303,16 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 		}
 
 		kind, reason := warningKindReason(w)
-		ae.warnings.With(cleanLabels(prometheus.Labels{
+		ae.warnings.With(ae.cleanLabels(prometheus.Labels{
 			KindLabel:     kind,
 			ReasonLabel:   reason,
 			ClientIDLabel: client,
 		})).Add(1)
 
 		ae.l.Info("authorizer event: capability warning",
-			zap.String("sat_client_id", client),
-			zap.String("sat_partner_id", partner),
-			zap.String("warning", w.String()))
+			zap.String("jwt_principal", ae.value(client)),
+			zap.String("jwt_partner", ae.value(partner)),
+			zap.String("warning", ae.warning(w.String())))
 	}
 }
 
@@ -277,9 +336,12 @@ func warningKindReason(w bascule.Warning) (kind, reason string) {
 }
 
 func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) prometheus.Labels {
-	client := principalOf(e.Token)
-	partner := determinePartnerID(e.Token)
-	fs := []zap.Field{zap.String("sat_client_id", client), zap.String("sat_partner_id", partner)}
+	client := ae.value(principalOf(e.Token))
+	partner := ae.value(determinePartnerID(e.Token))
+	fs := []zap.Field{
+		zap.String("jwt_principal", client),
+		zap.String("jwt_partner", partner),
+	}
 	// The claim errors wrap bascule.ErrBadCredentials, so they are checked
 	// before it.
 	var reason string
@@ -305,7 +367,7 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 		reason = UnknownReason
 	}
 
-	fs = append(fs, zap.String("sat_rejection_reason", reason))
+	fs = append(fs, zap.String("jwt_rejection_reason", reason))
 	if reason == UnknownReason {
 		ae.l.Error("authorizer event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
@@ -328,13 +390,43 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	}
 }
 
+// unlimited is the limit for a value that is cleaned but not cut.
+const unlimited = math.MaxInt
+
+// sanitize makes s safe to record: invalid UTF-8 is replaced, since Prometheus
+// panics on it, and then s is cut to limit bytes on a character boundary.  A
+// cut value ends with an ellipsis.  The value is cleaned first because
+// replacing invalid bytes can make it longer.
+func sanitize(s string, limit int) string {
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	if len(s) <= limit {
+		return s
+	}
+
+	// cut on a character boundary, without running off the front of bytes that
+	// are not text at all
+	n := limit
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+
+	return s[:n] + "..."
+}
+
 // cleanLabels makes ls safe and clear to record.  Prometheus panics on a label
 // value that is not valid UTF-8, and some values, such as a basic auth user
-// name, are whatever the caller sends, so invalid bytes are replaced.  An
-// empty value becomes EmptyLabelValue.
-func cleanLabels(ls prometheus.Labels) prometheus.Labels {
+// name, are whatever the caller sends, so invalid bytes are replaced.  The
+// client and partner come from a token or a request, so they are also cut to
+// the maximum value length; every other label is set by this service, and
+// keeps its length.  An empty value becomes EmptyLabelValue.
+func (l limits) cleanLabels(ls prometheus.Labels) prometheus.Labels {
 	for k, v := range ls {
-		v = strings.ToValidUTF8(v, "\uFFFD")
+		if k == ClientIDLabel || k == PartnerIDLabel {
+			v = l.value(v)
+		} else {
+			v = sanitize(v, unlimited)
+		}
+
 		if v == "" {
 			v = EmptyLabelValue
 		}

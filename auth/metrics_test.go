@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +29,7 @@ import (
 	"github.com/xmidt-org/bascule/basculehttp"
 	"github.com/xmidt-org/bascule/basculejwt"
 	"github.com/xmidt-org/clortho"
+	"github.com/xmidt-org/tokenrate"
 )
 
 // testBasicToken is a basic auth token.
@@ -415,6 +418,420 @@ func TestEventListeners_MissingFields(t *testing.T) {
 			assert.Equal(t, len(tc.event.Warnings), testutil.CollectAndCount(warnings), "warnings counted")
 		})
 	}
+}
+
+func TestSanitize(t *testing.T) {
+	limit := defaultMaxValueLen
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "short", in: "user", want: "user"},
+		{name: "exactly the limit", in: strings.Repeat("a", limit), want: strings.Repeat("a", limit)},
+		{name: "one over", in: strings.Repeat("a", limit+1), want: strings.Repeat("a", limit) + "..."},
+		{name: "far over", in: strings.Repeat("a", 1<<20), want: strings.Repeat("a", limit) + "..."},
+		// "é" is two bytes, and the limit falls between them
+		{name: "cut between the bytes of a character", in: strings.Repeat("a", limit-1) + "é" + "bbb", want: strings.Repeat("a", limit-1) + "..."},
+		{name: "a character ending at the limit is kept", in: strings.Repeat("a", limit-2) + "é" + "bbb", want: strings.Repeat("a", limit-2) + "é..."},
+		// a run of bytes that are not text is one replacement character
+		{name: "bytes that are not text", in: strings.Repeat("\x80", limit+10), want: "\uFFFD"},
+		// each invalid byte here becomes 3, so the value is cleaned before it is
+		// measured: cutting first would leave it three times too long
+		{name: "replacement makes it longer", in: strings.Repeat("\xffa", limit/2), want: strings.Repeat("\uFFFDa", 64) + "..."},
+		{name: "cut inside a replacement character", in: strings.Repeat("a", limit-2) + "\xff" + "tail", want: strings.Repeat("a", limit-2) + "..."},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitize(tc.in, limit)
+			assert.Equal(t, tc.want, got)
+			assert.LessOrEqual(t, len(got), limit+len("..."))
+			assert.True(t, utf8.ValidString(got))
+		})
+	}
+
+	t.Run("unlimited is cleaned but not cut", func(t *testing.T) {
+		assert.Equal(t, strings.Repeat("a", 1<<20)+"\uFFFD", sanitize(strings.Repeat("a", 1<<20)+"\xff", unlimited))
+	})
+}
+
+// TestRejectionLogsShortenThePrincipal checks that a rejected request's
+// principal, which for basic auth is whatever the caller sent, is cut before it
+// is logged, and that the client label is not it.
+func TestRejectionLogsShortenThePrincipal(t *testing.T) {
+	user := strings.Repeat("u", 100_000)
+	logged := func(logs *observer.ObservedLogs) string {
+		require.Equal(t, 1, logs.Len())
+		return logs.All()[0].ContextMap()["jwt_principal"].(string)
+	}
+
+	t.Run("authenticator", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ae := authenticatorEvent{l: zap.New(core)}
+
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source: httptest.NewRequest(http.MethodGet, "/", nil),
+			Token:  testBasicToken{user: user},
+			Err:    bascule.ErrBadCredentials,
+		})
+
+		assert.Equal(t, Unauthenticated, got[ClientIDLabel])
+		assert.Equal(t, sanitize(user, defaultMaxValueLen), logged(logs))
+		assert.Len(t, logged(logs), defaultMaxValueLen+len("..."))
+	})
+
+	t.Run("authorizer", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ae := authorizerEvent{l: zap.New(core)}
+
+		got := ae.getLabels(bascule.AuthorizeEvent[*http.Request]{
+			Resource: httptest.NewRequest(http.MethodGet, "/", nil),
+			Token:    testBasicToken{user: user},
+			Err:      bascule.ErrBadCredentials,
+		})
+
+		assert.Equal(t, Unauthenticated, got[ClientIDLabel])
+		assert.Len(t, logged(logs), defaultMaxValueLen+len("..."))
+	})
+}
+
+// hugeJWT is a verified-looking token whose principal and partner are as long
+// as an issuer could make them.
+func hugeJWT(t *testing.T, value string) testJWT {
+	t.Helper()
+
+	token, err := jwt.NewBuilder().Subject(value).Claim(allowedResources, partners(value)).Build()
+	require.NoError(t, err)
+
+	return testJWT{token}
+}
+
+// logField returns a string field of the only entry logged.
+func logField(t *testing.T, logs *observer.ObservedLogs, key string) string {
+	t.Helper()
+
+	require.Equal(t, 1, logs.Len())
+	field, ok := logs.All()[0].ContextMap()[key].(string)
+	require.True(t, ok, "%s should be logged", key)
+
+	return field
+}
+
+// TestCleanLabels_BoundsValues checks that the client and partner, which come
+// from a token or a request, are cut, and that the labels this service sets
+// keep their length.
+func TestCleanLabels_BoundsValues(t *testing.T) {
+	long := strings.Repeat("x", 100_000)
+	got := limits{}.cleanLabels(prometheus.Labels{
+		ClientIDLabel: long,
+		// the replacement character, 3 bytes, starts at byte 254, so the limit
+		// falls inside it
+		PartnerIDLabel: strings.Repeat("a", 254) + "\xff" + "tail",
+		ReasonLabel:    "short",
+		MethodLabel:    "",
+		// a configured endpoint can be as long as its pattern
+		EndpointLabel: strings.Repeat("e", 1000),
+		KindLabel:     strings.Repeat("\xff", 100_000), // a run is one replacement
+	})
+
+	assert.Equal(t, strings.Repeat("x", defaultMaxValueLen)+"...", got[ClientIDLabel])
+	assert.Equal(t, strings.Repeat("a", 254)+"...", got[PartnerIDLabel], "cut on a character boundary")
+	assert.True(t, utf8.ValidString(got[PartnerIDLabel]))
+	assert.Equal(t, strings.Repeat("e", 1000), got[EndpointLabel], "not a value from a caller")
+	assert.Equal(t, "\uFFFD", got[KindLabel], "cleaned, whatever the label")
+	assert.Equal(t, "short", got[ReasonLabel])
+	assert.Equal(t, EmptyLabelValue, got[MethodLabel])
+}
+
+func TestNewLimits(t *testing.T) {
+	tests := []struct {
+		name               string
+		value, warning     int
+		wantValue, wantMsg int
+		wantErr            string
+	}{
+		{name: "defaults", wantValue: defaultMaxValueLen, wantMsg: defaultMaxWarningLen},
+		{name: "configured", value: 32, warning: 200, wantValue: 32, wantMsg: 200},
+		{name: "only the value", value: 32, wantValue: 32, wantMsg: defaultMaxWarningLen},
+		{name: "only the warning", warning: 200, wantValue: defaultMaxValueLen, wantMsg: 200},
+		{name: "negative value", value: -1, wantErr: "auth.inbound.maxValueLen"},
+		{name: "negative warning", warning: -1, wantErr: "auth.inbound.maxWarningLen"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			l, err := newLimits(tc.value, tc.warning)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			long := strings.Repeat("a", 5000)
+			assert.Equal(t, strings.Repeat("a", tc.wantValue)+"...", l.value(long))
+			assert.Equal(t, strings.Repeat("a", tc.wantMsg)+"...", l.warning(long))
+		})
+	}
+}
+
+func TestLimitsCleanLabels(t *testing.T) {
+	l, err := newLimits(4, 0)
+	require.NoError(t, err)
+
+	got := l.cleanLabels(prometheus.Labels{
+		ClientIDLabel:  "abcdefgh",
+		PartnerIDLabel: "ab",
+		EndpointLabel:  "/a/long/configured/endpoint",
+	})
+
+	assert.Equal(t, "abcd...", got[ClientIDLabel])
+	assert.Equal(t, "ab", got[PartnerIDLabel])
+	assert.Equal(t, "/a/long/configured/endpoint", got[EndpointLabel], "only the client and partner are cut")
+}
+
+func TestInboundLimitsFromYAML(t *testing.T) {
+	const config = `
+auth:
+  inbound:
+    maxValueLen: 64
+    maxWarningLen: 512
+`
+
+	v := viper.New()
+	v.SetConfigType("yaml")
+	require.NoError(t, v.ReadConfig(strings.NewReader(config)))
+
+	var cfg inboundConfig
+	require.NoError(t, v.UnmarshalKey(inboundConfigKey, &cfg))
+
+	assert.Equal(t, 64, cfg.MaxValueLen)
+	assert.Equal(t, 512, cfg.MaxWarningLen)
+}
+
+// TestNewMiddleware_ConfiguredLimitsReachEveryCheck checks that the configured
+// length is used by the parameter check and the rate limiter too, which are
+// given it separately from the authenticator and authorizer.
+func TestNewMiddleware_ConfiguredLimitsReachEveryCheck(t *testing.T) {
+	keys := newTestKeys(t)
+	principal := strings.Repeat("p", 50)
+	name := strings.Repeat("n", 50)
+	future := time.Now().Add(time.Hour)
+	cut := func(c string) string { return strings.Repeat(c, 8) + "..." }
+
+	v := viper.New()
+	v.Set(jwtPrefixesKey, []string{testPrefix})
+	v.Set(paramPrefixesKey, []string{testParamPrefix})
+	v.Set(ratePrefixesKey, []string{testRatePrefix})
+	cfg := inboundConfig{
+		JWT: jwtConfig{
+			Prefixes: []string{testPrefix},
+			Param:    paramConfig{Prefixes: []string{testParamPrefix}, Mode: ModeEnforce},
+			Rate:     rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModeEnforce},
+		},
+		MaxValueLen: 8,
+	}
+
+	core, logs := observer.New(zapcore.InfoLevel)
+	chain, params, err := NewMiddleware(cfg, v, keys.provider, zap.New(core), testCounter(), testWarningCounter())
+	require.NoError(t, err)
+
+	extract := func(*http.Request) (ParamRequest, bool) {
+		return ParamRequest{Operation: OperationRead, Names: []string{name}}, true
+	}
+	mw := chain.Then(params.Middleware(extract)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	// a log entry of the given message, which is not the only one logged
+	entry := func(message string) map[string]any {
+		for _, e := range logs.All() {
+			if e.Message == message {
+				return e.ContextMap()
+			}
+		}
+
+		require.Fail(t, "not logged", message)
+
+		return nil
+	}
+
+	t.Run("parameter check", func(t *testing.T) {
+		bearer := keys.signAs(t, principal, time.Now(), future, map[string]any{
+			capabilitiesClaim: []string{testPrefix + "device/.*/config:get", testParamPrefix + "Device.Allowed:read"},
+			allowedResources:  partners(testPartner),
+		})
+		rec := serveRequest(t, mw, func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+bearer) })
+		require.Equal(t, http.StatusForbidden, rec.Code)
+
+		got := entry("parameter check: request rejected")
+		assert.Equal(t, cut("p"), got["jwt_principal"])
+		assert.Equal(t, cut("n"), got["parameter"])
+	})
+
+	t.Run("rate limiter", func(t *testing.T) {
+		other := strings.Repeat("r", 50)
+		bearer := keys.signAs(t, other, time.Now(), future, map[string]any{
+			capabilitiesClaim: []string{testPrefix + "device/.*/config:get", testRatePrefix + onePerMinute},
+			allowedResources:  partners(testPartner),
+		})
+
+		// the second request is over the limit, once the parameter check,
+		// which has no capability for this token, lets it through
+		var last int
+		for range 2 {
+			last = serveRequest(t, mw, func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+bearer) }).Code
+		}
+		require.Equal(t, http.StatusTooManyRequests, last)
+
+		assert.Equal(t, cut("r"), entry("rate limiter: request rejected")["jwt_principal"])
+	})
+}
+
+func TestNewMiddleware_LimitsMustNotBeNegative(t *testing.T) {
+	v := viper.New()
+	v.Set(basicKey, []string{encodedCredential("user", "pass")})
+
+	for _, cfg := range []inboundConfig{
+		{Basic: []string{encodedCredential("user", "pass")}, MaxValueLen: -1},
+		{Basic: []string{encodedCredential("user", "pass")}, MaxWarningLen: -1},
+	} {
+		_, _, err := NewMiddleware(cfg, v, nil, zap.NewNop(), testCounter(), testWarningCounter())
+		assert.Error(t, err)
+	}
+}
+
+// TestNewMiddleware_ConfiguredLimits checks that the configured length is the
+// one used, through the whole chain: a long principal is cut in the metric and
+// in the log to the length configured, not the default.
+func TestNewMiddleware_ConfiguredLimits(t *testing.T) {
+	keys := newTestKeys(t)
+	principal := strings.Repeat("p", 50)
+
+	core, logs := observer.New(zapcore.InfoLevel)
+	v := viper.New()
+	v.Set(jwtPrefixesKey, []string{testPrefix})
+	cfg := inboundConfig{JWT: jwtConfig{Prefixes: []string{testPrefix}}, MaxValueLen: 8}
+
+	checks, warnings := testCounter(), testWarningCounter()
+	chain, _, err := NewMiddleware(cfg, v, keys.provider, zap.New(core), checks, warnings)
+	require.NoError(t, err)
+
+	mw := chain.Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+
+	// expired, so it is rejected, and its signature verified, so it is recorded
+	bearer := keys.signAs(t, principal, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour), map[string]any{allowedResources: partners(testPartner)})
+	rec := serveRequest(t, mw, func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+bearer) })
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	cut := strings.Repeat("p", 8) + "..."
+	assert.Equal(t, 1, testutil.CollectAndCount(checks))
+	assert.Equal(t, float64(1), testutil.ToFloat64(checks.With(prometheus.Labels{
+		OutcomeLabel:   Rejected,
+		ReasonLabel:    AuthUnsatifiedExp,
+		ClientIDLabel:  cut,
+		PartnerIDLabel: testPartner,
+		EndpointLabel:  NoneEndpoint,
+		MethodLabel:    http.MethodGet,
+	})))
+	assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+}
+
+// TestLongValuesAreBoundedInLogs checks every place a value from a token or a
+// request is logged: none is longer than the limit, whatever a caller or an
+// issuer sent.
+func TestLongValuesAreBoundedInLogs(t *testing.T) {
+	long := strings.Repeat("v", 100_000)
+	cut := strings.Repeat("v", defaultMaxValueLen) + "..."
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	t.Run("authenticator partner", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ae := authenticatorEvent{l: zap.New(core)}
+
+		got := ae.getLabels(bascule.AuthenticateEvent[*http.Request]{
+			Source:       req,
+			InvalidToken: hugeJWT(t, long),
+			Err:          basculejwt.ErrExpired,
+		})
+
+		assert.Equal(t, long, got[PartnerIDLabel], "the label is bounded by cleanLabels")
+		assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+		assert.Equal(t, cut, logField(t, logs, "jwt_partner"))
+	})
+
+	t.Run("authorizer rejection partner", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ae := authorizerEvent{l: zap.New(core)}
+
+		ae.getLabels(bascule.AuthorizeEvent[*http.Request]{Resource: req, Token: hugeJWT(t, long), Err: bascule.ErrUnauthorized})
+
+		assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+		assert.Equal(t, cut, logField(t, logs, "jwt_partner"))
+	})
+
+	t.Run("authorizer warning", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ae := authorizerEvent{l: zap.New(core), counter: testCounter(), warnings: testWarningCounter()}
+
+		ae.OnEvent(bascule.AuthorizeEvent[*http.Request]{
+			Resource: req,
+			Token:    hugeJWT(t, long),
+			Warnings: []bascule.Warning{{
+				Reason: warningWouldReject,
+				Attrs:  []bascule.WarningAttr{{Key: KindLabel, Value: "cidr"}, {Key: "cap", Value: long}},
+			}},
+		})
+
+		warning := logField(t, logs, "warning")
+		assert.Len(t, warning, defaultMaxWarningLen+len("..."))
+		assert.True(t, strings.HasPrefix(warning, "would-reject; kind=cidr; cap="), warning)
+		assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+		assert.Equal(t, cut, logField(t, logs, "jwt_partner"))
+	})
+
+	paramLogs := func(t *testing.T, mode string) *observer.ObservedLogs {
+		t.Helper()
+
+		core, logs := observer.New(zapcore.DebugLevel)
+		check, err := newParamCheck(paramConfig{Prefixes: []string{testParamPrefix}, Mode: mode}, zap.New(core), testCounter(), testWarningCounter(), nil)
+		require.NoError(t, err)
+
+		check.record(http.Header{}, req, hugeJWT(t, long), ParamRequest{Operation: OperationRead}, paramDecision{name: long})
+
+		return logs
+	}
+
+	t.Run("parameter check enforced", func(t *testing.T) {
+		logs := paramLogs(t, ModeEnforce)
+
+		assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+		assert.Equal(t, cut, logField(t, logs, "jwt_partner"))
+		assert.Equal(t, cut, logField(t, logs, "parameter"))
+	})
+
+	t.Run("parameter check would reject", func(t *testing.T) {
+		logs := paramLogs(t, ModePermissive)
+
+		assert.Equal(t, cut, logField(t, logs, "parameter"))
+		assert.Len(t, logField(t, logs, "warning"), defaultMaxWarningLen+len("..."))
+	})
+
+	t.Run("rate limiter", func(t *testing.T) {
+		core, logs := observer.New(zapcore.DebugLevel)
+		rl, err := newRateLimiter(rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModeEnforce}, zap.New(core), testCounter(), testWarningCounter(), nil)
+		require.NoError(t, err)
+
+		rl.record(http.Header{}, req, hugeJWT(t, long), tokenrate.Decision{Reason: tokenrate.RateExceeded})
+
+		assert.Equal(t, cut, logField(t, logs, "jwt_principal"))
+		assert.Equal(t, cut, logField(t, logs, "jwt_partner"))
+	})
 }
 
 // TestAuthorizerEvent_AcceptedIsNotARejection checks that an accepted request

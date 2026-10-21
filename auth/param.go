@@ -178,6 +178,7 @@ type parsedParamCapability struct {
 //
 // A nil ParamCheck, or one built from no configuration, checks nothing.
 type ParamCheck struct {
+	limits
 	prefixes  []string
 	mode      checkMode
 	overrides map[string][]paramCapability
@@ -407,7 +408,7 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 			header.Add(WarningHeader, w.String())
 		}
 
-		c.warnings.With(cleanLabels(prometheus.Labels{
+		c.warnings.With(c.cleanLabels(prometheus.Labels{
 			KindLabel:     paramWarningKind,
 			ReasonLabel:   w.Reason,
 			ClientIDLabel: client,
@@ -419,11 +420,11 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 	}
 
 	fields := []zap.Field{
-		zap.String("sat_client_id", client),
-		zap.String("sat_partner_id", partner),
-		zap.String("sat_rejection_reason", ParameterNotAllowed),
+		zap.String("jwt_principal", c.value(client)),
+		zap.String("jwt_partner", c.value(partner)),
+		zap.String("jwt_rejection_reason", ParameterNotAllowed),
 		zap.String("operation", string(req.Operation)),
-		zap.String("parameter", d.name),
+		zap.String("parameter", c.value(d.name)),
 	}
 
 	if c.mode.permissive {
@@ -441,13 +442,13 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 			header.Add(WarningHeader, w.String())
 		}
 
-		c.warnings.With(cleanLabels(prometheus.Labels{
+		c.warnings.With(c.cleanLabels(prometheus.Labels{
 			KindLabel:     paramWarningKind,
 			ReasonLabel:   ParameterNotAllowed,
 			ClientIDLabel: client,
 		})).Add(1)
 
-		c.l.Info("parameter check: would reject", append(fields, zap.Stringer("warning", w))...)
+		c.l.Info("parameter check: would reject", append(fields, zap.String("warning", c.warning(w.String())))...)
 
 		return
 	}
@@ -466,7 +467,7 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 		}.String())
 	}
 
-	c.counter.With(cleanLabels(prometheus.Labels{
+	c.counter.With(c.cleanLabels(prometheus.Labels{
 		ClientIDLabel:  client,
 		PartnerIDLabel: partner,
 		EndpointLabel:  determineEndpoint(c.endpoints, request),
