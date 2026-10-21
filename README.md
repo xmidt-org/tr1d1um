@@ -34,6 +34,15 @@ Fetch the statistics (i.e. uptime) for a given device connected to the XMiDT clu
 
 Tr1d1um validates the incoming request, injects it into the payload of a SimpleRequestResponse [WRP](https://github.com/xmidt-org/wrp-c/wiki/Web-Routing-Protocol) message and sends it to XMiDT. It is worth mentioning that Tr1d1um encodes the outgoing `WRP` message in `msgpack` as it is the encoding XMiDT ultimately uses to communicate with devices.
 
+### Response codes
+
+For the `/stat` and `/config` endpoints, Tr1d1um forwards the response code XMiDT provided. A handful of codes come from Tr1d1um itself:
+
+- `400` the request failed validation; the body names the problem.
+- `499` the caller closed its connection before Tr1d1um finished the request (the nginx convention). No caller ever sees this code; it exists so that client cancellations are recorded in logs and in the `server_request_count` metric separately from Tr1d1um's own failures, which would otherwise count as `500` or `503`.
+- `500` something unexpected failed inside Tr1d1um; the detail is in the log line `sending non-200, non-404 response` carrying the same transaction id.
+- `503` XMiDT could not be reached, or did not answer within the configured timeout.
+
 ### Event listener registration - `/hook(s)` endpoints
 Devices connected to the XMiDT Cluster generate events (i.e. going offline). The webhooks library used by Tr1d1um leverages AWS SNS to publish these events. These endpoints then allow API users to both setup listeners of desired events and fetch the current list of configured listeners in the system.
 

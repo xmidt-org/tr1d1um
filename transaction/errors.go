@@ -14,6 +14,16 @@ import (
 // ErrTr1d1umInternal should be the error shown to external API consumers in Internal Server error cases
 var ErrTr1d1umInternal = errors.New("oops! Something unexpected went wrong in this service")
 
+// StatusClientClosedRequest is the status recorded when the caller closed
+// its connection before tr1d1um finished the request.  It follows the nginx
+// convention; no caller ever receives it, since the caller is gone.  It
+// keeps client cancellations out of the 5xx counts in logs and metrics.
+const StatusClientClosedRequest = 499
+
+// ErrClientClosedRequest wraps the error a stage returned because the
+// caller's request context was canceled.
+var ErrClientClosedRequest = errors.New("client closed the request")
+
 // CodedError describes the behavior of an error that additionally has an HTTP status code used for TR1D1UM business logic
 type CodedError interface {
 	error

@@ -639,6 +639,24 @@ func TestEncodeError(t *testing.T) {
 		}
 	})
 
+	t.Run("ClientClosedRequest", func(t *testing.T) {
+		assert := assert.New(t)
+
+		e := transaction.NewCodedError(
+			fmt.Errorf("%w: %w", transaction.ErrClientClosedRequest, context.Canceled),
+			transaction.StatusClientClosedRequest)
+
+		w := httptest.NewRecorder()
+		encodeError(ctxTID, e, w)
+
+		expected := bytes.NewBufferString("")
+		json.NewEncoder(expected).Encode(map[string]string{
+			"message": e.Error()})
+
+		assert.Equal(transaction.StatusClientClosedRequest, w.Code)
+		assert.Equal(expected.String(), w.Body.String())
+	})
+
 	t.Run("InternalError", func(t *testing.T) {
 		assert := assert.New(t)
 
