@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -174,15 +175,26 @@ func TestLog(t *testing.T) {
 	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, arrival)
 	ctxWithTID := context.WithValue(context.Background(), ContextKeyRequestTID, "tid-123")
 
+	// a request that is being traced carries a valid span
+	traceID, _ := trace.TraceIDFromHex("0af7651916cd43dd8448eb211c80319c")
+	spanID, _ := trace.SpanIDFromHex("b7ad6b7169203331")
+	ctxWithTrace := trace.ContextWithSpanContext(ctxWithTID, trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: traceID,
+		SpanID:  spanID,
+	}))
+
 	tcs := []struct {
 		desc                        string
 		reducedLoggingResponseCodes []int
 		ctx                         context.Context
 		code                        int
 		// wantError is whether the missing arrival time is reported, with
-		// the tid when there is one.
-		wantError bool
-		wantTID   string
+		// the tid when there is one and the trace and span IDs when the
+		// request is traced.
+		wantError   bool
+		wantTID     string
+		wantTraceID string
+		wantSpanID  string
 		// wantHeaders is whether the response line carries the headers.
 		wantHeaders bool
 	}{
@@ -211,6 +223,17 @@ func TestLog(t *testing.T) {
 			wantHeaders:                 true,
 		},
 		{
+			desc:                        "arrival time missing on a traced request",
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         ctxWithTrace,
+			code:                        200,
+			wantError:                   true,
+			wantTID:                     "tid-123",
+			wantTraceID:                 "0af7651916cd43dd8448eb211c80319c",
+			wantSpanID:                  "b7ad6b7169203331",
+			wantHeaders:                 true,
+		},
+		{
 			desc:                        "reduced logging response code",
 			reducedLoggingResponseCodes: []int{200},
 			ctx:                         ctxWithArrivalTime,
@@ -235,7 +258,17 @@ func TestLog(t *testing.T) {
 				require.Len(entries, 2, "the missing arrival time is reported before the response")
 				assert.Equal(zapcore.ErrorLevel, entries[0].Level)
 				assert.Equal("request arrival time not captured", entries[0].Message)
-				assert.Equal(tc.wantTID, entries[0].ContextMap()["tid"])
+
+				fields := entries[0].ContextMap()
+				assert.Equal(tc.wantTID, fields["tid"])
+				if tc.wantTraceID == "" {
+					assert.NotContains(fields, candlelight.TraceIdLogKeyName, "an untraced request has no trace ID to report")
+					assert.NotContains(fields, candlelight.SpanIDLogKeyName)
+				} else {
+					assert.Equal(tc.wantTraceID, fields[candlelight.TraceIdLogKeyName])
+					assert.Equal(tc.wantSpanID, fields[candlelight.SpanIDLogKeyName])
+				}
+
 				entries = entries[1:]
 			}
 
