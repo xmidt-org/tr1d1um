@@ -169,7 +169,10 @@ const (
 
 type authenticatorEvent struct {
 	limits
-	l          *zap.Logger
+	l *zap.Logger
+
+	// origin resolves where a request came from, for its log line.
+	origin     *basculehttp.OriginResolver
 	counter    *prometheus.CounterVec
 	endpoints  []*regexp.Regexp
 	parserOpts []jwt.ParseOption
@@ -178,8 +181,10 @@ type authenticatorEvent struct {
 func (ae authenticatorEvent) OnEvent(e bascule.AuthenticateEvent[*http.Request]) {
 	if e.Err == nil {
 		requestLogger(e.Source, ae.l).Debug("authenticator event: creds authenticated",
-			zap.String(PrincipalField, ae.value(principalOf(e.Token))),
-			zap.String(PartnerField, ae.value(determinePartnerID(e.Token))))
+			append([]zap.Field{
+				zap.String(PrincipalField, ae.value(principalOf(e.Token))),
+				zap.String(PartnerField, ae.value(determinePartnerID(e.Token))),
+			}, whereFrom(ae.origin, e.Source)...)...)
 
 		return
 	}
@@ -238,6 +243,8 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		zap.String(PartnerField, ae.value(partner)),
 		zap.String("jwt_rejection_reason", reason),
 	}
+	fs = append(fs, whereFrom(ae.origin, e.Source)...)
+
 	l := requestLogger(e.Source, ae.l)
 	if reason == UnknownReason {
 		l.Error("authenticator event failure",
@@ -266,7 +273,10 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 
 type authorizerEvent struct {
 	limits
-	l         *zap.Logger
+	l *zap.Logger
+
+	// origin resolves where a request came from, for its log lines.
+	origin    *basculehttp.OriginResolver
 	counter   *prometheus.CounterVec
 	warnings  *prometheus.CounterVec
 	endpoints []*regexp.Regexp
@@ -318,9 +328,11 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 		})).Add(1)
 
 		requestLogger(e.Resource, ae.l).Info("authorizer event: capability warning",
-			zap.String(PrincipalField, ae.value(client)),
-			zap.String(PartnerField, ae.value(partner)),
-			zap.String("warning", ae.warning(w.String())))
+			append([]zap.Field{
+				zap.String(PrincipalField, ae.value(client)),
+				zap.String(PartnerField, ae.value(partner)),
+				zap.String("warning", ae.warning(w.String())),
+			}, whereFrom(ae.origin, e.Resource)...)...)
 	}
 }
 
@@ -376,6 +388,8 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	}
 
 	fs = append(fs, zap.String("jwt_rejection_reason", reason))
+	fs = append(fs, whereFrom(ae.origin, e.Resource)...)
+
 	l := requestLogger(e.Resource, ae.l)
 	if reason == UnknownReason {
 		l.Error("authorizer event failure",

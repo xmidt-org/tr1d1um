@@ -307,17 +307,22 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 
 	reason := rateRejectionReason(d)
 	fields := []zap.Field{
-		zap.String("jwt_principal", rl.value(client)),
-		zap.String("jwt_partner", rl.value(partner)),
 		zap.String("jwt_rejection_reason", reason),
+		zap.Strings(RateField, rateTexts(d.Limits)),
 		zap.Stringer("limit", d.Limit),
 		zap.Duration("retry_after", d.RetryAfter),
 	}
 
+	// The request logger already names the caller and where they called
+	// from; outside the chain, the service logger names the caller.
+	l := requestLogger(request, rl.l.With(
+		zap.String(PrincipalField, rl.value(client)),
+		zap.String(PartnerField, rl.value(partner))))
+
 	// The resolver never errs, so a denial means tokenrate rejected what it
 	// returned.
 	if d.Reason == tokenrate.Denied {
-		rl.l.Error("rate limiter failure", append(fields, zap.Error(d.Err))...)
+		l.Error("rate limiter failure", append(fields, zap.Error(d.Err))...)
 	}
 
 	if rl.mode.permissive {
@@ -342,7 +347,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 			ClientIDLabel: client,
 		})).Add(1)
 
-		rl.l.Info("rate limiter: would reject", append(fields, zap.Stringer("warning", w))...)
+		l.Info("rate limiter: would reject", append(fields, zap.Stringer("warning", w))...)
 
 		return
 	}
@@ -356,7 +361,7 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 		ReasonLabel:    reason,
 	})).Add(1)
 
-	rl.l.Info("rate limiter: request rejected", fields...)
+	l.Info("rate limiter: request rejected", fields...)
 }
 
 // rateTexts returns rates as text, for the request logger.

@@ -155,22 +155,38 @@ func logCaller(resolver *basculehttp.OriginResolver, lim limits) alice.Construct
 				partner = determinePartnerID(token)
 			}
 
-			fields := []zap.Field{
+			fields := append([]zap.Field{
 				zap.String(PrincipalField, lim.value(principal)),
 				zap.String(PartnerField, lim.value(partner)),
-				zap.String(RemoteAddrField, request.RemoteAddr),
-			}
-
-			if origin, ok := resolver.Origin(request); ok {
-				fields = append(fields, zap.Stringer(OriginField, origin))
-			}
-
-			if networks, ok := recordFrom(request.Context()).heldTo(); ok {
-				fields = append(fields, zap.Strings(CIDRField, networks))
-			}
+			}, whereFrom(resolver, request)...)
 
 			ctx := addLogFields(request.Context(), fields...)
 			next.ServeHTTP(response, request.WithContext(ctx))
 		})
 	}
+}
+
+// whereFrom returns the fields that say where a request came from: the peer,
+// the origin the resolver finds, and the networks the CIDR check held the
+// caller to, if it has run.  A nil resolver trusts no proxies.  There is
+// nothing to say without a request.
+func whereFrom(resolver *basculehttp.OriginResolver, request *http.Request) []zap.Field {
+	if request == nil {
+		return nil
+	}
+
+	if resolver == nil {
+		resolver = &basculehttp.OriginResolver{}
+	}
+
+	fields := []zap.Field{zap.String(RemoteAddrField, request.RemoteAddr)}
+	if origin, ok := resolver.Origin(request); ok {
+		fields = append(fields, zap.Stringer(OriginField, origin))
+	}
+
+	if networks, ok := recordFrom(request.Context()).heldTo(); ok {
+		fields = append(fields, zap.Strings(CIDRField, networks))
+	}
+
+	return fields
 }
