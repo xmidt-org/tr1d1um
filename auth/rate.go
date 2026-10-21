@@ -254,6 +254,10 @@ func (rl *rateLimiter) handle(next http.Handler) http.Handler {
 		decision := rl.limiter.Check(request.Context(), principal, capabilities)
 		rl.record(response.Header(), request, token, decision)
 
+		// the rates the caller was held to, for the request logger
+		request = request.WithContext(addLogFields(request.Context(),
+			zap.Strings(RateField, rateTexts(decision.Limits))))
+
 		if decision.Allowed || rl.mode.permissive {
 			next.ServeHTTP(response, request)
 			return
@@ -353,6 +357,16 @@ func (rl *rateLimiter) record(header http.Header, request *http.Request, token b
 	})).Add(1)
 
 	rl.l.Info("rate limiter: request rejected", fields...)
+}
+
+// rateTexts returns rates as text, for the request logger.
+func rateTexts(rates []tokenrate.Rate) []string {
+	texts := make([]string, 0, len(rates))
+	for _, r := range rates {
+		texts = append(texts, r.String())
+	}
+
+	return texts
 }
 
 // rateRejectionReason names why a decision refused the request, as a metric
