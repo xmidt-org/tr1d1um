@@ -348,11 +348,13 @@ Two counters, from the `auth` package:
   what a rollout watches.
 
 Every finding is also logged at info level with the caller's
-`sat_client_id` and `sat_partner_id`. A warning is logged as
-`authorizer event: capability warning` with the warning text in a `warning`
-field. A refusal is logged as `authorizer event: creds rejected` with the
-reason in `sat_rejection_reason`, or as `rate limiter: request rejected` for
-a rate.
+`jwt_principal` and `jwt_partner`. The principal is the token's `sub` claim,
+or the user name of a basic credential. Each is cut to `maxValueLen` bytes
+(256 by default) under `auth.inbound`, and a logged warning to `maxWarningLen`
+(1024 by default). A warning is logged as `authorizer event: capability
+warning` with the warning text in a `warning` field. A refusal is logged as
+`authorizer event: creds rejected` with the reason in `jwt_rejection_reason`,
+or as `rate limiter: request rejected` for a rate.
 
 ## For callers
 
