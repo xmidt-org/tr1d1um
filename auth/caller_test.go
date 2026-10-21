@@ -294,6 +294,149 @@ func TestLogCaller(t *testing.T) {
 	}
 }
 
+// TestLogCaller_Rejected checks that a rejected or warned-about caller is
+// logged with the same fields as an accepted one: who they are, where they
+// called from, and whatever the checks that ran held them to, each once.
+func TestLogCaller_Rejected(t *testing.T) {
+	keys := newTestKeys(t)
+	now := time.Now()
+
+	const (
+		peer    = "192.0.2.1:1234" // httptest.NewRequest's RemoteAddr
+		client  = "198.51.100.7"
+		allowed = "198.51.100.0/24"
+		denied  = "203.0.113.0/24"
+	)
+
+	// bearer signs a token for testPrincipal granting the endpoint, with any
+	// further capabilities.
+	bearer := func(caps ...string) string {
+		return "Bearer " + keys.sign(t, testKeyID, now.Add(time.Hour), map[string]any{
+			capabilitiesClaim: append([]string{testPrefix + "device/.*/config:all"}, caps...),
+			allowedResources:  partners(testPartner),
+		})
+	}
+
+	// setup configures every check, the CIDR check in cidrMode and the
+	// others enforced, behind a trusted proxy.
+	setup := func(cidrMode string) (inboundConfig, *viper.Viper) {
+		v := viper.New()
+		v.Set(jwtPrefixesKey, []string{testPrefix})
+		v.Set(cidrPrefixesKey, []string{testCIDRPrefix})
+		v.Set(ratePrefixesKey, []string{testRatePrefix})
+		v.Set(paramPrefixesKey, []string{testParamPrefix})
+
+		return inboundConfig{JWT: jwtConfig{
+			Prefixes: []string{testPrefix},
+			CIDR: cidrConfig{
+				Prefixes:       []string{testCIDRPrefix},
+				Mode:           cidrMode,
+				TrustedProxies: []string{"192.0.2.0/24"},
+			},
+			Rate:  rateConfig{Prefixes: []string{testRatePrefix}, Mode: ModeEnforce},
+			Param: paramConfig{Prefixes: []string{testParamPrefix}, Mode: ModeEnforce},
+		}}, v
+	}
+
+	read := func(*http.Request) (ParamRequest, bool) {
+		return ParamRequest{Operation: OperationRead, Names: []string{"Device.WiFi.SSID"}}, true
+	}
+
+	tests := []struct {
+		name     string
+		cidrMode string
+		// requests is how many requests are sent; the line is looked for
+		// after the last.
+		requests      int
+		authorization string
+		message       string
+
+		wantCIDR  []string // nil when the CIDR check has not run
+		wantRate  []string // nil when the rate check has not run
+		wantParam []string // nil when the parameter check has not run
+	}{
+		{
+			name:     "authenticator rejection",
+			cidrMode: ModeEnforce,
+			requests: 1,
+			authorization: "Bearer " + keys.signAs(t, testPrincipal, now.Add(-2*time.Hour), now.Add(-time.Hour),
+				map[string]any{allowedResources: partners(testPartner)}),
+			message: "authenticator event: creds rejected",
+		}, {
+			name:          "authorizer rejection",
+			cidrMode:      ModeEnforce,
+			requests:      1,
+			authorization: bearer(testCIDRPrefix + denied),
+			message:       "authorizer event: creds rejected",
+			wantCIDR:      []string{denied},
+		}, {
+			name:          "authorizer warning",
+			cidrMode:      ModePermissive,
+			requests:      1,
+			authorization: bearer(testCIDRPrefix+denied, testParamPrefix+"Device.**"),
+			message:       "authorizer event: capability warning",
+			wantCIDR:      []string{denied},
+		}, {
+			name:          "rate rejection",
+			cidrMode:      ModeEnforce,
+			requests:      2,
+			authorization: bearer(testCIDRPrefix+allowed, testRatePrefix+"1/1m"),
+			message:       "rate limiter: request rejected",
+			wantCIDR:      []string{allowed},
+			wantRate:      []string{"1/1m"},
+		}, {
+			name:          "parameter rejection",
+			cidrMode:      ModeEnforce,
+			requests:      1,
+			authorization: bearer(testCIDRPrefix+allowed, testParamPrefix+"Device.DeviceInfo.**:read"),
+			message:       "parameter check: request rejected",
+			wantCIDR:      []string{allowed},
+			wantRate:      []string{},
+			wantParam:     []string{"Device.DeviceInfo.**:read"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, v := setup(tc.cidrMode)
+			mw, logs := protectLogging(t, cfg, v, keys.provider, read)
+
+			for range tc.requests {
+				serveRequest(t, mw, func(r *http.Request) {
+					r.Header.Set("Authorization", tc.authorization)
+					r.Header.Set("X-Forwarded-For", client)
+				})
+			}
+
+			lines := logs.FilterMessage(tc.message).All()
+			require.Len(t, lines, 1)
+
+			seen := make(map[string]int)
+			for _, f := range lines[0].Context {
+				seen[f.Key]++
+			}
+			for key, n := range seen {
+				assert.Equal(t, 1, n, "%s should be logged once", key)
+			}
+
+			fields := lines[0].ContextMap()
+			assert.Contains(t, fields, "requestURL")
+			assert.Equal(t, testPrincipal, fields[PrincipalField])
+			assert.Equal(t, testPartner, fields[PartnerField])
+			assert.Equal(t, peer, fields[RemoteAddrField])
+			assert.Equal(t, client, fields[OriginField])
+
+			for key, want := range map[string][]string{CIDRField: tc.wantCIDR, RateField: tc.wantRate, ParamField: tc.wantParam} {
+				if want == nil {
+					assert.NotContains(t, fields, key)
+				} else {
+					assert.Equal(t, want, stringsField(t, fields, key))
+				}
+			}
+		})
+	}
+}
+
 // TestRequestLogger checks that a listener's line is written with the
 // request's logger when there is one, and the listener's own otherwise.
 func TestRequestLogger(t *testing.T) {

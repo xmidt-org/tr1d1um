@@ -446,12 +446,17 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 	}
 
 	fields := []zap.Field{
-		zap.String("jwt_principal", c.value(client)),
-		zap.String("jwt_partner", c.value(partner)),
 		zap.String("jwt_rejection_reason", ParameterNotAllowed),
+		zap.Strings(ParamField, capabilityTexts(d.caps)),
 		zap.String("operation", string(req.Operation)),
 		zap.String("parameter", c.value(d.name)),
 	}
+
+	// The request logger already names the caller and where they called
+	// from; outside the chain, the service logger names the caller.
+	l := requestLogger(request, c.l.With(
+		zap.String(PrincipalField, c.value(client)),
+		zap.String(PartnerField, c.value(partner))))
 
 	if c.mode.permissive {
 		w := bascule.Warning{
@@ -474,7 +479,7 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 			ClientIDLabel: client,
 		})).Add(1)
 
-		c.l.Info("parameter check: would reject", append(fields, zap.String("warning", c.warning(w.String())))...)
+		l.Info("parameter check: would reject", append(fields, zap.String("warning", c.warning(w.String())))...)
 
 		return
 	}
@@ -502,5 +507,5 @@ func (c *ParamCheck) record(header http.Header, request *http.Request, token bas
 		ReasonLabel:    ParameterNotAllowed,
 	})).Add(1)
 
-	c.l.Info("parameter check: request rejected", fields...)
+	l.Info("parameter check: request rejected", fields...)
 }

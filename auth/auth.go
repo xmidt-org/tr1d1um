@@ -355,6 +355,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 			authorizerEvent{
 				limits:    lim,
 				l:         l,
+				origin:    origin,
 				counter:   counter,
 				warnings:  warnings,
 				endpoints: endpointBuckets}))
@@ -371,6 +372,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 				authenticatorEvent{
 					limits:     lim,
 					l:          l,
+					origin:     origin,
 					counter:    counter,
 					parserOpts: jwtParseOpts,
 					endpoints:  endpointBuckets}),
