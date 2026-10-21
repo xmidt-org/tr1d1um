@@ -19,9 +19,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/xmidt-org/candlelight"
@@ -171,54 +171,129 @@ func TestWelcome(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+	arrival := time.Now().Add(-time.Second)
+	ctxWithArrivalTime := context.WithValue(context.Background(), ContextKeyRequestArrivalTime, arrival)
+	ctxWithTID := context.WithValue(context.Background(), ContextKeyRequestTID, "tid-123")
+
+	// a request that is being traced carries a valid span
+	traceID, _ := trace.TraceIDFromHex("0af7651916cd43dd8448eb211c80319c")
+	spanID, _ := trace.SpanIDFromHex("b7ad6b7169203331")
+	ctxWithTrace := trace.ContextWithSpanContext(ctxWithTID, trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: traceID,
+		SpanID:  spanID,
+	}))
+
 	tcs := []struct {
 		desc                        string
 		reducedLoggingResponseCodes []int
 		ctx                         context.Context
 		code                        int
-		request                     *http.Request
-		expectedLogCount            int
+		// wantError is whether the missing arrival time is reported, with
+		// the tid when there is one and the trace and span IDs when the
+		// request is traced.
+		wantError   bool
+		wantTID     string
+		wantTraceID string
+		wantSpanID  string
+		// wantHeaders is whether the response line carries the headers.
+		wantHeaders bool
 	}{
 		{
-			desc:                        "Sanity Check",
-			reducedLoggingResponseCodes: []int{},
-			ctx:                         context.Background(),
-			code:                        200,
-			request:                     &http.Request{},
-			expectedLogCount:            1,
-		},
-		{
-			desc:                        "Arrival Time Present",
+			desc:                        "arrival time present",
 			reducedLoggingResponseCodes: []int{},
 			ctx:                         ctxWithArrivalTime,
 			code:                        200,
-			request:                     &http.Request{},
-			expectedLogCount:            2,
+			wantHeaders:                 true,
 		},
 		{
-			desc:                        "IncludeHeaders is False",
-			reducedLoggingResponseCodes: []int{200},
+			desc:                        "arrival time missing",
+			reducedLoggingResponseCodes: []int{},
 			ctx:                         context.Background(),
 			code:                        200,
-			request:                     &http.Request{},
-			expectedLogCount:            1,
+			wantError:                   true,
+			wantHeaders:                 true,
+		},
+		{
+			desc:                        "arrival time missing with a tid",
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         ctxWithTID,
+			code:                        200,
+			wantError:                   true,
+			wantTID:                     "tid-123",
+			wantHeaders:                 true,
+		},
+		{
+			desc:                        "arrival time missing on a traced request",
+			reducedLoggingResponseCodes: []int{},
+			ctx:                         ctxWithTrace,
+			code:                        200,
+			wantError:                   true,
+			wantTID:                     "tid-123",
+			wantTraceID:                 "0af7651916cd43dd8448eb211c80319c",
+			wantSpanID:                  "b7ad6b7169203331",
+			wantHeaders:                 true,
+		},
+		{
+			desc:                        "reduced logging response code",
+			reducedLoggingResponseCodes: []int{200},
+			ctx:                         ctxWithArrivalTime,
+			code:                        200,
+			wantHeaders:                 false,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert := assert.New(t)
-			var logCount = 0
-			logger := zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(
-				func(e zapcore.Entry) error {
-					logCount++
-					return nil
-				})))
-			ctx := sallust.With(tc.ctx, logger)
-			s := Log(tc.reducedLoggingResponseCodes)
-			s(ctx, tc.code, tc.request)
-			assert.Equal(tc.expectedLogCount, logCount)
+			require := require.New(t)
+
+			core, logs := observer.New(zapcore.DebugLevel)
+			ctx := context.WithValue(tc.ctx, ContextKeyResponseHeaders, http.Header{"X-Test": []string{"yes"}})
+			ctx = sallust.With(ctx, zap.New(core))
+
+			Log(tc.reducedLoggingResponseCodes)(ctx, tc.code, &http.Request{})
+
+			entries := logs.All()
+			if tc.wantError {
+				require.Len(entries, 2, "the missing arrival time is reported before the response")
+				assert.Equal(zapcore.ErrorLevel, entries[0].Level)
+				assert.Equal("request arrival time not captured", entries[0].Message)
+
+				fields := entries[0].ContextMap()
+				assert.Equal(tc.wantTID, fields["tid"])
+				if tc.wantTraceID == "" {
+					assert.NotContains(fields, candlelight.TraceIdLogKeyName, "an untraced request has no trace ID to report")
+					assert.NotContains(fields, candlelight.SpanIDLogKeyName)
+				} else {
+					assert.Equal(tc.wantTraceID, fields[candlelight.TraceIdLogKeyName])
+					assert.Equal(tc.wantSpanID, fields[candlelight.SpanIDLogKeyName])
+				}
+
+				entries = entries[1:]
+			}
+
+			require.Len(entries, 1)
+			line := entries[0]
+			assert.Equal(zapcore.InfoLevel, line.Level)
+			assert.Equal("response", line.Message)
+
+			fields := line.ContextMap()
+			if tc.wantError {
+				assert.NotContains(fields, "duration", "no arrival time, no duration")
+			} else {
+				duration, ok := fields["duration"].(time.Duration)
+				require.True(ok, "duration is a time.Duration")
+				assert.GreaterOrEqual(duration, time.Second, "measured from the arrival time")
+			}
+
+			body, ok := fields["response"].(response)
+			require.True(ok, "the response is logged as the response struct")
+			assert.Equal(tc.code, body.Code)
+			if tc.wantHeaders {
+				assert.NotNil(body.Headers)
+			} else {
+				assert.Nil(body.Headers)
+			}
 		})
 	}
 }

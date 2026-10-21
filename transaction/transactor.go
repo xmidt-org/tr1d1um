@@ -127,19 +127,21 @@ func Log(reducedLoggingResponseCodes []int) FinalizerFunc {
 	return func(ctx context.Context, code int, r *http.Request) {
 		tid, _ := ctx.Value(ContextKeyRequestTID).(string)
 		logger := sallust.Get(ctx)
-		requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time)
-
-		if !ok {
+		// Welcome records when the request arrived.  Without it there is no
+		// duration to report, and a handler was wired without Welcome.
+		if requestArrival, ok := ctx.Value(ContextKeyRequestArrivalTime).(time.Time); ok {
 			logger = logger.With(
-				zap.Any("duration", time.Since(requestArrival)),
+				zap.Duration("duration", time.Since(requestArrival)),
 			)
 		} else {
-			traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx)
-			if !ok {
-				logger.Error("Request arrival not capture for logger", zap.String("tid", tid))
-			} else {
-				logger.Error("Request arrival not capture for logger", zap.String("tid", tid), zap.String(candlelight.TraceIdLogKeyName, traceID), zap.String(candlelight.SpanIDLogKeyName, spanID))
+			fields := []zap.Field{zap.String("tid", tid)}
+			if traceID, spanID, ok := candlelight.ExtractTraceInfo(ctx); ok {
+				fields = append(fields,
+					zap.String(candlelight.TraceIdLogKeyName, traceID),
+					zap.String(candlelight.SpanIDLogKeyName, spanID))
 			}
+
+			logger.Error("request arrival time not captured", fields...)
 		}
 
 		includeHeaders := true
