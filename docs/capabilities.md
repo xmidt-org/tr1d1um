@@ -348,13 +348,40 @@ Two counters, from the `auth` package:
   what a rollout watches.
 
 Every finding is also logged at info level with the caller's
-`jwt_principal` and `jwt_partner`. The principal is the token's `sub` claim,
-or the user name of a basic credential. Each is cut to `maxValueLen` bytes
-(256 by default) under `auth.inbound`, and a logged warning to `maxWarningLen`
-(1024 by default). A warning is logged as `authorizer event: capability
-warning` with the warning text in a `warning` field. A refusal is logged as
-`authorizer event: creds rejected` with the reason in `jwt_rejection_reason`,
-or as `rate limiter: request rejected` for a rate.
+`jwt_principal` and `jwt_partner`, beside the request's URL, method and
+headers. The principal is the token's `sub` claim, or the user name of a
+basic credential. Each is cut to `maxValueLen` bytes (256 by default) under
+`auth.inbound`, and a logged warning to `maxWarningLen` (1024 by default). A
+warning is logged as `authorizer event: capability warning` with the warning
+text in a `warning` field. A refusal is logged as `authorizer event: creds
+rejected` with the reason in `jwt_rejection_reason`, or as `rate limiter:
+request rejected` for a rate. A credential that authenticates is logged at
+debug level as `authenticator event: creds authenticated`, with the same
+identity fields, before authorization decides whether it may do what it
+asks.
+
+Once a caller is accepted, every line the request logs afterwards, the
+`response` line included, carries who they are and what they were held to:
+
+- `jwt_principal` is the token's `sub` claim, or the user name of a basic
+  credential.
+- `jwt_partner` is the partner the token names.
+- `remoteAddr` is the address of the peer that opened the connection.
+- `origin` is the caller origin the CIDR check judges: the peer, or the
+  nearest hop in the forwarding headers that is not a trusted proxy. It is
+  absent when the peer address cannot be parsed.
+- `cidr` lists the networks the CIDR check held the caller to, from the
+  token or an override.
+- `rate` lists the rates the rate check held the caller to, from the token,
+  an override or the defaults.
+- `tr181` lists the parameter capabilities, without their prefix, the
+  parameter check held the caller to.
+
+`cidr`, `rate` and `tr181` are each absent when their check is not
+configured, and `tr181` also when the route has no parameters to check.  An
+empty list means the caller was unrestricted by that check.  The forwarding
+headers themselves, `Forwarded` and `X-Forwarded-For`, are in
+`requestHeaders` like every other request header.
 
 ## For callers
 

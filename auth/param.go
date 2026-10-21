@@ -93,6 +93,10 @@ type paramConfig struct {
 
 // paramCapability is one parsed parameter capability.
 type paramCapability struct {
+	// text is the capability as it was given, without its prefix, for the
+	// request logger.
+	text string
+
 	// pattern matches lowercased parameter names.
 	pattern *regexp.Regexp
 
@@ -142,7 +146,7 @@ func parseParamCapability(text string) (paramCapability, error) {
 		return paramCapability{}, fmt.Errorf("empty pattern in %q", text)
 	}
 
-	pcap := paramCapability{subtree: strings.HasSuffix(pattern, "**")}
+	pcap := paramCapability{text: text, subtree: strings.HasSuffix(pattern, "**")}
 	switch Operation(op) {
 	case OperationRead:
 		pcap.read = true
@@ -265,6 +269,10 @@ func (c *ParamCheck) Middleware(extract ParamExtractor) func(http.Handler) http.
 			d := c.check(token, req)
 			c.record(response.Header(), request, token, req, d)
 
+			// the capabilities the caller was held to, for the request logger
+			request = request.WithContext(addLogFields(request.Context(),
+				zap.Strings(ParamField, capabilityTexts(d.caps))))
+
 			if d.allowed || c.mode.permissive {
 				next.ServeHTTP(response, request)
 				return
@@ -284,6 +292,22 @@ type paramDecision struct {
 
 	// malformed are the token's malformed parameter capabilities.
 	malformed []string
+
+	// caps are the capabilities the caller was held to: their override, or
+	// the well-formed ones their token carries.  Empty for an unrestricted
+	// caller.
+	caps []paramCapability
+}
+
+// capabilityTexts returns capabilities as they were given, for the request
+// logger.
+func capabilityTexts(caps []paramCapability) []string {
+	texts := make([]string, 0, len(caps))
+	for _, c := range caps {
+		texts = append(texts, c.text)
+	}
+
+	return texts
 }
 
 // check decides whether the token may do what the request asks.  A token
@@ -318,6 +342,8 @@ func (c *ParamCheck) check(token bascule.Token, req ParamRequest) paramDecision 
 			}
 		}
 	}
+
+	d.caps = caps
 
 	if !present {
 		d.allowed = true

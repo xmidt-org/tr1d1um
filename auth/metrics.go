@@ -177,7 +177,9 @@ type authenticatorEvent struct {
 
 func (ae authenticatorEvent) OnEvent(e bascule.AuthenticateEvent[*http.Request]) {
 	if e.Err == nil {
-		ae.l.Debug("authenticator event: creds authenticated")
+		requestLogger(e.Source, ae.l).Debug("authenticator event: creds authenticated",
+			zap.String(PrincipalField, ae.value(principalOf(e.Token))),
+			zap.String(PartnerField, ae.value(determinePartnerID(e.Token))))
 
 		return
 	}
@@ -231,11 +233,17 @@ func (ae authenticatorEvent) getLabels(e bascule.AuthenticateEvent[*http.Request
 		reason = UnknownReason
 	}
 
-	fs := []zap.Field{zap.String("jwt_principal", ae.value(client)), zap.String("jwt_partner", ae.value(partner)), zap.String("jwt_rejection_reason", reason)}
+	fs := []zap.Field{
+		zap.String(PrincipalField, ae.value(client)),
+		zap.String(PartnerField, ae.value(partner)),
+		zap.String("jwt_rejection_reason", reason),
+	}
+	l := requestLogger(e.Source, ae.l)
 	if reason == UnknownReason {
-		ae.l.Error("authenticator event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
+		l.Error("authenticator event failure",
+			append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
-		ae.l.Info("authenticator event: creds rejected", fs...)
+		l.Info("authenticator event: creds rejected", fs...)
 	}
 
 	// A JWT token only exists once its signature has been verified, so its
@@ -309,9 +317,9 @@ func (ae authorizerEvent) recordWarnings(e bascule.AuthorizeEvent[*http.Request]
 			ClientIDLabel: client,
 		})).Add(1)
 
-		ae.l.Info("authorizer event: capability warning",
-			zap.String("jwt_principal", ae.value(client)),
-			zap.String("jwt_partner", ae.value(partner)),
+		requestLogger(e.Resource, ae.l).Info("authorizer event: capability warning",
+			zap.String(PrincipalField, ae.value(client)),
+			zap.String(PartnerField, ae.value(partner)),
 			zap.String("warning", ae.warning(w.String())))
 	}
 }
@@ -368,10 +376,12 @@ func (ae authorizerEvent) getLabels(e bascule.AuthorizeEvent[*http.Request]) pro
 	}
 
 	fs = append(fs, zap.String("jwt_rejection_reason", reason))
+	l := requestLogger(e.Resource, ae.l)
 	if reason == UnknownReason {
-		ae.l.Error("authorizer event failure", append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
+		l.Error("authorizer event failure",
+			append(fs, zap.Error(fmt.Errorf("unexpected event error: %v", e.Err)))...)
 	} else {
-		ae.l.Info("authorizer event: creds rejected", fs...)
+		l.Info("authorizer event: creds rejected", fs...)
 	}
 
 	// Basic credentials are checked while authorizing, so a bad_creds

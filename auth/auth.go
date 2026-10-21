@@ -233,6 +233,12 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		return alice.Chain{}, nil, err
 	}
 
+	// origin resolves where a request came from, for the request logger.
+	// The CIDR check supplies it when configured, so the logged origin is
+	// the one the check judged.  Otherwise the zero resolver, which trusts
+	// no proxies, gives the peer.
+	origin := &basculehttp.OriginResolver{}
+
 	if v.IsSet(basicConfigKey) && v.IsSet(jwtConfigKey) {
 		return alice.Chain{}, nil, fmt.Errorf("`%s` and `%s` can't both be set", basicConfigKey, jwtConfigKey)
 	} else if v.IsSet(basicConfigKey) {
@@ -288,6 +294,7 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 
 			authorizerOpts = append(authorizerOpts, bascule.WithApprovers(cidr.approver))
 			tellCaller = cidr.mode.warnings
+			origin = cidr.resolver
 
 			l.Info("inbound cidr capability checks enabled",
 				zap.String("mode", cidr.mode.String()),
@@ -375,9 +382,13 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 		return alice.Chain{}, nil, fmt.Errorf("failed to create auth middleware: %v", err)
 	}
 
-	// The limiter keeps state per principal, so it must run only once the
-	// token has been verified: after auth, never before.
-	constructors := []alice.Constructor{setLogger(l), auth.Then}
+	// The record is given before auth so the CIDR check can fill it in, and
+	// the caller is logged after auth so that only an accepted caller is
+	// named.  The limiter keeps state per principal, so it must run only
+	// once the token has been verified: after auth, never before.
+	constructors := []alice.Constructor{
+		setLogger(l), withCallerRecord, auth.Then, logCaller(origin, lim),
+	}
 	if limiter != nil {
 		constructors = append(constructors, limiter.handle)
 	}
@@ -471,23 +482,32 @@ func parseCIDROverrides(overrides map[string][]string) (map[string][]netip.Prefi
 	return parsed, nil
 }
 
-// overrideNetworks returns a resolver that gives a caller with an override
+// resolveNetworks returns a resolver that gives a caller with an override
 // exactly the override's networks, whatever their token carries, and leaves
-// every other caller with their token's.
-func overrideNetworks(overrides map[string][]netip.Prefix) basculehttp.CIDRResolver {
-	return func(_ context.Context, principal string, provided []netip.Prefix) ([]netip.Prefix, error) {
-		if networks, ok := overrides[strings.ToLower(principal)]; ok {
-			return networks, nil
+// every other caller with their token's.  Whatever it decides is recorded on
+// the request's callerRecord, so the request logger can say what the caller
+// was held to.
+func resolveNetworks(overrides map[string][]netip.Prefix) basculehttp.CIDRResolver {
+	return func(
+		ctx context.Context, principal string, provided []netip.Prefix,
+	) ([]netip.Prefix, error) {
+		networks := provided
+		if override, ok := overrides[strings.ToLower(principal)]; ok {
+			networks = override
 		}
 
-		return provided, nil
+		recordFrom(ctx).setNetworks(networks)
+
+		return networks, nil
 	}
 }
 
-// cidrCheck is the configured CIDR approver and the mode it runs in.
+// cidrCheck is the configured CIDR approver, the mode it runs in and the
+// resolver it finds the caller origin with.
 type cidrCheck struct {
 	approver *basculehttp.CIDRApprover
 	mode     checkMode
+	resolver *basculehttp.OriginResolver
 }
 
 // newCIDRApprover builds the approver that holds a token's bearer to the
@@ -519,11 +539,8 @@ func newCIDRApprover(cfg cidrConfig) (cidrCheck, error) {
 	opts := []basculehttp.CIDRApproverOption{
 		basculehttp.WithCIDRPrefixLiterals(cfg.Prefixes...),
 		basculehttp.WithOriginResolver(resolver),
+		basculehttp.WithCIDRResolver(resolveNetworks(overrides)),
 		cidrModeOption(mode),
-	}
-
-	if len(overrides) > 0 {
-		opts = append(opts, basculehttp.WithCIDRResolver(overrideNetworks(overrides)))
 	}
 
 	if cfg.CacheSize > 0 {
@@ -535,7 +552,7 @@ func newCIDRApprover(cfg cidrConfig) (cidrCheck, error) {
 		return cidrCheck{}, err
 	}
 
-	return cidrCheck{approver: approver, mode: mode}, nil
+	return cidrCheck{approver: approver, mode: mode, resolver: resolver}, nil
 }
 
 // cidrModeOption maps a mode onto the approver's option for it.
