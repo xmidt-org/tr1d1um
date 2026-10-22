@@ -65,6 +65,8 @@ func TestDetermineEndpoint(t *testing.T) {
 	endpoints := []*regexp.Regexp{
 		regexp.MustCompile(`/api/v3/device/[^/]+/config`),
 		regexp.MustCompile(`/api/v3/hook[s ]`),
+		regexp.MustCompile(`device/.*/stat\b`),
+		regexp.MustCompile(`/hooks\b`),
 	}
 
 	tests := []struct {
@@ -80,6 +82,10 @@ func TestDetermineEndpoint(t *testing.T) {
 		{name: "match must be at the start", endpoints: endpoints, path: "/prefix/api/v3/device/mac:112233445566/config", want: NotRecognizedEndpoint},
 		{name: "no match", endpoints: endpoints, path: "/api/v3/other", want: NotRecognizedEndpoint},
 		{name: "spaces become underscores", endpoints: endpoints, path: "/api/v3/hooks", want: "/api/v3/hook[s_]"},
+		{name: "capability style without the api prefix", endpoints: endpoints, path: "/api/v2/device/mac:112233445566/stat", want: `device/.*/stat\b`},
+		{name: "capability style with a leading slash", endpoints: endpoints[2:], path: "/api/v3/hooks", want: `/hooks\b`},
+		{name: "word boundary holds", endpoints: endpoints[2:], path: "/api/v3/device/mac:112233445566/statX", want: NotRecognizedEndpoint},
+		{name: "a double slash is not unrooted", endpoints: endpoints[2:], path: "/api/v3//device/mac:112233445566/stat", want: NotRecognizedEndpoint},
 	}
 
 	for _, tc := range tests {
