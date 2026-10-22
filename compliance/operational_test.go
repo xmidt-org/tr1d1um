@@ -257,14 +257,21 @@ func TestBasicAuthProfile(t *testing.T) {
 		hookURL := uniqueListenerURL()
 		body := hookBody(t, "v3", map[string]any{"config": map[string]any{"url": hookURL, "content_type": "application/json"}})
 		resp := send(t, request{Method: http.MethodPost, URL: a.hookURL("v3"), Token: configured, Body: body,
-			Headers: map[string]string{"X-Xmidt-Partner-Ids": "partner-x"}})
+			Headers: map[string]string{"X-Xmidt-Partner-Id": "partner-x"}})
 		require.Equal(t, http.StatusOK, resp.Status, "body: %s", resp.Body)
 
-		list := send(t, request{Method: http.MethodGet, URL: a.hooksURL("v3"), Token: configured, Headers: map[string]string{"X-Xmidt-Partner-Ids": "partner-x"}})
-		require.Equal(t, http.StatusOK, list.Status, "body: %s", list.Body)
-		var hooks []listedHook
-		require.NoError(t, json.Unmarshal([]byte(list.Body), &hooks))
-		assert.Contains(t, hookURLs(hooks), hookURL)
+		// the same header on the listing shows the webhook; another partner's
+		// header, or none, does not
+		listWith := func(headers map[string]string) []string {
+			list := send(t, request{Method: http.MethodGet, URL: a.hooksURL("v3"), Token: configured, Headers: headers})
+			require.Equal(t, http.StatusOK, list.Status, "body: %s", list.Body)
+			var hooks []listedHook
+			require.NoError(t, json.Unmarshal([]byte(list.Body), &hooks))
+			return hookURLs(hooks)
+		}
+		assert.Contains(t, listWith(map[string]string{"X-Xmidt-Partner-Id": "partner-x"}), hookURL)
+		assert.NotContains(t, listWith(map[string]string{"X-Xmidt-Partner-Id": "partner-y"}), hookURL)
+		assert.NotContains(t, listWith(nil), hookURL)
 	})
 
 	t.Run("no_capability_warning_header", func(t *testing.T) {

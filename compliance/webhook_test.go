@@ -233,9 +233,11 @@ func TestWebhookLifecycle(t *testing.T) {
 
 	t.Run("expires", func(t *testing.T) {
 		hookURL := uniqueListenerURL()
+		// two seconds: the store keeps a TTL in whole seconds, and one of
+		// zero means no expiry at all
 		body := hookBody(t, "v3", map[string]any{
 			"config":   map[string]any{"url": hookURL, "content_type": "application/json"},
-			"duration": "1s",
+			"duration": "2s",
 		})
 		resp := register(t, a, "v3", tok, body)
 		require.Equal(t, http.StatusOK, resp.Status, "body: %s", resp.Body)

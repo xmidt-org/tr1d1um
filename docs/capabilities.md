@@ -338,8 +338,10 @@ Two counters, from the `auth` package:
   | rate      | `rate_exceeded`, `rate_denied`                               |
   | parameter | `parameter_not_allowed`, `token_too_old`, `no_issued_at`     |
 
-  `rate_denied` is a refusal at a rate of zero, which a malformed rate
-  capability produces.
+  A malformed rate capability is held to zero, so it is refused as
+  `rate_exceeded`, with no `Retry-After` since waiting never helps.
+  `rate_denied` is a refusal because the rates could not be resolved at
+  all, which the log explains.
 
 - `auth_capability_warning` counts every finding that did not reject,
   labeled with `kind` (`cidr`, `rate` or `param`), `reason` and `clientid`.

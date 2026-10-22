@@ -405,9 +405,12 @@ func TestRateEnforce(t *testing.T) {
 	})
 
 	t.Run("malformed_rate_allows_nothing", func(t *testing.T) {
+		// held to zero: over the rate from the first call, and since waiting
+		// never helps there is no Retry-After
 		sub := "rate-" + randomHex(4)
 		resp := get(t, url, withRate(t, sub, "100/1d"))
-		assert.Equal(t, http.StatusForbidden, resp.Status, "a malformed rate is held to zero, body: %s", resp.Body)
+		assert.Equal(t, http.StatusTooManyRequests, resp.Status, "a malformed rate is held to zero, body: %s", resp.Body)
+		assert.Empty(t, resp.Header.Get("Retry-After"))
 		assertWarning(t, resp, "malformed", "kind=rate", "100/1d")
 	})
 
@@ -448,7 +451,7 @@ func TestRateOverridesAndDefaults(t *testing.T) {
 	t.Run("a_malformed_rate_is_not_rateless", func(t *testing.T) {
 		a := appFor(t, rateDefaults)
 		resp := get(t, a.statURL("v3", newMAC()), withRate(t, "rate-"+randomHex(4), "nope"))
-		assert.Equal(t, http.StatusForbidden, resp.Status, "held to zero, not to the defaults, body: %s", resp.Body)
+		assert.Equal(t, http.StatusTooManyRequests, resp.Status, "held to zero, not to the defaults, body: %s", resp.Body)
 	})
 }
 
@@ -512,10 +515,10 @@ func TestRateRejectionsAreCounted(t *testing.T) {
 		assert.Equal(t, 1.0, delta)
 	})
 
-	t.Run("rate_denied", func(t *testing.T) {
+	t.Run("malformed_rate_is_rate_exceeded", func(t *testing.T) {
 		sub := "rate-count-" + randomHex(4)
-		delta := counterDelta(t, a, name, map[string]string{"outcome": "rejected", "reason": "rate_denied", "clientid": sub}, func() {
-			assert.Equal(t, http.StatusForbidden, get(t, url, withRate(t, sub, "100/1d")).Status)
+		delta := counterDelta(t, a, name, map[string]string{"outcome": "rejected", "reason": "rate_exceeded", "clientid": sub}, func() {
+			assert.Equal(t, http.StatusTooManyRequests, get(t, url, withRate(t, sub, "100/1d")).Status)
 		})
 		assert.Equal(t, 1.0, delta)
 	})
@@ -887,7 +890,6 @@ func TestKindsAreIndependent(t *testing.T) {
 
 	for name, tok := range map[string]string{
 		"bad_cidr":     signer.mint(t, claims{Capabilities: []string{apiPrefix + allCapability, cidrPrefix + excludedNetwork, ratePrefix + "100/1m", paramPrefix + "Device.**"}}),
-		"bad_rate":     signer.mint(t, claims{Capabilities: []string{apiPrefix + allCapability, cidrPrefix + includedNetwork, ratePrefix + "100/1d", paramPrefix + "Device.**"}}),
 		"bad_param":    signer.mint(t, claims{Capabilities: []string{apiPrefix + allCapability, cidrPrefix + includedNetwork, ratePrefix + "100/1m", paramPrefix + "Device.WiFi.**"}}),
 		"bad_endpoint": signer.mint(t, claims{Capabilities: []string{apiPrefix + hooksGetCapability, cidrPrefix + includedNetwork, ratePrefix + "100/1m", paramPrefix + "Device.**"}}),
 	} {
@@ -897,4 +899,11 @@ func TestKindsAreIndependent(t *testing.T) {
 			dev.none(t)
 		})
 	}
+
+	t.Run("bad_rate", func(t *testing.T) {
+		tok := signer.mint(t, claims{Capabilities: []string{apiPrefix + allCapability, cidrPrefix + includedNetwork, ratePrefix + "100/1d", paramPrefix + "Device.**"}})
+		resp := get(t, url, tok)
+		assert.Equal(t, http.StatusTooManyRequests, resp.Status, "body: %s", resp.Body)
+		dev.none(t)
+	})
 }
