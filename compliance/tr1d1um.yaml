@@ -75,13 +75,12 @@ webhook:
   disablePartnerIDs: false
   validation:
     url:
-      httpsOnly: false
+      schemes: ["http", "https"]
       allowLoopback: true
-      allowIP: true
-      allowSpecialUseHosts: true
-      allowSpecialUseIPs: true
-      invalidHosts: []
-      invalidSubnets: []
+    ip:
+      allow: true
+    domain:
+      allowSpecialUseDomains: true
     ttl:
       max: 5m
       jitter: 10s
