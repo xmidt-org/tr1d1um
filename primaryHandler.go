@@ -176,9 +176,8 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		in.Logger.Info("Webhook service disabled")
 		return
 	}
-	out.GetAllWebhooksHandler = ancla.NewGetAllWRPEventStreamsHandler(in.Service, ancla.HandlerConfig{
-		GetLogger: sallust.Get,
-	})
+	// tr1d1um's own listing, which shows a caller only its partners' webhooks
+	out.GetAllWebhooksHandler = newGetAllWebhooksHandler(in.Service, in.WebhookConfig.DisablePartnerIDs)
 
 	builtValidators, err := in.WebhookConfig.Validation.BuildOptions()
 	if err != nil {
