@@ -297,7 +297,9 @@ auth:
     # It is intended for local testing.  A basic credential carries no
     # capabilities and no partner IDs, so a caller using one is not subject
     # to capability checks and supplies partner IDs through the
-    # X-Webpa-Partner-Id header.
+    # X-Xmidt-Partner-Id header, on device requests and webhook requests
+    # alike.  A JWT's partner IDs come from its claims and the header is
+    # ignored.
     #
     # WARNING! Be sure to remove this from your production config.
     basic: ["dXNlcjpwYXNz"]
