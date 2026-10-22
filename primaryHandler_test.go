@@ -19,6 +19,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/ancla"
+	"github.com/xmidt-org/ancla/schema"
+	webhook "github.com/xmidt-org/webhook-schema"
 )
 
 // temporaryError is an error that reports itself as temporary, as a network
@@ -202,4 +204,49 @@ func TestValidateWRPSource(t *testing.T) {
 		require.Error(t, err, source)
 		assert.Contains(t, err.Error(), "WRPSource", source)
 	}
+}
+
+func TestRequireReceiverURL(t *testing.T) {
+	var v1 webhook.RegistrationV1
+	require.ErrorIs(t, requireReceiverURL{}.Validate(&v1), errNoReceiverURL)
+	v1.Config.ReceiverURL = "http://listener.example.test/events"
+	require.NoError(t, requireReceiverURL{}.Validate(&v1))
+
+	var v2 webhook.RegistrationV2
+	require.NoError(t, requireReceiverURL{}.Validate(&v2), "no webhooks, nothing to require")
+	v2.Webhooks = []webhook.Webhook{{}}
+	require.ErrorIs(t, requireReceiverURL{}.Validate(&v2), errNoReceiverURL)
+	v2.Webhooks[0].ReceiverURLs = []string{"http://listener.example.test/events"}
+	require.NoError(t, requireReceiverURL{}.Validate(&v2))
+
+	require.NoError(t, requireReceiverURL{}.Validate("not a registration"))
+	assert.Equal(t, "requireReceiverURL()", requireReceiverURL{}.String())
+}
+
+func TestV2WebhookValidators(t *testing.T) {
+	var cfg ancla.Config
+	cfg.Validation.BuildOpts = schema.BuildOptions{
+		AtLeastOneEvent:              true,
+		ValidateRegistrationDuration: true,
+		CheckUntil:                   true,
+	}
+	cfg.Validation.TTL.Max = time.Minute
+
+	opts, err := v2WebhookValidators(cfg)
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(opts))
+	for _, o := range opts {
+		names = append(names, o.String())
+	}
+	assert.Contains(t, names, "AtLeastOneEvent()")
+	assert.Contains(t, names, "requireReceiverURL()")
+	for _, name := range names {
+		assert.NotContains(t, name, "ValidateRegistrationDuration", "the v2 shim repairs the duration instead")
+		assert.NotContains(t, name, "untilOption", "the v2 shim repairs until instead")
+	}
+
+	cfg.Validation.IP.ForbiddenSubnets = []string{"not a subnet"}
+	_, err = v2WebhookValidators(cfg)
+	require.Error(t, err)
 }
