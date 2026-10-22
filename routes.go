@@ -70,6 +70,7 @@ type primaryEndpointIn struct {
 	BearerFingerprint           transaction.FingerprintConfig `name:"bearerFingerprint"`
 	ParamFilters                *paramfilter.Filters          `name:"paramFilters"`
 	ParamCheck                  *auth.ParamCheck
+	MaxRequestBodyBytes         int64 `name:"maxRequestBodyBytes"`
 }
 
 type handleWebhookRoutesIn struct {
@@ -83,6 +84,7 @@ type handleWebhookRoutesIn struct {
 	V2AddWebhookHandler   http.Handler `name:"v2_add_webhook_handler"`
 	GetAllWebhooksHandler http.Handler `name:"get_all_webhooks_handler"`
 	WebhookConfig         ancla.Config
+	MaxRequestBodyBytes   int64 `name:"maxRequestBodyBytes"`
 }
 
 type apiAltRouterIn struct {
@@ -217,6 +219,7 @@ func provideConfig() fx.Option {
 		viperfx.Provide("targetURL", "localhost:6000"),
 		viperfx.Provide("WRPSource", "dns:localhost"),
 		viperfx.Provide("supportedServices", []string{}), // no services allowed by default
+		viperfx.Provide("maxRequestBodyBytes", int64(transaction.DefaultMaxRequestBodyBytes)),
 	)
 }
 
@@ -298,6 +301,7 @@ func handlePrimaryEndpoint(in primaryEndpointIn) {
 		BearerFingerprint:           in.BearerFingerprint,
 		ParamFilters:                in.ParamFilters,
 		ParamCheck:                  in.ParamCheck,
+		MaxRequestBodyBytes:         in.MaxRequestBodyBytes,
 		Tracing:                     in.Tracing,
 	})
 }
@@ -310,8 +314,11 @@ func handleWebhookRoutes(in handleWebhookRoutesIn) error {
 	hooks := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.GetAllWebhooksHandler)
 	hook := candlelight.EchoFirstTraceNodeInfo(in.Tracing, false)(in.AddWebhookHandler)
 	fixV2Middleware := fixV2Duration(in.WebhookConfig.Validation.TTL, in.V2AddWebhookHandler)
+	limit := transaction.BodyLimit(in.MaxRequestBodyBytes)
 
-	in.APIRouter.Handle("/hook", in.AuthChain.Then(fixV2Middleware(hook))).Methods(http.MethodPost)
+	// the body limit runs after authentication, so that only an authorized
+	// caller can have a body read at all
+	in.APIRouter.Handle("/hook", in.AuthChain.Then(limit(fixV2Middleware(hook)))).Methods(http.MethodPost)
 	in.APIRouter.Handle("/hooks", in.AuthChain.Then(hooks)).Methods(http.MethodGet)
 
 	return nil

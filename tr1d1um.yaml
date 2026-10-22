@@ -750,6 +750,14 @@ WRPSource: "dns:tr1d1um.example.com"
 supportedServices:
   - "config"
 
+# maxRequestBodyBytes is the most bytes of a request body tr1d1um reads, on
+# the device routes and the webhook registration route alike.  A longer body
+# is refused with 413 Request Entity Too Large before it is read into
+# memory, so a caller cannot exhaust memory with one request.  A WDMP
+# request or a webhook registration is a few kilobytes.
+# (Optional). Defaults to 1048576 (1 MiB).
+# maxRequestBodyBytes: 1048576
+
 
 ##############################################################################
 # HTTP Transaction Configurations
