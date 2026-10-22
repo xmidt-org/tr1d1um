@@ -291,7 +291,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"message": err.Error(),
+		"message": transaction.CallerMessage(err),
 	})
 
 }

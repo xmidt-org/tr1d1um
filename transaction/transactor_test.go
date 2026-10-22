@@ -32,7 +32,7 @@ func TestTransactError(t *testing.T) {
 	assert := assert.New(t)
 
 	plainErr := errors.New("network test error")
-	expectedErr := NewCodedError(plainErr, 503)
+	expectedErr := NewXmidtUnavailableError(plainErr)
 
 	transactor := New(&Options{
 		Do: func(_ *http.Request) (*http.Response, error) {
@@ -44,6 +44,9 @@ func TestTransactError(t *testing.T) {
 	_, e := transactor.Transact(r)
 
 	assert.EqualValues(expectedErr, e)
+	require.ErrorIs(t, e, plainErr, "the cause is kept for the log")
+	require.ErrorIs(t, e, ErrXmidtUnavailable)
+	assert.Equal(ErrXmidtUnavailable.Error(), CallerMessage(e), "the caller is not told the cause")
 }
 
 func TestTransactIdeal(t *testing.T) {
