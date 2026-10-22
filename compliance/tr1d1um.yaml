@@ -1,0 +1,156 @@
+---
+## SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
+## SPDX-License-Identifier: Apache-2.0
+##############################################################################
+# The configuration the compliance suite runs tr1d1um with.
+#
+# The harness (harness_test.go) reads this file, merges in the values that
+# only exist at run time (listen ports, the fake XMiDT and Argus URLs, the
+# test signing key, the log file) and the per-profile overrides (capability
+# modes), and writes the result to a temporary file that tr1d1um is started
+# with.  Everything that can be static is here, so the suite's view of a
+# deployment can be read in one place.
+#
+# Capability prefixes and overrides are keyed so that a test can opt into a
+# behavior by minting a token with a particular principal (sub); a token
+# with the default principal is held to nothing but its own capabilities.
+##############################################################################
+
+server: "compliance.example.com"
+build: "0.0.0-compliance"
+region: "test"
+flavor: "compliance"
+
+prometheus:
+  defaultNamespace: webpa
+  defaultSubsystem: tr1d1um
+  handler:
+    maxRequestsInFlight: 5
+    timeout: 5s
+    instrumentMetricHandler: true
+
+health:
+  disableLogging: false
+
+servers:
+  primary:
+    address: "127.0.0.1:0" # replaced by the harness
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - compliance
+      X-Tr1d1um-Version:
+        - 0.0.0-compliance
+  alternate:
+    address: "127.0.0.1:0" # replaced by the harness
+    header:
+      X-Midt-Server:
+        - tr1d1um
+      X-Midt-Version:
+        - compliance
+  metrics:
+    address: "127.0.0.1:0" # replaced by the harness
+  health:
+    address: "127.0.0.1:0" # replaced by the harness
+    header:
+      X-Midt-Server:
+        - tr1d1um
+  pprof:
+    address: "127.0.0.1:0" # replaced by the harness
+
+logging:
+  outputPaths:
+    - stdout # replaced by the harness with a per-instance log file
+  errorOutputPaths:
+    - stderr
+  level: debug
+  encoding: json
+  encoderConfig:
+    messageKey: msg
+    levelKey: level
+    levelEncoder: lowercase
+
+webhook:
+  disablePartnerIDs: false
+  validation:
+    url:
+      httpsOnly: false
+      allowLoopback: true
+      allowIP: true
+      allowSpecialUseHosts: true
+      allowSpecialUseIPs: true
+      invalidHosts: []
+      invalidSubnets: []
+    ttl:
+      max: 5m
+      jitter: 10s
+  client:
+    storeBaseURL: "http://127.0.0.1:1" # replaced by the harness
+    bucket: "webhooks"
+    clientTimeout: 5s
+    netDialerTimeout: 1s
+  listener:
+    pullInterval: 500ms
+
+auth:
+  inbound:
+    jwt:
+      prefixes: ["webpa-prefix-api:"]
+      acceptAllMethod: "all"
+      endpointBuckets:
+        - "hook\\b"
+        - "hooks\\b"
+        - "device/.*/stat\\b"
+        - "device/.*/config\\b"
+      cidr:
+        prefixes: ["webpa-prefix-cidr:"]
+        mode: "enforce" # replaced per profile
+        overrides:
+          # held to a network the loopback peer is not in, whatever the token says
+          "cidr-override-caller": ["192.0.2.0/24"]
+          # held to nothing, whatever the token says
+          "cidr-exempt-caller": []
+      rate:
+        prefixes: ["webpa-prefix-rate:"]
+        mode: "enforce" # replaced per profile
+        overrides:
+          "rate-override-caller": ["2/1m"]
+          "rate-exempt-caller": []
+      param:
+        prefixes: ["webpa-prefix-param:"]
+        mode: "enforce" # replaced per profile
+        overrides:
+          "param-override-caller": ["Device.DeviceInfo.**:read"]
+          "param-exempt-caller": []
+        maxAge:
+          "Device.Secret.**": 30m
+      clortho:
+        fixed:
+          - keys:
+              - keyID: "compliance"
+                key: "replaced by the harness"
+  outbound:
+    fanout:
+      basic: "ZmFub3V0OnNlY3JldA==" # fanout:secret
+    webhook:
+      basic: "d2ViaG9vazpzZWNyZXQ=" # webhook:secret
+
+targetURL: "http://127.0.0.1:1/api/v3" # replaced by the harness
+WRPSource: "dns:tr1d1um.compliance.example.com"
+supportedServices:
+  - "config"
+
+# Short, so a device that never answers fails fast.
+xmidtClientTimeout:
+  clientTimeout: 3s
+  requestTimeout: 1s
+  netDialerTimeout: 1s
+
+requestRetryInterval: "100ms"
+requestMaxRetries: 1
+
+tracing:
+  provider: "noop"
+
+previousVersionSupport: true
