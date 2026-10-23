@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/spiffe/go-spiffe/v2 v2.9.0
 	github.com/stretchr/testify v1.12.1
-	github.com/xmidt-org/ancla v0.5.4
+	github.com/xmidt-org/ancla v0.5.5
 	github.com/xmidt-org/arrange v0.5.10
 	github.com/xmidt-org/bascule v1.8.1
 	github.com/xmidt-org/candlelight v0.4.2
