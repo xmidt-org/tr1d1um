@@ -94,7 +94,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 
 	// The status is already written; a failed body write cannot be reported.
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"message": err.Error(),
+		"message": transaction.CallerMessage(err),
 	})
 }
 

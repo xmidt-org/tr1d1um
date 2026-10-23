@@ -6,6 +6,7 @@ package transaction
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -24,25 +25,67 @@ const StatusClientClosedRequest = 499
 // caller's request context was canceled.
 var ErrClientClosedRequest = errors.New("client closed the request")
 
+// ErrXmidtUnavailable is what a caller is told when the XMiDT cluster could
+// not be reached or did not answer in time.  The cause, which names the
+// cluster's address, is logged but never sent to the caller.
+var ErrXmidtUnavailable = errors.New("the XMiDT cluster could not be reached")
+
 // CodedError describes the behavior of an error that additionally has an HTTP status code used for TR1D1UM business logic
 type CodedError interface {
 	error
 	StatusCode() int
 }
 
+// CallerError is an error whose full text is for the log and whose
+// CallerMessage is for the caller, because the full text names something
+// internal, such as the address of the XMiDT cluster.
+type CallerError interface {
+	error
+	CallerMessage() string
+}
+
 type codedError struct {
 	error
 	statusCode int
+
+	// callerMessage, when set, is what the caller is told instead of the
+	// error text.
+	callerMessage string
 }
 
 func (c *codedError) StatusCode() int {
 	return c.statusCode
 }
 
+// CallerMessage implements CallerError.  It is the message set for the
+// caller, or the wrapped error's when that is a CallerError, or else the
+// error text.
+func (c *codedError) CallerMessage() string {
+	if c.callerMessage != "" {
+		return c.callerMessage
+	}
+
+	if inner, ok := errors.AsType[CallerError](c.error); ok {
+		return inner.CallerMessage()
+	}
+
+	return c.Error()
+}
+
 // Unwrap exposes the underlying error, so errors.Is and errors.As see
 // through the status code to the cause.
 func (c *codedError) Unwrap() error {
 	return c.error
+}
+
+// CallerMessage returns what a caller should be told about err: its
+// CallerMessage when it is a CallerError, otherwise its text.
+func CallerMessage(err error) string {
+	if ce, ok := errors.AsType[CallerError](err); ok {
+		return ce.CallerMessage()
+	}
+
+	return err.Error()
 }
 
 // NewBadRequestError is the constructor for an error returned for bad HTTP requests to tr1d1um
@@ -56,6 +99,17 @@ func NewCodedError(e error, code int) CodedError {
 	return &codedError{
 		error:      e,
 		statusCode: code,
+	}
+}
+
+// NewXmidtUnavailableError returns the 503 for a request XMiDT could not
+// serve: cause is for the log, and the caller is told only
+// ErrXmidtUnavailable.
+func NewXmidtUnavailableError(cause error) CodedError {
+	return &codedError{
+		error:         fmt.Errorf("%w: %w", ErrXmidtUnavailable, cause),
+		statusCode:    http.StatusServiceUnavailable,
+		callerMessage: ErrXmidtUnavailable.Error(),
 	}
 }
 

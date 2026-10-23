@@ -385,11 +385,12 @@ func NewMiddleware(cfg inboundConfig, v *viper.Viper, kp jws.KeyProvider, l *zap
 	}
 
 	// The record is given before auth so the CIDR check can fill it in, and
-	// the caller is logged after auth so that only an accepted caller is
-	// named.  The limiter keeps state per principal, so it must run only
-	// once the token has been verified: after auth, never before.
+	// the caller is logged and its partners recorded after auth so that only
+	// an accepted caller is named.  The limiter keeps state per principal,
+	// so it must run only once the token has been verified: after auth,
+	// never before.
 	constructors := []alice.Constructor{
-		setLogger(l), withCallerRecord, auth.Then, logCaller(origin, lim),
+		setLogger(l), withCallerRecord, auth.Then, logCaller(origin, lim), withPartnerIDs,
 	}
 	if limiter != nil {
 		constructors = append(constructors, limiter.handle)

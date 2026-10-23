@@ -116,8 +116,9 @@ func (t *transactor) Transact(req *http.Request) (result *XmidtResponse, err err
 		return
 	}
 
-	// Timeout, network errors, etc.
-	err = NewCodedError(err, http.StatusServiceUnavailable)
+	// Timeout, network errors, etc.  The error names the cluster's address,
+	// which the caller is not told.
+	err = NewXmidtUnavailableError(err)
 	return
 }
 

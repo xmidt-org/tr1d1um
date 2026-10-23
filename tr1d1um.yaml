@@ -182,42 +182,64 @@ webhook:
   # least one value and all values must compile into regular expressions.
   validation:
 
-    # url provides options for additional validation of the webhook's
-    # Config.URL, FailureURL, and Config.AlternativeURLs fields.
+    # url, ip and domain are the rules a registration's URLs are checked
+    # against: the receiver URL, the failure URL and the alternative URLs.
     url:
-      # httpsOnly will allow only URLs with https schemes through if true.
-      # (Optional). Defaults to 'false'.
-      httpsOnly: false
+      # schemes are the URL schemes allowed.  An empty list allows any.
+      # (Optional). Defaults to any.
+      schemes: ["http", "https"]
 
-      # allowLoopback will allow any canonical or IP loopback address if
-      # true. Otherwise, loopback addresses are considered invalid.
+      # allowLoopback allows a loopback host or address if true.  Otherwise
+      # loopback addresses are invalid.
       # (Optional). Defaults to 'false'.
       allowLoopback: true
 
-      # allowIP allows the different webhook URLs to have IP hostnames if set to true.
+    ip:
+      # allow lets a URL name an IP address instead of a host if true.
       # (Optional). Defaults to 'false'.
-      allowIP: true
+      allow: true
 
-      # allowSpecialUseHosts allows URLs that include reserved domains if set to true.
-      # Read more here: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
+      # forbiddenSubnets are IP subnets a URL may not contain or resolve
+      # to.
+      # (Optional). Defaults to an empty list.
+      forbiddenSubnets: []
+
+    domain:
+      # allowSpecialUseDomains allows the reserved domains (such as
+      # .test, .example and .localhost) if true.  Read more here:
+      # https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
       # (Optional). Defaults to 'false'.
-      allowSpecialUseHosts: true
+      allowSpecialUseDomains: true
 
-      # allowSpecialUseIPs, if set to true, allows URLs that contain or route to IPs that have
-      # been marked as reserved through various RFCs: rfc6761, rfc6890, rfc8190.
-      # (Optional). Defaults to 'false'.
-      allowSpecialUseIPs: true
+      # forbiddenDomains are domain names a URL may not use.
+      # (Optional). Defaults to an empty list.
+      forbiddenDomains: []
 
-      # invalidHosts is a slice that contains strings that we do not want
-      # allowed in URLs, providing a way to deny certain domains or hostnames.
-      # (Optional). Defaults to an empty slice.
-      invalidHosts: []
-
-      # invalidSubnets is a list of IP subnets.  If a URL contains an
-      # IP or resolves to an IP in one of these subnets, the webhook is
-      # considered invalid.
-      # (Optional). Defaults to an empty slice.
-      invalidSubnets: []
+    # buildOpts turns each validation of a registration on or off.  Every
+    # one is on unless set to false here.  v3 registrations are rejected
+    # when a validation fails; v2 registrations have a missing or invalid
+    # duration or until repaired instead, with an X-Xmidt-Warning header.
+    # A registration in the v2 schema (webhooks, matcher, expires) has no
+    # events, device IDs, alternative URLs or until, so those four
+    # validations are not applied to it.
+    # (Optional). The defaults are shown.
+    # buildOpts:
+    #   # the registration must name at least one event
+    #   atLeastOneEvent: true
+    #   # every event must be a valid regular expression
+    #   eventRegexMustCompile: true
+    #   # every matcher device ID must be a valid regular expression
+    #   deviceIDRegexMustCompile: true
+    #   # exactly one of duration and until, within ttl.max, not past
+    #   validateRegistrationDuration: true
+    #   # the receiver URL passes the url rules above
+    #   provideReceiverURLValidator: true
+    #   # the failure URL passes the url rules above
+    #   provideFailureURLValidator: true
+    #   # the alternative URLs pass the url rules above
+    #   provideAlternativeURLValidator: true
+    #   # until is no later than now + ttl.max + ttl.jitter
+    #   checkUntil: true
 
     # ttl provides information for what is considered valid for time-related
     # fields (Duration and Until) in the webhook.  A webhook set to expire
@@ -297,7 +319,9 @@ auth:
     # It is intended for local testing.  A basic credential carries no
     # capabilities and no partner IDs, so a caller using one is not subject
     # to capability checks and supplies partner IDs through the
-    # X-Webpa-Partner-Id header.
+    # X-Xmidt-Partner-Id header, on device requests and webhook requests
+    # alike.  A JWT's partner IDs come from its claims and the header is
+    # ignored.
     #
     # WARNING! Be sure to remove this from your production config.
     basic: ["dXNlcjpwYXNz"]
@@ -728,6 +752,14 @@ WRPSource: "dns:tr1d1um.example.com"
 # we will soon drop this configuration
 supportedServices:
   - "config"
+
+# maxRequestBodyBytes is the most bytes of a request body tr1d1um reads, on
+# the device routes and the webhook registration route alike.  A longer body
+# is refused with 413 Request Entity Too Large before it is read into
+# memory, so a caller cannot exhaust memory with one request.  A WDMP
+# request or a webhook registration is a few kilobytes.
+# (Optional). Defaults to 1048576 (1 MiB).
+# maxRequestBodyBytes: 1048576
 
 
 ##############################################################################

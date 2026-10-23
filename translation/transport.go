@@ -58,6 +58,11 @@ type Options struct {
 	// capabilities name.  Nil when not configured.
 	ParamCheck *auth.ParamCheck
 
+	// MaxRequestBodyBytes is the most bytes of a request body that are
+	// read; a longer body is refused with 413.  Zero or less is
+	// transaction.DefaultMaxRequestBodyBytes.
+	MaxRequestBodyBytes int64
+
 	// Tracing supplies the propagator and header prefix used to pick up
 	// trace context from incoming requests.
 	Tracing candlelight.Tracing
@@ -76,13 +81,15 @@ func ConfigHandler(c *Options) {
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
 	params := c.ParamCheck.Middleware(extractParameters)
+	limit := transaction.BodyLimit(c.MaxRequestBodyBytes)
 
-	// the parameter check runs after authentication, so that the token it
-	// reads has been verified
-	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler))))).
+	// The parameter check runs after authentication, so that the token it
+	// reads has been verified, and the body limit runs after it too, so
+	// that only an authorized caller can have a body read at all.
+	c.APIRouter.Handle("/device/{deviceid}/{service}", c.Authenticate.Then(limit(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))))).
 		Methods(http.MethodGet, http.MethodPatch)
 
-	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler))))).
+	c.APIRouter.Handle("/device/{deviceid}/{service}/{parameter}", c.Authenticate.Then(limit(params(candlelight.EchoFirstTraceNodeInfo(c.Tracing, false)(welcome(WRPHandler)))))).
 		Methods(http.MethodDelete, http.MethodPut, http.MethodPost)
 }
 
@@ -284,7 +291,7 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"message": err.Error(),
+		"message": transaction.CallerMessage(err),
 	})
 
 }

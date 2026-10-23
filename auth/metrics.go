@@ -480,21 +480,31 @@ func methodOf(req *http.Request) string {
 	return req.Method
 }
 
+// determineEndpoint names the bucket a request falls in, for the endpoint
+// metric label.  A bucket pattern is matched the way a capability's URL
+// pattern is: against the path with the /api/vN prefix removed, with and
+// without its leading slash, and only from the start.  So a bucket may be
+// written as a capability is, "device/.*/config\\b", or with the leading
+// slash, or with the API prefix.
 func determineEndpoint(endpoints []*regexp.Regexp, req *http.Request) string {
 	if len(endpoints) == 0 || req == nil {
 		return NoneEndpoint
 	}
 
-	url := req.URL.EscapedPath()
-	for _, r := range endpoints {
-		idxs := r.FindStringIndex(url)
-		if len(idxs) == 0 {
-			continue
-		} else if idxs[0] != 0 {
-			continue
-		}
+	full := req.URL.EscapedPath()
+	normalized := stripAPIVersion(*req.URL)
+	stripped := normalized.EscapedPath()
+	candidates := []string{full, stripped}
+	if unrooted, ok := strings.CutPrefix(stripped, "/"); ok && !strings.HasPrefix(unrooted, "/") {
+		candidates = append(candidates, unrooted)
+	}
 
-		return strings.ReplaceAll(r.String(), " ", "_")
+	for _, r := range endpoints {
+		for _, candidate := range candidates {
+			if idxs := r.FindStringIndex(candidate); len(idxs) > 0 && idxs[0] == 0 {
+				return strings.ReplaceAll(r.String(), " ", "_")
+			}
+		}
 	}
 
 	return NotRecognizedEndpoint

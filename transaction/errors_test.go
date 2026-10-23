@@ -20,6 +20,23 @@ import (
 	"github.com/xmidt-org/sallust"
 )
 
+func TestCallerMessage(t *testing.T) {
+	plain := errors.New("plain")
+	assert.Equal(t, "plain", CallerMessage(plain), "a plain error is shown as it is")
+	assert.Equal(t, "plain", CallerMessage(NewCodedError(plain, 400)), "a coded error without a caller message is shown as it is")
+
+	cause := errors.New(`Post "http://scytale:6300/api/v3/device": context deadline exceeded`)
+	unavailable := NewXmidtUnavailableError(cause)
+	assert.Equal(t, http.StatusServiceUnavailable, unavailable.StatusCode())
+	assert.Equal(t, ErrXmidtUnavailable.Error(), CallerMessage(unavailable))
+	assert.Contains(t, unavailable.Error(), "scytale:6300", "the log keeps the cause")
+	require.ErrorIs(t, unavailable, cause)
+
+	// wrapping keeps the caller message reachable
+	wrapped := NewCodedError(fmt.Errorf("%w: %w", ErrClientClosedRequest, unavailable), StatusClientClosedRequest)
+	assert.Equal(t, ErrXmidtUnavailable.Error(), CallerMessage(wrapped))
+}
+
 func TestNewCodedError(t *testing.T) {
 	assert := assert.New(t)
 	var ce = NewCodedError(errors.New("test"), 500)

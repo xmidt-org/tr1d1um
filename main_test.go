@@ -360,6 +360,7 @@ type configValues struct {
 	TargetURL            string        `name:"targetURL"`
 	WRPSource            string        `name:"WRPSource"`
 	SupportedServices    []string      `name:"supportedServices"`
+	MaxRequestBodyBytes  int64         `name:"maxRequestBodyBytes"`
 }
 
 // TestDefaults checks the values the application is given when the
@@ -382,4 +383,5 @@ func TestDefaults(t *testing.T) {
 	assert.Equal(t, "localhost:6000", got.TargetURL)
 	assert.Equal(t, "dns:localhost", got.WRPSource)
 	assert.Empty(t, got.SupportedServices)
+	assert.Equal(t, int64(1<<20), got.MaxRequestBodyBytes)
 }
