@@ -60,6 +60,8 @@ type listedHook struct {
 	} `json:"matcher"`
 	Events     []string `json:"events"`
 	FailureURL string   `json:"failure_url,omitempty"`
+	// Duration is kept as sent: a number of nanoseconds on v2, a string on v3.
+	Duration json.RawMessage `json:"duration"`
 }
 
 // listHooks returns every webhook the token may see in the v1 schema.  A

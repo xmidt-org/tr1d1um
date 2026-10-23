@@ -73,6 +73,13 @@ func TestWebhookRegisterAndList(t *testing.T) {
 				assert.Equal(t, []string{mac}, found.Matcher.DeviceID)
 				assert.Equal(t, []string{"compliance-test"}, found.Events)
 				assert.Equal(t, listenerURL+"/failures", found.FailureURL)
+				// Both registrations last a minute.  v2 lists the duration as
+				// it always has, an integer of nanoseconds; v3 as a string.
+				if listVersion == "v2" {
+					assert.Equal(t, "60000000000", string(found.Duration), "v2 lists the duration as nanoseconds")
+				} else {
+					assert.Equal(t, `"1m0s"`, string(found.Duration), "v3 lists the duration as a string")
+				}
 			}
 		})
 	}

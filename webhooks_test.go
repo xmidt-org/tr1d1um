@@ -9,8 +9,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -133,6 +136,29 @@ func TestGetAllWebhooksHandler(t *testing.T) {
 		assert.NotContains(t, body, "argus:6600")
 		assert.Contains(t, body, "failed to list webhooks")
 	})
+}
+
+func TestGetAllWebhooksHandlerDurationByVersion(t *testing.T) {
+	m := v1Manifest("http://a.example/hook", "secret-a", "partner-a")
+	m.Registration.Duration = webhook.CustomDuration(5 * time.Minute)
+	h := newGetAllWebhooksHandler(fakeWebhookService{manifests: []schema.Manifest{m, v2Manifest("v2", "s", "partner-a")}}, true)
+
+	for version, want := range map[string]string{
+		"v2": `"duration":300000000000`, // nanoseconds, as before the webhook-schema upgrade
+		"v3": `"duration":"5m0s"`,
+	} {
+		t.Run(version, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/"+version+"/hooks", nil)
+			req = mux.SetURLVars(req, map[string]string{"version": version})
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			assert.Contains(t, rec.Body.String(), want)
+			assert.Contains(t, rec.Body.String(), `"canonical_name":"v2"`, "a v2-schema registration is listed as it is")
+			assert.Equal(t, 1, strings.Count(rec.Body.String(), `"duration"`), "one duration per v1 registration")
+		})
+	}
 }
 
 func TestSharesPartner(t *testing.T) {

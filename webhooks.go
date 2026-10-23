@@ -8,7 +8,9 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/ancla"
@@ -60,12 +62,35 @@ func newGetAllWebhooksHandler(s ancla.Service, disablePartnerIDs bool) http.Hand
 
 		streams := schema.SchemasToWRPEventStreams(visible)
 		obfuscateSecrets(streams)
+		if mux.Vars(request)["version"] == prevAPIVersion {
+			asV2Listing(streams)
+		}
 		encoder := json.NewEncoder(response)
 		encoder.SetEscapeHTML(false) // so <obfuscated> reads as written
 		if err := encoder.Encode(streams); err != nil {
 			sallust.Get(ctx).Error("failed to encode the webhook list", zap.Error(err))
 		}
 	})
+}
+
+// v2ListedRegistration is a v1 registration as /api/v2/hooks has always
+// listed it.  The webhook-schema upgrade made the duration a string such as
+// "5m0s"; v2 callers were given an integer of nanoseconds, as time.Duration
+// encodes, and keep getting one.  /api/v3/hooks lists the string, which is
+// the form a v3 registration gives the duration in.
+type v2ListedRegistration struct {
+	webhook.RegistrationV1
+	Duration time.Duration `json:"duration"`
+}
+
+// asV2Listing renders the v1 registrations in the v2 shape, in place.  A
+// registration in the v2 schema has no v2 shape and is listed as it is.
+func asV2Listing(streams []any) {
+	for i, v := range streams {
+		if r, ok := v.(webhook.RegistrationV1); ok {
+			streams[i] = v2ListedRegistration{RegistrationV1: r, Duration: time.Duration(r.Duration)}
+		}
+	}
 }
 
 // manifestPartners returns the partners a webhook was registered under.
