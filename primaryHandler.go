@@ -170,6 +170,54 @@ func v2WebhookValidators(c ancla.Config) ([]webhook.Option, error) {
 	return append(opts, requireReceiverURL{}), nil
 }
 
+// v3WebhookValidators are the validations a v3 registration gets: the
+// configured ones, applied by the shape of the registration.  A v3 body
+// may be a RegistrationV1 or a RegistrationV2, and four of the configured
+// validations exist only for a RegistrationV1: at least one event, the
+// device ID regex, the alternative URLs and until.  Those refuse a
+// RegistrationV2 as the wrong type instead of skipping it, so a
+// RegistrationV2 gets the set without them.
+func v3WebhookValidators(c ancla.Config) (webhook.Option, error) {
+	v1, err := c.Validation.BuildOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	v := c.Validation
+	v.BuildOpts.AtLeastOneEvent = false
+	v.BuildOpts.DeviceIDRegexMustCompile = false
+	v.BuildOpts.ProvideAlternativeURLValidator = false
+	v.BuildOpts.CheckUntil = false
+
+	v2, err := v.BuildOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	return byRegistration{
+		v1: append(v1, requireReceiverURL{}),
+		v2: append(v2, requireReceiverURL{}),
+	}, nil
+}
+
+// byRegistration validates a registration with the set built for its shape.
+type byRegistration struct {
+	v1 webhook.Validators
+	v2 webhook.Validators
+}
+
+func (b byRegistration) Validate(i any) error {
+	if _, ok := i.(*webhook.RegistrationV2); ok {
+		return b.v2.Validate(i)
+	}
+
+	return b.v1.Validate(i)
+}
+
+func (b byRegistration) String() string {
+	return fmt.Sprintf("byRegistration(v1: %v, v2: %v)", b.v1, b.v2)
+}
+
 // requireReceiverURL refuses a registration without a receiver URL.  The
 // URL is what a registration is keyed by, so one without is useless and
 // would collide with every other such registration.
@@ -205,14 +253,13 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 	// tr1d1um's own listing, which shows a caller only its partners' webhooks
 	out.GetAllWebhooksHandler = newGetAllWebhooksHandler(in.Service, in.WebhookConfig.DisablePartnerIDs)
 
-	builtValidators, err := in.WebhookConfig.Validation.BuildOptions()
+	v3Validator, err := v3WebhookValidators(in.WebhookConfig)
 	if err != nil {
 		return out, fmt.Errorf("failed to initialize webhook validators: %w", err)
 	}
-	builtValidators = append(builtValidators, requireReceiverURL{})
 
 	out.AddWebhookHandler = ancla.NewAddWRPEventStreamHandler(in.Service, ancla.HandlerConfig{
-		V:                 builtValidators,
+		V:                 []webhook.Option{v3Validator},
 		DisablePartnerIDs: in.WebhookConfig.DisablePartnerIDs,
 		GetLogger:         sallust.Get,
 	})

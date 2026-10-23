@@ -62,15 +62,43 @@ type listedHook struct {
 	FailureURL string   `json:"failure_url,omitempty"`
 }
 
-// listHooks returns every webhook the token may see.
+// listHooks returns every webhook the token may see in the v1 schema.  A
+// registration in the v2 schema (a canonical_name and a list of webhooks)
+// is listed alongside them and is left out here; TestWebhookV3RegistrationV2
+// reads those.
 func listHooks(t *testing.T, a *app, tok string, headers map[string]string) []listedHook {
+	t.Helper()
+	var hooks []listedHook
+	for _, raw := range listRawHooks(t, a, tok, headers) {
+		if v2schema(raw) {
+			continue
+		}
+		var h listedHook
+		require.NoError(t, json.Unmarshal(raw, &h), "GET /hooks entry: %s", raw)
+		hooks = append(hooks, h)
+	}
+
+	return hooks
+}
+
+// listRawHooks returns every entry of GET /hooks as the server sent it.
+func listRawHooks(t *testing.T, a *app, tok string, headers map[string]string) []json.RawMessage {
 	t.Helper()
 	resp := send(t, request{Method: "GET", URL: a.hooksURL("v3"), Token: tok, Headers: headers})
 	require.Equal(t, 200, resp.Status, "GET /hooks body: %s", resp.Body)
-	var hooks []listedHook
-	require.NoError(t, json.Unmarshal([]byte(resp.Body), &hooks), "GET /hooks body: %s", resp.Body)
+	var entries []json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(resp.Body), &entries), "GET /hooks body: %s", resp.Body)
 
-	return hooks
+	return entries
+}
+
+// v2schema reports whether a listed entry is in the v2 registration schema.
+func v2schema(raw json.RawMessage) bool {
+	var probe struct {
+		CanonicalName *string `json:"canonical_name"`
+	}
+
+	return json.Unmarshal(raw, &probe) == nil && probe.CanonicalName != nil
 }
 
 // findHook returns the listed webhook with the given URL, or nil.

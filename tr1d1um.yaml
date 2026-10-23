@@ -219,6 +219,9 @@ webhook:
     # one is on unless set to false here.  v3 registrations are rejected
     # when a validation fails; v2 registrations have a missing or invalid
     # duration or until repaired instead, with an X-Xmidt-Warning header.
+    # A registration in the v2 schema (webhooks, matcher, expires) has no
+    # events, device IDs, alternative URLs or until, so those four
+    # validations are not applied to it.
     # (Optional). The defaults are shown.
     # buildOpts:
     #   # the registration must name at least one event

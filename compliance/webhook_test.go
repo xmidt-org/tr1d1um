@@ -191,6 +191,98 @@ func TestWebhookV3Validation(t *testing.T) {
 	})
 }
 
+// TestWebhookV3RegistrationV2: v3 also takes the v2 registration schema,
+// which has no events, device IDs or until, and is checked by the rules
+// that apply to its shape.  A body is read as that schema when it has a
+// field only it has, such as canonical_name or webhooks.
+func TestWebhookV3RegistrationV2(t *testing.T) {
+	a := appFor(t, enforce)
+	tok := allToken(t)
+
+	body := func(t *testing.T, overrides map[string]any) string {
+		t.Helper()
+		b := map[string]any{
+			"canonical_name": "compliance-" + randomHex(6),
+			"webhooks": []map[string]any{{
+				"accept":        "application/json",
+				"secret":        "compliance-secret",
+				"receiver_urls": []string{uniqueListenerURL()},
+			}},
+			"matcher": []map[string]any{{"field": "destination", "regex": "compliance-test"}},
+			"expires": time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+		}
+		for k, v := range overrides {
+			if v == nil {
+				delete(b, k)
+				continue
+			}
+			b[k] = v
+		}
+		data, err := json.Marshal(b)
+		require.NoError(t, err)
+		return string(data)
+	}
+
+	t.Run("valid_without_matcher", func(t *testing.T) {
+		resp := register(t, a, "v3", tok, body(t, map[string]any{"matcher": nil}))
+		require.Equal(t, http.StatusOK, resp.Status, "body: %s", resp.Body)
+		assert.Equal(t, "Success", resp.message())
+	})
+
+	t.Run("valid_registration", func(t *testing.T) {
+		name := "compliance-" + randomHex(6)
+		resp := register(t, a, "v3", tok, body(t, map[string]any{"canonical_name": name}))
+		require.Equal(t, http.StatusOK, resp.Status, "body: %s", resp.Body)
+		assert.Equal(t, "Success", resp.message())
+
+		// It is listed in its own schema, with the secret obfuscated.
+		type listedV2 struct {
+			CanonicalName string `json:"canonical_name"`
+			Webhooks      []struct {
+				Secret       string   `json:"secret"`
+				ReceiverURLs []string `json:"receiver_urls"`
+			} `json:"webhooks"`
+		}
+		var listed *listedV2
+		for _, raw := range listRawHooks(t, a, tok, nil) {
+			if !v2schema(raw) {
+				continue
+			}
+			var entry listedV2
+			require.NoError(t, json.Unmarshal(raw, &entry), "GET /hooks entry: %s", raw)
+			if entry.CanonicalName == name {
+				listed = &entry
+			}
+		}
+		require.NotNil(t, listed, "the registration should be listed by its canonical name")
+		require.Len(t, listed.Webhooks, 1)
+		assert.Equal(t, "<obfuscated>", listed.Webhooks[0].Secret)
+		assert.Len(t, listed.Webhooks[0].ReceiverURLs, 1)
+	})
+
+	rejected := []struct {
+		name      string
+		overrides map[string]any
+	}{
+		{name: "expired", overrides: map[string]any{"expires": "2000-01-01T00:00:00Z"}},
+		{name: "no_expiry", overrides: map[string]any{"expires": nil}},
+		{name: "invalid_receiver_url", overrides: map[string]any{"webhooks": []map[string]any{{"receiver_urls": []string{"not-a-url"}}}}},
+		{name: "no_receiver_url", overrides: map[string]any{"webhooks": []map[string]any{{"accept": "application/json"}}}},
+		{name: "invalid_failure_url", overrides: map[string]any{"failure_url": "not-a-url"}},
+		{name: "invalid_matcher_regex", overrides: map[string]any{"matcher": []map[string]any{{"field": "source", "regex": "("}}}},
+		{name: "wrong_field_type", overrides: map[string]any{"webhooks": "not-a-list"}},
+	}
+
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := register(t, a, "v3", tok, body(t, tc.overrides))
+			assert.Equal(t, http.StatusBadRequest, resp.Status, "body: %s", resp.Body)
+			assert.NotEmpty(t, resp.message(), "the body should say what was wrong: %s", resp.Body)
+			assertNoLeak(t, resp.Body)
+		})
+	}
+}
+
 // TestWebhookLifecycle: defaults, overwrite-by-URL and expiry.
 func TestWebhookLifecycle(t *testing.T) {
 	a := appFor(t, enforce)

@@ -250,3 +250,64 @@ func TestV2WebhookValidators(t *testing.T) {
 	_, err = v2WebhookValidators(cfg)
 	require.Error(t, err)
 }
+
+func TestV3WebhookValidators(t *testing.T) {
+	cfg := ancla.Config{Validation: schema.SchemaURLValidatorConfig{
+		URL:    schema.URLVConfig{Schemes: []string{"http", "https"}},
+		Domain: schema.DomainVConfig{AllowSpecialUseDomains: true},
+		TTL:    schema.TTLVConfig{Max: time.Minute},
+		BuildOpts: schema.BuildOptions{
+			AtLeastOneEvent:                true,
+			EventRegexMustCompile:          true,
+			DeviceIDRegexMustCompile:       true,
+			ValidateRegistrationDuration:   true,
+			ProvideReceiverURLValidator:    true,
+			ProvideFailureURLValidator:     true,
+			ProvideAlternativeURLValidator: true,
+			CheckUntil:                     true,
+		},
+	}}
+
+	opt, err := v3WebhookValidators(cfg)
+	require.NoError(t, err)
+	assert.Contains(t, opt.String(), "requireReceiverURL()")
+
+	t.Run("v1", func(t *testing.T) {
+		var r webhook.RegistrationV1
+		r.Config.ReceiverURL = "http://listener.example.test/events"
+		r.Events = []string{"device-status"}
+		r.Duration = webhook.CustomDuration(30 * time.Second)
+		require.NoError(t, opt.Validate(&r))
+
+		r.Events = nil
+		err := opt.Validate(&r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot have zero events")
+	})
+
+	t.Run("v2 gets only the validations that fit its shape", func(t *testing.T) {
+		r := webhook.RegistrationV2{
+			CanonicalName: "test",
+			Webhooks:      []webhook.Webhook{{ReceiverURLs: []string{"http://listener.example.test/events"}}},
+			Expires:       time.Now().Add(30 * time.Second),
+		}
+		require.NoError(t, opt.Validate(&r))
+
+		r.Expires = time.Time{}
+		err := opt.Validate(&r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already expired")
+		assert.NotContains(t, err.Error(), "invalid type", "no validation refuses the v2 shape as the wrong type")
+
+		r.Webhooks[0].ReceiverURLs = nil
+		require.ErrorIs(t, opt.Validate(&r), errNoReceiverURL)
+	})
+
+	t.Run("unknown type", func(t *testing.T) {
+		require.Error(t, opt.Validate("not a registration"))
+	})
+
+	cfg.Validation.IP.ForbiddenSubnets = []string{"not a subnet"}
+	_, err = v3WebhookValidators(cfg)
+	require.Error(t, err)
+}
