@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,6 +23,8 @@ import (
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
 	webhook "github.com/xmidt-org/webhook-schema"
+
+	"github.com/xmidt-org/tr1d1um/transaction"
 )
 
 // temporaryError is an error that reports itself as temporary, as a network
@@ -310,4 +314,36 @@ func TestV3WebhookValidators(t *testing.T) {
 	cfg.Validation.IP.ForbiddenSubnets = []string{"not a subnet"}
 	_, err = v3WebhookValidators(cfg)
 	require.Error(t, err)
+}
+
+// TestNewRetryingClient_BodyReadableAfterDo checks that a response body can be
+// read once Do has returned.  Before retry v0.0.9, the retrying client bound
+// each attempt to a context the runner canceled as Do returned, which failed
+// the read of any body not yet buffered with "context canceled".
+func TestNewRetryingClient_BodyReadableAfterDo(t *testing.T) {
+	const size = 209220
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		time.Sleep(20 * time.Millisecond)
+		_, _ = w.Write(bytes.Repeat([]byte("x"), size))
+	}))
+	defer srv.Close()
+
+	for _, retries := range []int{0, 1, 2} {
+		t.Run(strconv.Itoa(retries), func(t *testing.T) {
+			counter := prometheus.NewCounter(prometheus.CounterOpts{Name: "test_retries"})
+			client, err := newRetryingClient(zap.NewNop(), retries, time.Millisecond, counter, &http.Client{})
+			require.NoError(t, err)
+
+			tr := transaction.New(&transaction.Options{Do: client.Do, RequestTimeout: 10 * time.Second})
+			req, err := http.NewRequest(http.MethodPost, srv.URL, bytes.NewBufferString("hi"))
+			require.NoError(t, err)
+
+			resp, err := tr.Transact(req)
+			require.NoError(t, err)
+			assert.Len(t, resp.Body, size)
+		})
+	}
 }

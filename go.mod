@@ -22,7 +22,7 @@ require (
 	github.com/xmidt-org/candlelight v0.4.2
 	github.com/xmidt-org/clortho v0.5.1
 	github.com/xmidt-org/httpaux v0.4.5
-	github.com/xmidt-org/retry v0.0.8
+	github.com/xmidt-org/retry v0.0.9
 	github.com/xmidt-org/sallust v0.2.10
 	github.com/xmidt-org/tokenrate v0.1.0
 	github.com/xmidt-org/touchstone v0.1.8
