@@ -137,7 +137,10 @@ logging:
 ##############################################################################
 # parameterLogging controls which TR-181 parameter values are included in log
 # output.  Parameter names are always logged; this controls only values.
-# Separate rules can be configured for GET and PATCH operations.
+# Separate rules can be configured for GET and PATCH operations.  GET values
+# are logged from the device's response; PATCH values are logged from the
+# request.  Both appear as "parameterValues" on the request's log lines.
+# GET_ATTRIBUTES requests have no values to log.
 #
 # Each section supports two modes:
 #   - "never"  (default) -- log no values, except parameters matching the

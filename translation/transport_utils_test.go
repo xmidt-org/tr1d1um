@@ -609,3 +609,172 @@ func TestExtractParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeLoggingGetValues(t *testing.T) {
+	const (
+		paramUpTime   = "Device.DeviceInfo.UpTime"
+		paramModel    = "Device.DeviceInfo.ModelName"
+		paramPassword = "Device.Security.Password"
+	)
+
+	body := func(status int, payload string) *transaction.XmidtResponse {
+		return &transaction.XmidtResponse{
+			Code: status,
+			Body: wrp.MustEncode(&wrp.Message{
+				Type:    wrp.SimpleRequestResponseMessageType,
+				Payload: []byte(payload),
+			}, wrp.Msgpack, wrp.NoStandardValidation()),
+		}
+	}
+
+	const getPayload = `{"statusCode":200,"parameters":[` +
+		`{"name":"Device.DeviceInfo.UpTime","value":"1234","dataType":2,"parameterCount":1,"message":"Success"},` +
+		`{"name":"Device.DeviceInfo.ModelName","value":"abc","dataType":0,"parameterCount":1,"message":"Success"},` +
+		`{"name":"Device.Security.Password","value":"secret","dataType":0,"parameterCount":1,"message":"Success"}]}`
+
+	deviceInfo := paramfilter.NewFilters(paramfilter.Config{
+		Get: paramfilter.FilterConfig{
+			Mode:   paramfilter.ModeNever,
+			Except: []string{"Device.DeviceInfo.**"},
+		},
+	})
+
+	tests := []struct {
+		name    string
+		filters *paramfilter.Filters
+		method  string
+		target  string
+		resp    *transaction.XmidtResponse
+		want    map[string]any // nil: no parameterValues logged
+	}{
+		{
+			name:    "never with exception logs only the matched values",
+			filters: deviceInfo,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.,Device.Security.Password",
+			resp:    body(http.StatusOK, getPayload),
+			want:    map[string]any{paramUpTime: "1234", paramModel: "abc"},
+		},
+		{
+			name: "always logs every value",
+			filters: paramfilter.NewFilters(paramfilter.Config{
+				Get: paramfilter.FilterConfig{Mode: paramfilter.ModeAlways},
+			}),
+			method: http.MethodGet,
+			target: "http://localhost?names=Device.DeviceInfo.",
+			resp:   body(http.StatusOK, getPayload),
+			want:   map[string]any{paramUpTime: "1234", paramModel: "abc", paramPassword: "secret"},
+		},
+		{
+			name:    "default config logs no values",
+			filters: paramfilter.NewFilters(paramfilter.Config{}),
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.",
+			resp:    body(http.StatusOK, getPayload),
+		},
+		{
+			name:    "nil filters log no values",
+			filters: nil,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.",
+			resp:    body(http.StatusOK, getPayload),
+		},
+		{
+			name:    "only the get filter applies to a get",
+			filters: paramfilter.NewFilters(paramfilter.Config{Patch: paramfilter.FilterConfig{Mode: paramfilter.ModeAlways}}),
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.",
+			resp:    body(http.StatusOK, getPayload),
+		},
+		{
+			name:    "get attributes logs no values",
+			filters: deviceInfo,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.UpTime&attributes=notify",
+			resp:    body(http.StatusOK, getPayload),
+		},
+		{
+			name:    "a patch response is not logged by the get filter",
+			filters: deviceInfo,
+			method:  http.MethodPatch,
+			target:  "http://localhost",
+			resp:    body(http.StatusOK, getPayload),
+		},
+		{
+			name:    "a failed get logs no values",
+			filters: deviceInfo,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.",
+			resp:    body(http.StatusServiceUnavailable, getPayload),
+		},
+		{
+			name:    "a payload that is not parameters logs no values",
+			filters: deviceInfo,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.",
+			resp:    body(http.StatusOK, `not json`),
+		},
+		{
+			name:    "a parameter without a value is skipped",
+			filters: deviceInfo,
+			method:  http.MethodGet,
+			target:  "http://localhost?names=Device.DeviceInfo.UpTime",
+			resp:    body(http.StatusOK, `{"statusCode":520,"parameters":[{"name":"Device.DeviceInfo.UpTime","message":"Invalid"}]}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, logs := newObservedContext()
+
+			var r *http.Request
+			if tt.method == http.MethodPatch {
+				r = httptest.NewRequest(tt.method, tt.target,
+					strings.NewReader(`{"parameters":[{"name":"Device.WiFi.SSID","value":"x","dataType":0}]}`))
+			} else {
+				r = httptest.NewRequest(tt.method, tt.target, nil)
+			}
+			ctx = captureWDMPParameters(tt.filters)(ctx, r)
+			logs.TakeAll()
+
+			rec := httptest.NewRecorder()
+			err := encodeLoggingGetValues(encodeResponse)(ctx, rec, tt.resp)
+			require.NoError(t, err)
+
+			// The caller still gets exactly what the device answered.
+			if tt.resp.Code == http.StatusOK {
+				assert.Equal(t, getPayloadOrRaw(tt.resp), rec.Body.String())
+			}
+
+			// The values ride on the response line the finalizer writes.
+			logs.TakeAll()
+			finalize := finalizeLoggingGetValues(transaction.Log(nil))
+			finalize(ctx, rec.Code, r)
+
+			var got []map[string]any
+			for _, e := range logs.FilterMessage("response").All() {
+				for _, f := range e.Context {
+					if f.Key == "parameterValues" {
+						enc := zapcore.NewMapObjectEncoder()
+						f.AddTo(enc)
+						got = append(got, enc.Fields["parameterValues"].(map[string]any))
+					}
+				}
+			}
+
+			if tt.want == nil {
+				assert.Empty(t, got)
+				return
+			}
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.want, got[0])
+		})
+	}
+}
+
+// getPayloadOrRaw is the payload carried by a device response.
+func getPayloadOrRaw(resp *transaction.XmidtResponse) string {
+	var m wrp.Message
+	_ = wrp.NewDecoderBytes(resp.Body, wrp.Msgpack).Decode(&m, wrp.NoStandardValidation())
+	return string(m.Payload)
+}
