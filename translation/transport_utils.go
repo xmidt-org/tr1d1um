@@ -161,7 +161,15 @@ func captureWDMPParameters(filters *paramfilter.Filters) transaction.RequestFunc
 				zap.String("command", CommandGet),
 				zap.Strings("parameters", allNames),
 			)
-			return sallust.With(ctx, logger)
+			ctx = sallust.With(ctx, logger)
+
+			// The values of a GET are in the device's response, so the
+			// filter is kept for the encoder to apply.  GET_ATTRIBUTES
+			// answers with attributes, not values.
+			if r.FormValue("attributes") == "" {
+				ctx = context.WithValue(ctx, getValuesKey{}, &getValues{filter: filters.GetFilter()})
+			}
+			return ctx
 
 		case http.MethodPatch:
 			bodyBytes, _ := io.ReadAll(r.Body)
@@ -290,4 +298,61 @@ func getParamNames(params []setParam) (paramNames []string) {
 
 func contains(i string, elements []string) bool {
 	return slices.Contains(elements, i)
+}
+
+// getValuesKey is the context key under which captureWDMPParameters leaves
+// a getValues for a request whose response carries parameter values.
+type getValuesKey struct{}
+
+// getValues carries the GET filter to the encoder, and the values it lets
+// through to the finalizer.  The encoder cannot hand the finalizer a new
+// context, so they share this.
+type getValues struct {
+	filter *paramfilter.Filter
+	values map[string]any
+}
+
+// encodeLoggingGetValues wraps next so that the values in a successful GET
+// response are collected, as far as the GET filter allows, for
+// finalizeLoggingGetValues to log.  The response the caller receives is
+// next's, unchanged.
+func encodeLoggingGetValues(next func(context.Context, http.ResponseWriter, *transaction.XmidtResponse) error) func(context.Context, http.ResponseWriter, *transaction.XmidtResponse) error {
+	return func(ctx context.Context, w http.ResponseWriter, resp *transaction.XmidtResponse) error {
+		if gv, ok := ctx.Value(getValuesKey{}).(*getValues); ok && gv.filter != nil && resp.Code == http.StatusOK {
+			gv.values = getResponseValues(resp.Body, gv.filter)
+		}
+
+		return next(ctx, w, resp)
+	}
+}
+
+// getResponseValues returns the name -> value pairs of a device's GET
+// response that the filter allows to be logged.  A response that cannot be
+// read yields none; encodeResponse reports that to the caller.
+func getResponseValues(body []byte, f *paramfilter.Filter) map[string]any {
+	msg := new(wrp.Message)
+	if err := wrp.NewDecoderBytes(body, wrp.Msgpack).Decode(msg, wrp.NoStandardValidation()); err != nil {
+		return nil
+	}
+
+	var payload struct {
+		Parameters []setParam `json:"parameters"`
+	}
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return nil
+	}
+
+	return filterParamValues(payload.Parameters, f)
+}
+
+// finalizeLoggingGetValues wraps next so that the response line carries the
+// values encodeLoggingGetValues collected.
+func finalizeLoggingGetValues(next transaction.FinalizerFunc) transaction.FinalizerFunc {
+	return func(ctx context.Context, code int, r *http.Request) {
+		if gv, ok := ctx.Value(getValuesKey{}).(*getValues); ok && len(gv.values) > 0 {
+			ctx = sallust.With(ctx, sallust.Get(ctx).With(zap.Any("parameterValues", gv.values)))
+		}
+
+		next(ctx, code, r)
+	}
 }
