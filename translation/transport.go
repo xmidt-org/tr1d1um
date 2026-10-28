@@ -74,9 +74,9 @@ func ConfigHandler(c *Options) {
 		Before:      captureWDMPParameters(c.ParamFilters),
 		Decode:      decodeValidServiceRequest(c.ValidServices, decodeRequest),
 		Serve:       makeTranslationEndpoint(c.S),
-		Encode:      encodeResponse,
+		Encode:      encodeLoggingGetValues(encodeResponse),
 		EncodeError: transaction.ErrorLogEncoder(sallust.Get, encodeError),
-		Finalize:    transaction.Log(c.ReducedLoggingResponseCodes),
+		Finalize:    finalizeLoggingGetValues(transaction.Log(c.ReducedLoggingResponseCodes)),
 	}
 
 	welcome := transaction.Welcome(c.BearerFingerprint)
