@@ -10,10 +10,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+
 	"github.com/xmidt-org/ancla"
 	"github.com/xmidt-org/ancla/schema"
 	"github.com/xmidt-org/tr1d1um/internal/viperfx"
-	"go.uber.org/fx"
 )
 
 func TestNewOutputFormat(t *testing.T) {
