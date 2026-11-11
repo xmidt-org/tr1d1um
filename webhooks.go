@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -33,9 +34,11 @@ const obfuscatedSecretValue = "<obfuscated>" //nolint:gosec // not a credential,
 // registered under a partner the caller acts for, as the token's claim or,
 // for a basic credential, the partner header names.  A caller sees nothing
 // of another partner's, whatever headers it sends.  With partner IDs
-// disabled in the webhook configuration every webhook is listed.  Secrets
-// are obfuscated.
-func newGetAllWebhooksHandler(s ancla.Service, disablePartnerIDs bool) http.Handler {
+// disabled in the webhook configuration every webhook is listed.  With
+// filterByOwner only the webhooks the caller itself registered are
+// considered, and a caller with no principal is refused.  Secrets are
+// obfuscated.
+func newGetAllWebhooksHandler(s *ancla.Registry, disablePartnerIDs, filterByOwner bool) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		ctx := request.Context()
 		response.Header().Set("Content-Type", "application/json")
@@ -46,7 +49,19 @@ func newGetAllWebhooksHandler(s ancla.Service, disablePartnerIDs bool) http.Hand
 			return
 		}
 
-		manifests, err := s.GetAll(ctx)
+		list := s.GetAll
+		if filterByOwner {
+			owner, _ := anclaauth.GetPrincipal(ctx)
+			list = func(ctx context.Context) ([]schema.Manifest, error) {
+				return s.GetAllByOwner(ctx, owner)
+			}
+			if owner == "" {
+				writeWebhookError(response, http.StatusUnauthorized, ancla.ErrNoOwner)
+				return
+			}
+		}
+
+		manifests, err := list(ctx)
 		if err != nil {
 			sallust.Get(ctx).Error("failed to list webhooks", zap.Error(err))
 			writeWebhookError(response, http.StatusInternalServerError, errWebhookListFailed)

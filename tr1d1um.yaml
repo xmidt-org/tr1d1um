@@ -178,6 +178,18 @@ webhook:
   # Defaults to 'false'.
   disablePartnerIDs: false
 
+  # outputFormat selects the layout a v1 webhook is written to the store in.
+  #   legacy: readable by every release, including ancla v0.3.12 readers.
+  #   v1:     not readable by v0.3.12 readers; upgrade them (caduceus) first.
+  # Defaults to 'legacy'.
+  outputFormat: legacy
+
+  # filterByOwner, if true, returns to a caller only the webhooks it
+  # registered itself (a caller with no principal is refused with a 401).
+  # If false, a caller sees every webhook of the partners it acts for.
+  # Defaults to 'false'.
+  filterByOwner: false
+
   # validation provides options for validating the webhook's URL and TTL
   # related fields. Some validation happens regardless of the configuration:
   # URLs must be a valid URL structure, the Matcher.DeviceID values must

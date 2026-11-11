@@ -27,6 +27,7 @@ import (
 	"github.com/xmidt-org/tr1d1um/stat"
 	"github.com/xmidt-org/tr1d1um/transaction"
 	"github.com/xmidt-org/tr1d1um/translation"
+	tr1webhook "github.com/xmidt-org/tr1d1um/webhook"
 	"github.com/xmidt-org/webhook-schema"
 	"github.com/xmidt-org/wrp-go/v5"
 )
@@ -50,7 +51,8 @@ type provideWebhookHandlersIn struct {
 	V             *viper.Viper
 	WebhookConfig ancla.Config
 	Logger        *zap.Logger
-	Service       ancla.Service
+	Service       *ancla.Registry
+	Options       tr1webhook.Config
 	Tracing       candlelight.Tracing
 	Tf            *touchstone.Factory
 }
@@ -251,7 +253,7 @@ func provideWebhookHandlers(in provideWebhookHandlersIn) (out provideWebhookHand
 		return
 	}
 	// tr1d1um's own listing, which shows a caller only its partners' webhooks
-	out.GetAllWebhooksHandler = newGetAllWebhooksHandler(in.Service, in.WebhookConfig.DisablePartnerIDs)
+	out.GetAllWebhooksHandler = newGetAllWebhooksHandler(in.Service, in.WebhookConfig.DisablePartnerIDs, in.Options.FilterByOwner)
 
 	v3Validator, err := v3WebhookValidators(in.WebhookConfig)
 	if err != nil {
