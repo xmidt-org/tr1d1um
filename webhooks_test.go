@@ -17,21 +17,61 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xmidt-org/ancla"
 	anclaauth "github.com/xmidt-org/ancla/auth"
+	"github.com/xmidt-org/ancla/chrysom"
+	"github.com/xmidt-org/ancla/model"
 	"github.com/xmidt-org/ancla/schema"
 	webhook "github.com/xmidt-org/webhook-schema"
 )
 
-// fakeWebhookService is an ancla.Service with a fixed list.
-type fakeWebhookService struct {
-	manifests []schema.Manifest
-	err       error
+// fakeStore is a chrysom.PushReader holding items by owner.
+type fakeStore struct {
+	items map[string]chrysom.Items
+	err   error
 }
 
-func (f fakeWebhookService) Add(context.Context, string, schema.Manifest) error { return nil }
+func (f fakeStore) PushItem(context.Context, string, model.Item) (chrysom.PushResult, error) {
+	return chrysom.CreatedPushResult, nil
+}
 
-func (f fakeWebhookService) GetAll(context.Context) ([]schema.Manifest, error) {
-	return f.manifests, f.err
+func (f fakeStore) RemoveItem(context.Context, string, string) (model.Item, error) {
+	return model.Item{}, nil
+}
+
+func (f fakeStore) GetItems(_ context.Context, owner string) (chrysom.Items, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if owner != "" {
+		return f.items[owner], nil
+	}
+	var all chrysom.Items
+	for _, items := range f.items {
+		all = append(all, items...)
+	}
+
+	return all, nil
+}
+
+// fakeRegistry is a registry over manifests all owned by "owner-a".
+func fakeRegistry(t *testing.T, manifests []schema.Manifest, err error) *ancla.Registry {
+	t.Helper()
+	return fakeRegistryOwned(t, map[string][]schema.Manifest{"owner-a": manifests}, err)
+}
+
+func fakeRegistryOwned(t *testing.T, byOwner map[string][]schema.Manifest, err error) *ancla.Registry {
+	t.Helper()
+	store := fakeStore{items: map[string]chrysom.Items{}, err: err}
+	for owner, manifests := range byOwner {
+		for _, m := range manifests {
+			item, cerr := schema.SchemaToItemFormat(time.Now, m, schema.OutputLegacy)
+			require.NoError(t, cerr)
+			store.items[owner] = append(store.items[owner], item)
+		}
+	}
+
+	return ancla.NewRegistry(store)
 }
 
 func v1Manifest(url, secret string, partners ...string) *schema.ManifestV1 {
@@ -92,7 +132,7 @@ func TestGetAllWebhooksHandler(t *testing.T) {
 		return urls
 	}
 
-	h := newGetAllWebhooksHandler(fakeWebhookService{manifests: manifests}, false)
+	h := newGetAllWebhooksHandler(fakeRegistry(t, manifests, nil), false, false)
 
 	t.Run("a caller sees only its partners' webhooks", func(t *testing.T) {
 		code, listed, body := list(t, h, []string{"partner-a"}, true)
@@ -122,7 +162,7 @@ func TestGetAllWebhooksHandler(t *testing.T) {
 	})
 
 	t.Run("partner ids disabled lists everything", func(t *testing.T) {
-		all := newGetAllWebhooksHandler(fakeWebhookService{manifests: manifests}, true)
+		all := newGetAllWebhooksHandler(fakeRegistry(t, manifests, nil), true, false)
 		code, listed, body := list(t, all, nil, false)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Len(t, listed, len(manifests))
@@ -130,7 +170,7 @@ func TestGetAllWebhooksHandler(t *testing.T) {
 	})
 
 	t.Run("a store failure is a 500 without the cause", func(t *testing.T) {
-		failing := newGetAllWebhooksHandler(fakeWebhookService{err: errors.New("argus at http://argus:6600 is down")}, false)
+		failing := newGetAllWebhooksHandler(fakeRegistry(t, nil, errors.New("argus at http://argus:6600 is down")), false, false)
 		code, _, body := list(t, failing, []string{"partner-a"}, true)
 		assert.Equal(t, http.StatusInternalServerError, code)
 		assert.NotContains(t, body, "argus:6600")
@@ -138,10 +178,42 @@ func TestGetAllWebhooksHandler(t *testing.T) {
 	})
 }
 
+func TestGetAllWebhooksHandlerFilterByOwner(t *testing.T) {
+	reg := fakeRegistryOwned(t, map[string][]schema.Manifest{
+		"owner-a": {v1Manifest("http://a.example/hook", "s", "partner-a")},
+		"owner-b": {v1Manifest("http://b.example/hook", "s", "partner-a")},
+	}, nil)
+	h := newGetAllWebhooksHandler(reg, true, true)
+
+	get := func(principal string) (int, string) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v3/hooks", nil)
+		if principal != "" {
+			req = req.WithContext(anclaauth.SetPrincipal(req.Context(), principal))
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		return rec.Code, rec.Body.String()
+	}
+
+	t.Run("a caller sees only its own", func(t *testing.T) {
+		code, body := get("owner-a")
+		assert.Equal(t, http.StatusOK, code)
+		assert.Contains(t, body, "a.example")
+		assert.NotContains(t, body, "b.example")
+	})
+
+	t.Run("no principal is refused, never listing everyone's", func(t *testing.T) {
+		code, body := get("")
+		assert.Equal(t, http.StatusUnauthorized, code)
+		assert.NotContains(t, body, "example/hook")
+	})
+}
+
 func TestGetAllWebhooksHandlerDurationByVersion(t *testing.T) {
 	m := v1Manifest("http://a.example/hook", "secret-a", "partner-a")
 	m.Registration.Duration = webhook.CustomDuration(5 * time.Minute)
-	h := newGetAllWebhooksHandler(fakeWebhookService{manifests: []schema.Manifest{m, v2Manifest("v2", "s", "partner-a")}}, true)
+	h := newGetAllWebhooksHandler(fakeRegistry(t, []schema.Manifest{m, v2Manifest("v2", "s", "partner-a")}, nil), true, false)
 
 	for version, want := range map[string]string{
 		"v2": `"duration":300000000000`, // nanoseconds, as before the webhook-schema upgrade

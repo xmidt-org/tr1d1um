@@ -4,6 +4,8 @@
 package webhook
 
 import (
+	"fmt"
+
 	"go.uber.org/fx"
 
 	"github.com/xmidt-org/ancla"
@@ -35,12 +37,36 @@ func defaultConfig() ancla.Config {
 	}
 }
 
+// Config holds the webhook settings tr1d1um adds to ancla's own.
+type Config struct {
+	// OutputFormat is the layout a v1 registration is written in: "legacy"
+	// (the default) is readable by every release; "v1" is not readable by
+	// ancla v0.3.12 readers, so upgrade them (caduceus) first.
+	OutputFormat string
+
+	// FilterByOwner, if true, lists to a caller only the webhooks it
+	// registered itself, rather than every webhook its partners may see.
+	FilterByOwner bool
+}
+
+// NewOutputFormat parses the configured output format.
+func NewOutputFormat(c Config) (schema.OutputFormat, error) {
+	var f schema.OutputFormat
+	if err := f.UnmarshalText([]byte(c.OutputFormat)); err != nil {
+		return f, fmt.Errorf("invalid webhook.outputFormat: %w", err)
+	}
+
+	return f, nil
+}
+
 func Provide() fx.Option {
 	return fx.Module(
 		module,
 		anclafx.Provide(),
 		fx.Provide(
 			viperfx.Unmarshal("webhook", defaultConfig()),
+			viperfx.Unmarshal("webhook", Config{}),
+			NewOutputFormat,
 			viperfx.Unmarshal("webhook.client", clientConfig{}),
 			viperfx.Unmarshal("webhook.listener", listnerConfig{}),
 			fx.Annotate(NewClientOpts, fx.ResultTags(`group:"client_options,flatten"`)),
