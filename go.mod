@@ -17,7 +17,7 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.9.0
 	github.com/stretchr/testify v1.12.1
 	github.com/xmidt-org/ancla v0.7.0
-	github.com/xmidt-org/arrange v0.5.10
+	github.com/xmidt-org/arrange v0.5.11
 	github.com/xmidt-org/bascule v1.8.4
 	github.com/xmidt-org/candlelight v0.4.2
 	github.com/xmidt-org/clortho v0.5.2
