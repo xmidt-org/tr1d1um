@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/spiffe/go-spiffe/v2 v2.9.0
 	github.com/stretchr/testify v1.12.1
-	github.com/xmidt-org/ancla v0.7.0
+	github.com/xmidt-org/ancla v0.7.1
 	github.com/xmidt-org/arrange v0.5.11
 	github.com/xmidt-org/bascule v1.8.4
 	github.com/xmidt-org/candlelight v0.4.2
@@ -68,7 +68,7 @@ require (
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/xmidt-org/chronon v0.1.15 // indirect
 	github.com/xmidt-org/eventor v1.0.51 // indirect
-	github.com/xmidt-org/urlegit v0.1.31 // indirect
+	github.com/xmidt-org/urlegit v0.1.32 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect
